@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export type ProducerProfileDetails = {
   propertyName: string;
   responsibleName: string;
+  cnpj: string;
   phone: string;
   location: string;
   products: string[];
@@ -15,6 +16,7 @@ const PRODUCER_PROFILE_STORAGE_KEY = "origem-conecta-producer-profile";
 const DEFAULT_PRODUCER_PROFILE: ProducerProfileDetails = {
   propertyName: "Ramy Pitayas",
   responsibleName: "Ramy Pitayas",
+  cnpj: "",
   phone: "",
   location: "Queiroz, SP",
   products: ["Pitaya Roxa", "Pitaya Amarela", "Pitaya Branca"],
@@ -27,12 +29,14 @@ type RemoteProducerProfile = {
     | {
         nome_propriedade?: string | null;
         responsavel?: string | null;
+        cnpj?: string | null;
         localizacao?: string | null;
         categorias_atendidas?: string[] | null;
       }
     | Array<{
         nome_propriedade?: string | null;
         responsavel?: string | null;
+        cnpj?: string | null;
         localizacao?: string | null;
         categorias_atendidas?: string[] | null;
       }>
@@ -55,6 +59,7 @@ function mapRemoteProfile(row: RemoteProducerProfile): ProducerProfileDetails {
   return {
     propertyName: producer?.nome_propriedade || row.nome || DEFAULT_PRODUCER_PROFILE.propertyName,
     responsibleName: producer?.responsavel || row.nome || DEFAULT_PRODUCER_PROFILE.responsibleName,
+    cnpj: producer?.cnpj || "",
     phone: row.telefone || "",
     location: producer?.localizacao || DEFAULT_PRODUCER_PROFILE.location,
     products: producer?.categorias_atendidas ?? DEFAULT_PRODUCER_PROFILE.products,
@@ -66,7 +71,7 @@ async function loadRemoteProducerProfile(profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "nome,telefone,producers(nome_propriedade,responsavel,localizacao,categorias_atendidas)",
+      "nome,telefone,producers(nome_propriedade,responsavel,cnpj,localizacao,categorias_atendidas)",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -91,6 +96,7 @@ async function updateRemoteProducerProfile(profileId: string, details: ProducerP
     .update({
       nome_propriedade: details.propertyName,
       responsavel: details.responsibleName,
+      cnpj: details.cnpj || null,
       localizacao: details.location || null,
       categorias_atendidas: details.products,
     })

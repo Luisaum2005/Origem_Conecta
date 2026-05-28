@@ -34,6 +34,7 @@ function SignupProducer() {
         producer: {
           nomePropriedade: String(form.get("nomePropriedade") ?? ""),
           responsavel: String(form.get("responsavel") ?? ""),
+          cnpj: String(form.get("cnpj") ?? ""),
           produtos: picked,
         },
       });
@@ -68,6 +69,7 @@ function SignupProducer() {
             required
           />
           <Field name="responsavel" label="Responsável" placeholder="Nome completo" required />
+          <Field name="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" required />
         </FormSection>
 
         <FormSection title="Contato">

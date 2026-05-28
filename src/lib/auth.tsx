@@ -33,6 +33,7 @@ type SignUpInput = {
   producer?: {
     nomePropriedade: string;
     responsavel: string;
+    cnpj: string;
     produtos: string[];
   };
 };
@@ -231,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             profile_id: profileData.id,
             nome_propriedade: input.producer.nomePropriedade,
             responsavel: input.producer.responsavel,
+            cnpj: input.producer.cnpj,
             categorias_atendidas: input.producer.produtos,
           });
           if (producerError) throw producerError;

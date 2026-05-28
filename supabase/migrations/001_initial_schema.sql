@@ -20,6 +20,7 @@ create table public.producers (
   profile_id uuid references public.profiles(id) on delete cascade,
   nome_propriedade text not null,
   responsavel text not null,
+  cnpj text,
   localizacao text,
   categorias_atendidas text[] not null default '{}',
   score_confiabilidade numeric(3,2) not null default 0,

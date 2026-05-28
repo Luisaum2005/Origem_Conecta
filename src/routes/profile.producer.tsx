@@ -338,6 +338,7 @@ function ProducerDetailsPanel({
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Mini label="Propriedade" value={details.propertyName || "Nao informado"} />
             <Mini label="Responsavel" value={details.responsibleName || "Nao informado"} />
+            <Mini label="CNPJ" value={details.cnpj || "Nao informado"} />
             <Mini label="Telefone" value={details.phone || "Nao informado"} />
             <Mini label="Localizacao" value={details.location || "Nao informado"} />
           </dl>
@@ -389,6 +390,13 @@ function ProducerDetailsPanel({
               label="Responsavel"
               value={draft.responsibleName}
               onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
+            />
+            <TextField
+              icon={Store}
+              label="CNPJ"
+              value={draft.cnpj}
+              onChange={(cnpj) => setDraft({ ...draft, cnpj })}
+              placeholder="00.000.000/0000-00"
             />
             <TextField
               icon={Phone}
