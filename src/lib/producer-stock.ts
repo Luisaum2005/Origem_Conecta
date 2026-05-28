@@ -1,0 +1,353 @@
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+
+export type StockStatus = "ativo" | "pausado";
+
+export type ProducerStockItem = {
+  id: string;
+  producerId?: string;
+  producerName?: string;
+  imageUrl?: string;
+  product: string;
+  quantity: string;
+  unit: string;
+  price: string;
+  harvestDate: string;
+  expiryDate: string;
+  notes: string;
+  status: StockStatus;
+};
+
+export type StockDecrementItem = {
+  productId: string;
+  quantity: number;
+};
+
+type InventoryRow = {
+  id: string;
+  producer_id: string | null;
+  nome_produto: string | null;
+  unidade: string | null;
+  quantidade_disponivel: number | string | null;
+  preco: number | string | null;
+  data_colheita: string | null;
+  validade: string | null;
+  observacoes: string | null;
+  imagem_url: string | null;
+  ativo: boolean | null;
+  products?: {
+    nome?: string | null;
+    unidade?: string | null;
+  } | null;
+  producers?: {
+    nome_propriedade?: string | null;
+  } | null;
+};
+
+export const PRODUCER_STOCK_STORAGE_KEY = "origem-conecta-producer-stock";
+
+export const EMPTY_STOCK_ITEM: ProducerStockItem = {
+  id: "",
+  product: "",
+  quantity: "",
+  unit: "kg",
+  price: "",
+  harvestDate: "",
+  expiryDate: "",
+  notes: "",
+  status: "ativo",
+};
+
+export const INITIAL_PRODUCER_STOCK: ProducerStockItem[] = [
+  {
+    id: "demo-pitaya-roxa",
+    product: "Pitaya Roxa",
+    quantity: "42",
+    unit: "kg",
+    price: "18.50",
+    harvestDate: "2026-05-24",
+    expiryDate: "2026-05-31",
+    notes: "Frutas selecionadas para entrega no próximo ciclo.",
+    status: "ativo",
+  },
+  {
+    id: "demo-doce-figo",
+    product: "Doce Figo Ramy",
+    quantity: "70",
+    unit: "pote",
+    price: "18.00",
+    harvestDate: "",
+    expiryDate: "2026-08-30",
+    notes: "Lote artesanal pronto para venda.",
+    status: "ativo",
+  },
+];
+
+function readStoredStock() {
+  if (typeof window === "undefined") return INITIAL_PRODUCER_STOCK;
+  const stored = window.localStorage.getItem(PRODUCER_STOCK_STORAGE_KEY);
+  if (!stored) return INITIAL_PRODUCER_STOCK;
+  try {
+    return JSON.parse(stored) as ProducerStockItem[];
+  } catch {
+    return INITIAL_PRODUCER_STOCK;
+  }
+}
+
+function normalizeDecrementItems(items: StockDecrementItem[]) {
+  return items
+    .map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter((item) => item.productId && item.quantity > 0);
+}
+
+function applyStockDecrement(stock: ProducerStockItem[], items: StockDecrementItem[]) {
+  const decrements = normalizeDecrementItems(items);
+  if (!decrements.length) return stock;
+
+  return stock.map((stockItem) => {
+    const decrement = decrements.find((item) => item.productId === stockItem.id);
+    if (!decrement) return stockItem;
+
+    const nextQuantity = Math.max(0, Number(stockItem.quantity || 0) - decrement.quantity);
+    return {
+      ...stockItem,
+      quantity: String(nextQuantity),
+    };
+  });
+}
+
+function mapInventoryRow(row: InventoryRow): ProducerStockItem {
+  return {
+    id: row.id,
+    producerId: row.producer_id ?? undefined,
+    producerName: row.producers?.nome_propriedade ?? undefined,
+    imageUrl: row.imagem_url ?? undefined,
+    product: row.nome_produto || row.products?.nome || "Produto sem nome",
+    quantity: String(row.quantidade_disponivel ?? ""),
+    unit: row.unidade || row.products?.unidade || "kg",
+    price: String(row.preco ?? ""),
+    harvestDate: row.data_colheita ?? "",
+    expiryDate: row.validade ?? "",
+    notes: row.observacoes ?? "",
+    status: row.ativo === false ? "pausado" : "ativo",
+  };
+}
+
+async function getProducerId(profileId: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("producers")
+    .select("id")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
+async function loadInventory(producerId?: string | null) {
+  if (!supabase) return null;
+  let query = supabase
+    .from("producer_inventory")
+    .select(
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo,products(nome,unidade),producers(nome_propriedade)",
+    )
+    .order("atualizado_em", { ascending: false });
+
+  if (producerId) {
+    query = query.eq("producer_id", producerId);
+  } else {
+    query = query.eq("ativo", true);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row) => mapInventoryRow(row as InventoryRow));
+}
+
+async function syncProducerInventory(producerId: string, items: ProducerStockItem[]) {
+  if (!supabase) return;
+
+  const { data: currentRows, error: currentError } = await supabase
+    .from("producer_inventory")
+    .select("id")
+    .eq("producer_id", producerId);
+  if (currentError) throw currentError;
+
+  const nextIds = new Set(items.map((item) => item.id).filter(Boolean));
+  const removedIds = (currentRows ?? [])
+    .map((row) => row.id as string)
+    .filter((id) => !nextIds.has(id));
+
+  if (removedIds.length) {
+    const { error: deleteError } = await supabase
+      .from("producer_inventory")
+      .delete()
+      .in("id", removedIds);
+    if (deleteError) throw deleteError;
+  }
+
+  if (!items.length) return;
+
+  const payload = items.map((item) => ({
+    id: item.id,
+    producer_id: producerId,
+    nome_produto: item.product,
+    unidade: item.unit,
+    quantidade_disponivel: Number(item.quantity || 0),
+    preco: Number(item.price || 0),
+    data_colheita: item.harvestDate || null,
+    validade: item.expiryDate || null,
+    observacoes: item.notes || null,
+    imagem_url: item.imageUrl || null,
+    ativo: item.status === "ativo",
+    atualizado_em: new Date().toISOString(),
+  }));
+
+  const { error: upsertError } = await supabase
+    .from("producer_inventory")
+    .upsert(payload, { onConflict: "id" });
+  if (upsertError) throw upsertError;
+}
+
+async function decrementRemoteInventory(items: StockDecrementItem[]) {
+  if (!supabase) return;
+  const payload = normalizeDecrementItems(items);
+  if (!payload.length) return;
+
+  const { error } = await supabase.rpc("decrement_inventory_for_order", { p_items: payload });
+  if (error) throw error;
+}
+
+function extensionFromFile(file: File) {
+  const explicit = file.name.split(".").pop()?.toLowerCase();
+  if (explicit && ["jpg", "jpeg", "png", "webp"].includes(explicit)) return explicit;
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+export function useProducerStock() {
+  const { profile, isSupabaseConfigured } = useAuth();
+  const [items, setItemsState] = useState<ProducerStockItem[]>(readStoredStock);
+  const [producerId, setProducerId] = useState<string | null>(null);
+  const remoteLoadedRef = useRef(false);
+  const lastSyncedRef = useRef("");
+
+  useEffect(() => {
+    window.localStorage.setItem(PRODUCER_STOCK_STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
+
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured) return;
+
+    let active = true;
+
+    async function loadRemoteStock() {
+      try {
+        const nextProducerId =
+          profile?.tipo === "produtor" ? await getProducerId(profile.id) : null;
+        const remoteItems = await loadInventory(nextProducerId);
+        if (!active || !remoteItems) return;
+        setProducerId(nextProducerId);
+        setItemsState(
+          remoteItems.length ? remoteItems : profile?.tipo === "produtor" ? [] : readStoredStock(),
+        );
+        lastSyncedRef.current = JSON.stringify(remoteItems);
+        remoteLoadedRef.current = true;
+      } catch (error) {
+        console.warn("Não foi possível carregar o estoque do Supabase.", error);
+        remoteLoadedRef.current = false;
+      }
+    }
+
+    loadRemoteStock();
+
+    return () => {
+      active = false;
+    };
+  }, [isSupabaseConfigured, profile?.id, profile?.tipo]);
+
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured || !producerId || !remoteLoadedRef.current) return;
+    const serialized = JSON.stringify(items);
+    if (serialized === lastSyncedRef.current) return;
+
+    lastSyncedRef.current = serialized;
+    syncProducerInventory(producerId, items).catch((error) => {
+      console.warn("Não foi possível sincronizar o estoque com o Supabase.", error);
+    });
+  }, [isSupabaseConfigured, items, producerId]);
+
+  const setItems = useCallback((next: SetStateAction<ProducerStockItem[]>) => {
+    setItemsState((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      return resolved.map((item) => ({
+        ...item,
+        id: item.id || crypto.randomUUID(),
+      }));
+    });
+  }, []);
+
+  const uploadImage = useCallback(
+    async (file: File, itemId: string) => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Selecione um arquivo de imagem.");
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("A imagem deve ter ate 5 MB.");
+      }
+
+      if (!supabase || !isSupabaseConfigured || !producerId) {
+        return readFileAsDataUrl(file);
+      }
+
+      const path = `${producerId}/${itemId}-${Date.now()}.${extensionFromFile(file)}`;
+      const { error } = await supabase.storage.from("product-photos").upload(path, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
+      if (error) throw error;
+
+      const { data } = supabase.storage.from("product-photos").getPublicUrl(path);
+      return data.publicUrl;
+    },
+    [isSupabaseConfigured, producerId],
+  );
+
+  const decrementStock = useCallback(
+    async (orderItems: StockDecrementItem[]) => {
+      const normalized = normalizeDecrementItems(orderItems);
+      if (!normalized.length) return;
+
+      setItemsState((current) => applyStockDecrement(current, normalized));
+
+      if (supabase && isSupabaseConfigured) {
+        try {
+          await decrementRemoteInventory(normalized);
+        } catch (error) {
+          console.warn("Não foi possível baixar o estoque no Supabase.", error);
+        }
+      }
+    },
+    [isSupabaseConfigured],
+  );
+
+  return [
+    items,
+    setItems,
+    { uploadImage, canUploadRemoteImage: Boolean(producerId), decrementStock },
+  ] as const;
+}

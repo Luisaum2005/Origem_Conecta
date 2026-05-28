@@ -1,0 +1,366 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { RequireProfile } from "@/components/auth/RequireProfile";
+import { Navbar } from "@/components/layout/Navbar";
+import { formatOrderDate, type OrderStatus, useOrders } from "@/lib/orders";
+import { useProducerStock } from "@/lib/producer-stock";
+import { useQuoteRequests } from "@/lib/quote-requests";
+import {
+  CheckCircle2,
+  ClipboardList,
+  MessageSquareText,
+  Package,
+  RotateCcw,
+  Route as RouteIcon,
+  Sprout,
+  Store,
+  Trash2,
+  Truck,
+} from "lucide-react";
+
+export const Route = createFileRoute("/admin")({
+  component: () => (
+    <RequireProfile allowed={["admin"]}>
+      <Admin />
+    </RequireProfile>
+  ),
+});
+
+const statusOptions: OrderStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
+
+function Admin() {
+  const { orders, updateStatus } = useOrders();
+  const [stock] = useProducerStock();
+  const { quotes } = useQuoteRequests();
+  const activeStock = stock.filter((item) => item.status === "ativo");
+  const openOrders = orders.filter((order) => order.status !== "Entregue");
+  const openQuotes = quotes.filter(
+    (quote) => quote.status === "Aberta" || quote.status === "Respondida",
+  );
+  const totalValue = orders.reduce((sum, order) => sum + order.total, 0);
+
+  const clearLocalTestData = () => {
+    if (typeof window === "undefined") return;
+    const confirmed = window.confirm("Limpar todos os dados locais de teste deste navegador?");
+    if (!confirmed) return;
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith("origem-conecta-"))
+      .forEach((key) => window.localStorage.removeItem(key));
+    window.location.assign("/login");
+  };
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      <Navbar />
+      <main className="mx-auto max-w-[1200px] px-4 py-8 pb-24 sm:px-8 sm:py-10 md:pb-10">
+        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
+          Administração Origem
+        </p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
+              Central de operação
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              Gerencie pedidos, alocação de produtores, estoque publicado e andamento das entregas.
+            </p>
+          </div>
+          <Link
+            to="/production"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
+          >
+            <Sprout className="h-4 w-4 text-leaf-700" />
+            Ver estoque
+          </Link>
+        </div>
+
+        <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric icon={ClipboardList} label="Pedidos criados" value={`${orders.length}`} />
+          <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
+          <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
+          <Metric
+            icon={MessageSquareText}
+            label="Cotações abertas"
+            value={`${openQuotes.length}`}
+          />
+        </section>
+
+        <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric icon={Store} label="Valor em pedidos" value={`R$ ${totalValue.toFixed(2)}`} />
+          <Metric
+            icon={RouteIcon}
+            label="Produtores alocados"
+            value={`${producerSummary(orders).length}`}
+          />
+          <Metric icon={Sprout} label="Itens em estoque" value={`${stock.length}`} />
+          <Metric icon={RotateCcw} label="Base de teste" value="Local" />
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+          <Panel title="Gestão de pedidos" icon={ClipboardList}>
+            {orders.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <ul className="space-y-4">
+                {orders.map((order) => (
+                  <li
+                    key={order.id}
+                    className="rounded-2xl border border-border bg-white p-4 shadow-xs"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
+                          Pedido #{order.id}
+                        </p>
+                        <h3 className="mt-1 text-lg font-bold text-brand-900">
+                          {order.buyerName} · R$ {order.total.toFixed(2)}
+                        </h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatOrderDate(order.createdAt)} · {order.items.length} item
+                          {order.items.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+
+                      <label className="block w-full sm:w-auto sm:min-w-[180px]">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Status operacional
+                        </span>
+                        <select
+                          value={order.status}
+                          onChange={(event) =>
+                            updateStatus(order.id, event.target.value as OrderStatus)
+                          }
+                          className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+                        >
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+                      <table className="min-w-[680px] w-full text-sm">
+                        <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold">Produto</th>
+                            <th className="px-4 py-3 font-semibold">Produtor alocado</th>
+                            <th className="px-4 py-3 font-semibold">Qtd.</th>
+                            <th className="px-4 py-3 text-right font-semibold">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border bg-white">
+                          {order.items.map((item) => (
+                            <tr key={`${order.id}-${item.productId}`}>
+                              <td className="px-4 py-3 font-medium text-brand-900">
+                                {item.productName}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                {item.producerName}
+                                <span className="ml-2 rounded-full bg-surface-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                                  {item.manualProducerChoice ? "manual" : "auto"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                {item.quantity} {item.unit}
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold text-brand-900">
+                                R$ {item.lineTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => updateStatus(order.id, "Em separação")}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-leaf-700" />
+                        Confirmar alocação
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateStatus(order.id, "Em entrega")}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
+                      >
+                        <Truck className="h-4 w-4 text-leaf-700" />
+                        Enviar para entrega
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateStatus(order.id, "Entregue")}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
+                      >
+                        <Package className="h-4 w-4 text-leaf-700" />
+                        Marcar entregue
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <div className="space-y-6">
+            <Panel title="Alocação por produtor" icon={RouteIcon}>
+              {orders.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Crie um pedido para visualizar a alocação.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {producerSummary(orders).map((producer) => (
+                    <li
+                      key={producer.name}
+                      className="rounded-xl border border-border bg-canvas p-4"
+                    >
+                      <p className="font-semibold text-brand-900">{producer.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {producer.items} item{producer.items > 1 ? "s" : ""} · R${" "}
+                        {producer.total.toFixed(2)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel title="Estoque publicado" icon={Sprout}>
+              <ul className="space-y-3">
+                {activeStock.slice(0, 6).map((item) => (
+                  <li key={item.id} className="rounded-xl border border-border bg-canvas p-4">
+                    <p className="text-sm font-semibold text-brand-900">{item.product}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.quantity} {item.unit} · R$ {Number(item.price || 0).toFixed(2)}/
+                      {item.unit}
+                    </p>
+                  </li>
+                ))}
+                {activeStock.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhum produto ativo publicado.</p>
+                )}
+              </ul>
+            </Panel>
+
+            <Panel title="Cotações recentes" icon={MessageSquareText}>
+              <ul className="space-y-3">
+                {quotes.slice(0, 5).map((quote) => (
+                  <li key={quote.id} className="rounded-xl border border-border bg-canvas p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-brand-900">
+                          {quote.productName}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {quote.quantity} {quote.unit} - {quote.buyerName}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-brand-700">
+                        {quote.status}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+                {quotes.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhuma cotação criada ainda.</p>
+                )}
+              </ul>
+            </Panel>
+
+            <Panel title="Dados de teste" icon={Trash2}>
+              <p className="text-sm text-muted-foreground">
+                Remove apenas os dados salvos neste navegador. Dados reais no Supabase devem ser
+                apagados pelo painel do Supabase.
+              </p>
+              <button
+                type="button"
+                onClick={clearLocalTestData}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
+              >
+                <Trash2 className="h-4 w-4" />
+                Limpar dados locais
+              </button>
+            </Panel>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function producerSummary(orders: ReturnType<typeof useOrders>["orders"]) {
+  const map = new Map<string, { name: string; items: number; total: number }>();
+  for (const order of orders) {
+    for (const item of order.items) {
+      const current = map.get(item.producerName) ?? { name: item.producerName, items: 0, total: 0 };
+      current.items += 1;
+      current.total += item.lineTotal;
+      map.set(item.producerName, current);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-2xl border border-border bg-canvas p-8 text-center">
+      <h3 className="text-base font-semibold text-brand-900">Nenhum pedido criado ainda</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Quando o comprador confirmar um pedido, ele aparece aqui para alocação e operação.
+      </p>
+      <Link
+        to="/portfolio"
+        className="mt-5 inline-flex h-10 items-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+      >
+        Criar pedido de teste
+      </Link>
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-white p-5 shadow-xs sm:p-6">
+      <h2 className="inline-flex items-center gap-2 text-base font-semibold text-brand-900">
+        <Icon className="h-4 w-4 text-leaf-700" />
+        {title}
+      </h2>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function Metric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+        <Icon className="h-5 w-5" />
+      </span>
+      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+    </div>
+  );
+}
