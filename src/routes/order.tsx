@@ -2,6 +2,7 @@
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAvailableProducts } from "@/lib/available-products";
+import { useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { useCart } from "@/lib/cart";
 import { preferredProducer } from "@/lib/catalog";
 import { useOrders } from "@/lib/orders";
@@ -21,12 +22,14 @@ export const Route = createFileRoute("/order")({
 function Order() {
   const products = useAvailableProducts();
   const { cart, producerChoices, setQty, setProducerChoice, clear } = useCart();
+  const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const [, , { decrementStock }] = useProducerStock();
   const { addRecurringOrder } = useRecurringOrders();
   const navigate = useNavigate();
   const [repeatNotice, setRepeatNotice] = useState("");
   const [recurringNotice, setRecurringNotice] = useState("");
+  const [confirmError, setConfirmError] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const items = products.filter((product) => cart[product.id]);
   const subtotal = items.reduce((sum, product) => {
@@ -76,9 +79,10 @@ function Order() {
   const handleConfirmOrder = async () => {
     if (isConfirming || hasStockIssues) return;
     setIsConfirming(true);
+    setConfirmError("");
     try {
-      addOrder({
-        buyerName: "Cozinha Atelier",
+      await addOrder({
+        buyerName: buyerDetails.companyName || buyerDetails.responsibleName || "Comprador",
         subtotal,
         delivery,
         total,
@@ -93,6 +97,12 @@ function Order() {
       );
       clear();
       navigate({ to: "/orders" });
+    } catch (error) {
+      setConfirmError(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel confirmar o pedido. Tente novamente.",
+      );
     } finally {
       setIsConfirming(false);
     }
@@ -287,6 +297,11 @@ function Order() {
                 {hasStockIssues && (
                   <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]">
                     Ajuste as quantidades. Um ou mais itens ultrapassam o estoque publicado.
+                  </div>
+                )}
+                {confirmError && (
+                  <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]">
+                    {confirmError}
                   </div>
                 )}
                 <button

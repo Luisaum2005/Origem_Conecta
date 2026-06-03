@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { PrimaryButton, useFakeSubmit } from "@/components/auth/AuthShell";
 import { InstallButton } from "@/components/pwa/InstallButton";
 import { ALL_SUPPLIER_PRODUCTS } from "@/lib/hortifruti";
 import { EMPTY_STOCK_ITEM, type ProducerStockItem, useProducerStock } from "@/lib/producer-stock";
@@ -37,7 +36,6 @@ function Production() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState("");
-  const { loading, onSubmit } = useFakeSubmit(() => {});
 
   const isValid = draft.product && draft.quantity && draft.unit && draft.price;
   const activeItems = items.filter((item) => item.status === "ativo");
@@ -93,7 +91,7 @@ function Production() {
       const imageUrl = await uploadImage(file, itemId);
       setDraft((current) => ({ ...current, id: itemId, imageUrl }));
     } catch (error) {
-      setImageError(error instanceof Error ? error.message : "Nao foi possivel carregar a foto.");
+      setImageError(error instanceof Error ? error.message : "Não foi possível carregar a foto.");
     } finally {
       setUploadingImage(false);
     }
@@ -256,9 +254,13 @@ function Production() {
           </section>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-8 max-w-md">
-          <PrimaryButton loading={loading}>Publicar disponibilidade</PrimaryButton>
-        </form>
+        <div className="mt-8 rounded-2xl border border-border bg-white p-5 shadow-xs">
+          <p className="font-semibold text-brand-900">Disponibilidade publicada automaticamente</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Produtos salvos como ativos aparecem no portfólio dos compradores. Para tirar um item da
+            venda, use a opção Pausar no estoque.
+          </p>
+        </div>
       </main>
     </div>
   );

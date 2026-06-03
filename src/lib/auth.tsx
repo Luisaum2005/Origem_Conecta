@@ -29,6 +29,7 @@ type SignUpInput = {
   buyer?: {
     nomeEmpresa: string;
     tipoEmpresa: string;
+    cnpj: string;
   };
   producer?: {
     nomePropriedade: string;
@@ -223,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             profile_id: profileData.id,
             nome_empresa: input.buyer.nomeEmpresa,
             tipo_empresa: input.buyer.tipoEmpresa,
+            cnpj: input.buyer.cnpj,
           });
           if (buyerError) throw buyerError;
         }

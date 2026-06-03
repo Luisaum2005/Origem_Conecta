@@ -3,13 +3,13 @@ import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { ClipboardList, Package, Store, TrendingUp, Truck, User } from "lucide-react";
 
 const items = [
-  { to: "/portfolio", label: "Portfolio", icon: Store, profiles: ["comprador"] },
+  { to: "/portfolio", label: "Portfólio", icon: Store, profiles: ["comprador"] },
   { to: "/orders", label: "Pedidos", icon: Truck, profiles: ["comprador"] },
   { to: "/producer/orders", label: "Pedidos", icon: ClipboardList, profiles: ["produtor"] },
   { to: "/production", label: "Estoque", icon: Package, profiles: ["produtor"] },
   {
     to: "/quotes",
-    label: "Cotacoes",
+    label: "Cotações",
     icon: TrendingUp,
     profiles: ["comprador", "produtor", "admin"],
   },
@@ -23,7 +23,12 @@ function visibleForProfile(profiles: readonly ProfileType[], profileType?: Profi
 export function BottomNav() {
   const { pathname } = useLocation();
   const { profile } = useAuth();
-  const profilePath = profile ? getProfileHome(profile.tipo) : "/login";
+  const profilePath =
+    profile?.tipo === "comprador"
+      ? "/profile/buyer"
+      : profile
+        ? getProfileHome(profile.tipo)
+        : "/login";
   const visibleItems = profile
     ? [
         ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),

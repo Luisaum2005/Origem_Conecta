@@ -53,21 +53,21 @@ function Quotes() {
       <Navbar />
       <main className="mx-auto max-w-[1200px] px-4 py-8 pb-24 sm:px-8 sm:py-10 md:pb-10">
         <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Referencias CEASA, CONAB e CEPEA
+          Referências manuais CEASA, CONAB e CEPEA
         </p>
         <div className="mt-2">
-          <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">Cotacoes</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">Cotações</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
             {profile?.tipo === "produtor"
-              ? "Responda solicitacoes abertas e acompanhe propostas enviadas."
+              ? "Responda solicitações abertas e acompanhe propostas enviadas."
               : profile?.tipo === "admin"
-                ? "Acompanhe solicitacoes, respostas dos produtores e decisoes dos compradores."
-                : "Solicite cotacoes aos produtores e compare com referencias de mercado."}
+                ? "Acompanhe solicitações, respostas dos produtores e decisões dos compradores."
+                : "Solicite cotações aos produtores e compare com referências de mercado cadastradas pelo admin."}
           </p>
         </div>
 
         <section className="mt-8 grid gap-3 sm:grid-cols-3">
-          <Metric icon={ClipboardList} label="Solicitacoes" value={`${quotes.length}`} />
+          <Metric icon={ClipboardList} label="Solicitações" value={`${quotes.length}`} />
           <Metric icon={Send} label="Abertas" value={`${openQuotes.length}`} />
           <Metric
             icon={CheckCircle2}
@@ -122,32 +122,51 @@ function BuyerQuotes({
     targetPrice: "",
     notes: "",
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const canSubmit = draft.productName && draft.quantity && draft.unit;
 
-  const submitQuote = () => {
+  const submitQuote = async () => {
     if (!canSubmit) return;
-    addQuote({
-      buyerName,
-      productName: draft.productName,
-      quantity: draft.quantity,
-      unit: draft.unit,
-      deliveryDate: draft.deliveryDate,
-      targetPrice: draft.targetPrice,
-      notes: draft.notes,
-    });
-    setDraft({
-      productName: productOptions[0] ?? "",
-      quantity: "",
-      unit: "kg",
-      deliveryDate: "",
-      targetPrice: "",
-      notes: "",
-    });
+    setSaving(true);
+    setError("");
+    try {
+      await addQuote({
+        buyerName,
+        productName: draft.productName,
+        quantity: draft.quantity,
+        unit: draft.unit,
+        deliveryDate: draft.deliveryDate,
+        targetPrice: draft.targetPrice,
+        notes: draft.notes,
+      });
+      setDraft({
+        productName: productOptions[0] ?? "",
+        quantity: "",
+        unit: "kg",
+        deliveryDate: "",
+        targetPrice: "",
+        notes: "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar a cotação.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeStatus = async (id: string, status: QuoteStatus) => {
+    setError("");
+    try {
+      await updateStatus(id, status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível atualizar a cotação.");
+    }
   };
 
   return (
     <section className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-      <Panel title="Nova solicitacao" icon={Send}>
+      <Panel title="Nova solicitação" icon={Send}>
         <div className="grid gap-4">
           <label className="block">
             <span className="text-sm font-medium text-brand-900">Produto</span>
@@ -186,14 +205,14 @@ function BuyerQuotes({
               type="date"
             />
             <TextInput
-              label="Preco alvo"
+              label="Preço alvo"
               value={draft.targetPrice}
               onChange={(targetPrice) => setDraft({ ...draft, targetPrice })}
               placeholder="R$ 18,00"
             />
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-brand-900">Observacoes</span>
+            <span className="text-sm font-medium text-brand-900">Observações</span>
             <textarea
               value={draft.notes}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
@@ -201,27 +220,32 @@ function BuyerQuotes({
               className="mt-2 min-h-[96px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
             />
           </label>
+          {error && (
+            <p className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
+              {error}
+            </p>
+          )}
           <button
             type="button"
             onClick={submitQuote}
-            disabled={!canSubmit}
+            disabled={!canSubmit || saving}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
           >
             <Send className="h-4 w-4" />
-            Solicitar cotacao
+            {saving ? "Salvando..." : "Solicitar cotação"}
           </button>
         </div>
       </Panel>
 
-      <Panel title="Minhas cotacoes" icon={ClipboardList}>
-        <QuoteList empty="Nenhuma cotacao solicitada ainda.">
+      <Panel title="Minhas cotações" icon={ClipboardList}>
+        <QuoteList empty="Nenhuma cotação solicitada ainda.">
           {quotes.map((quote) => (
             <QuoteCard key={quote.id} quote={quote}>
               {quote.status === "Respondida" && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => updateStatus(quote.id, "Aprovada")}
+                    onClick={() => void changeStatus(quote.id, "Aprovada")}
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-leaf-600 bg-leaf-600 px-3 text-sm font-semibold text-white hover:bg-leaf-700"
                   >
                     <CheckCircle2 className="h-4 w-4" />
@@ -229,7 +253,7 @@ function BuyerQuotes({
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateStatus(quote.id, "Recusada")}
+                    onClick={() => void changeStatus(quote.id, "Recusada")}
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
                   >
                     <XCircle className="h-4 w-4 text-[var(--color-error-fg)]" />
@@ -261,11 +285,33 @@ function ProducerQuotes({
   const [responses, setResponses] = useState<
     Record<string, { producerName: string; responsePrice: string; responseNotes: string }>
   >({});
+  const [savingId, setSavingId] = useState("");
+  const [error, setError] = useState("");
+
+  const sendResponse = async (
+    id: string,
+    response: { producerName: string; responsePrice: string; responseNotes: string },
+  ) => {
+    setSavingId(id);
+    setError("");
+    try {
+      await respondQuote(id, response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível enviar a resposta.");
+    } finally {
+      setSavingId("");
+    }
+  };
 
   return (
     <section className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <Panel title="Solicitacoes abertas" icon={Send}>
-        <QuoteList empty="Nenhuma cotacao aberta no momento.">
+      <Panel title="Solicitações abertas" icon={Send}>
+        {error && (
+          <p className="mb-4 rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
+            {error}
+          </p>
+        )}
+        <QuoteList empty="Nenhuma cotação aberta no momento.">
           {actionable.map((quote) => {
             const response = responses[quote.id] ?? {
               producerName,
@@ -286,7 +332,7 @@ function ProducerQuotes({
                     }
                   />
                   <TextInput
-                    label="Preco"
+                    label="Preço"
                     value={response.responsePrice}
                     onChange={(responsePrice) =>
                       setResponses((current) => ({
@@ -312,12 +358,12 @@ function ProducerQuotes({
                   </label>
                   <button
                     type="button"
-                    onClick={() => respondQuote(quote.id, response)}
-                    disabled={!response.responsePrice}
+                    onClick={() => void sendResponse(quote.id, response)}
+                    disabled={!response.responsePrice || savingId === quote.id}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)] sm:col-span-2 sm:w-fit"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    Enviar resposta
+                    {savingId === quote.id ? "Enviando..." : "Enviar resposta"}
                   </button>
                 </div>
               </QuoteCard>
@@ -340,8 +386,8 @@ function ProducerQuotes({
 function AdminQuotes({ quotes }: { quotes: QuoteRequest[] }) {
   return (
     <section className="mt-8">
-      <Panel title="Monitoramento de cotacoes" icon={ClipboardList}>
-        <QuoteList empty="Nenhuma cotacao cadastrada ainda.">
+      <Panel title="Monitoramento de cotações" icon={ClipboardList}>
+        <QuoteList empty="Nenhuma cotação cadastrada ainda.">
           {quotes.map((quote) => (
             <QuoteCard key={quote.id} quote={quote} compact />
           ))}
@@ -373,7 +419,7 @@ function QuoteCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Cotacao #{quote.id}
+            Cotação #{quote.id}
           </p>
           <h3 className="mt-1 text-lg font-bold text-brand-900">{quote.productName}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -391,8 +437,8 @@ function QuoteCard({
         className={`mt-4 grid gap-3 rounded-xl bg-canvas p-4 text-sm ${compact ? "" : "sm:grid-cols-3"}`}
       >
         <Mini label="Entrega" value={quote.deliveryDate || "A combinar"} />
-        <Mini label="Preco alvo" value={quote.targetPrice || "Sem alvo"} />
-        <Mini label="Observacoes" value={quote.notes || "Sem observacoes"} />
+        <Mini label="Preço alvo" value={quote.targetPrice || "Sem alvo"} />
+        <Mini label="Observações" value={quote.notes || "Sem observações"} />
       </dl>
 
       {quote.status !== "Aberta" && (
@@ -455,6 +501,10 @@ function MarketReferences({
   return (
     <section className="mt-8">
       <Panel title="Referencias de mercado" icon={TrendingUp}>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Estes valores são informativos e devem ser atualizados manualmente pelo admin a partir das
+          fontes CEASA/CEAGESP, CONAB e CEPEA.
+        </p>
         {editable && (
           <div className="mb-5 rounded-2xl border border-border bg-canvas p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -489,13 +539,13 @@ function MarketReferences({
                 placeholder="1280.25"
               />
               <TextInput
-                label="Variacao"
+                label="Variação"
                 value={draft.variation}
                 onChange={(variation) => setDraft({ ...draft, variation })}
                 placeholder="+1,2%"
               />
               <label className="block">
-                <span className="text-sm font-medium text-brand-900">Tendencia</span>
+                <span className="text-sm font-medium text-brand-900">Tendência</span>
                 <select
                   value={draft.trend}
                   onChange={(event) =>
@@ -503,7 +553,7 @@ function MarketReferences({
                   }
                   className="mt-2 h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
                 >
-                  <option value="flat">Estavel</option>
+                  <option value="flat">Estável</option>
                   <option value="up">Alta</option>
                   <option value="down">Queda</option>
                 </select>
@@ -528,9 +578,9 @@ function MarketReferences({
                 <th className="px-5 py-4 font-semibold text-brand-900">CEASA/CEAGESP</th>
                 <th className="px-5 py-4 font-semibold text-brand-900">CONAB</th>
                 <th className="px-5 py-4 font-semibold text-brand-900">CEPEA</th>
-                <th className="px-5 py-4 font-semibold text-brand-900">Variacao</th>
+                <th className="px-5 py-4 font-semibold text-brand-900">Variação</th>
                 {editable && (
-                  <th className="px-5 py-4 text-right font-semibold text-brand-900">Acoes</th>
+                  <th className="px-5 py-4 text-right font-semibold text-brand-900">Ações</th>
                 )}
               </tr>
             </thead>
@@ -618,7 +668,7 @@ function trendMeta(t: MarketTrend) {
       label: "Queda",
     };
   }
-  return { Icon: Minus, color: "text-muted-foreground", bg: "bg-surface-muted", label: "Estavel" };
+  return { Icon: Minus, color: "text-muted-foreground", bg: "bg-surface-muted", label: "Estável" };
 }
 
 function statusClass(status: QuoteStatus) {

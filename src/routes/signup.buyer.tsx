@@ -31,6 +31,7 @@ function SignupBuyer() {
         buyer: {
           nomeEmpresa: String(form.get("nomeEmpresa") ?? ""),
           tipoEmpresa: "Restaurante",
+          cnpj: String(form.get("cnpj") ?? ""),
         },
       });
       navigate({ to: getProfileHome(profile.tipo) });

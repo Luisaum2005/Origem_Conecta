@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export type BuyerProfileDetails = {
   companyName: string;
   businessType: string;
+  cnpj: string;
   responsibleName: string;
   phone: string;
   city: string;
@@ -16,12 +17,13 @@ export type BuyerProfileDetails = {
 const BUYER_PROFILE_STORAGE_KEY = "origem-conecta-buyer-profile";
 
 const DEFAULT_BUYER_PROFILE: BuyerProfileDetails = {
-  companyName: "Cozinha Atelier",
-  businessType: "Restaurante",
-  responsibleName: "Ana Martins",
-  phone: "(11) 98765-4321",
-  city: "Sao Paulo",
-  state: "SP",
+  companyName: "",
+  businessType: "",
+  cnpj: "",
+  responsibleName: "",
+  phone: "",
+  city: "",
+  state: "",
   currentSupplier: "",
   monthlySpend: "",
 };
@@ -35,12 +37,14 @@ type RemoteBuyerProfile = {
     | {
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
+        cnpj?: string | null;
         fornecedor_atual?: string | null;
         gasto_medio_mensal?: number | string | null;
       }
     | Array<{
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
+        cnpj?: string | null;
         fornecedor_atual?: string | null;
         gasto_medio_mensal?: number | string | null;
       }>
@@ -63,6 +67,7 @@ function mapRemoteProfile(row: RemoteBuyerProfile): BuyerProfileDetails {
   return {
     companyName: buyer?.nome_empresa || DEFAULT_BUYER_PROFILE.companyName,
     businessType: buyer?.tipo_empresa || DEFAULT_BUYER_PROFILE.businessType,
+    cnpj: buyer?.cnpj || "",
     responsibleName: row.nome || DEFAULT_BUYER_PROFILE.responsibleName,
     phone: row.telefone || "",
     city: row.cidade || "",
@@ -77,7 +82,7 @@ async function loadRemoteBuyerProfile(profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,fornecedor_atual,gasto_medio_mensal)",
+      "nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,cnpj,fornecedor_atual,gasto_medio_mensal)",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -104,6 +109,7 @@ async function updateRemoteBuyerProfile(profileId: string, details: BuyerProfile
     .update({
       nome_empresa: details.companyName,
       tipo_empresa: details.businessType,
+      cnpj: details.cnpj || null,
       fornecedor_atual: details.currentSupplier || null,
       gasto_medio_mensal: details.monthlySpend
         ? Number(details.monthlySpend.replace(",", "."))
@@ -141,11 +147,11 @@ export function useBuyerProfileDetails() {
 
   const saveDetails = async (nextDetails: BuyerProfileDetails) => {
     setSaving(true);
-    setDetails(nextDetails);
     try {
       if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
         await updateRemoteBuyerProfile(profile.id, nextDetails);
       }
+      setDetails(nextDetails);
     } finally {
       setSaving(false);
     }

@@ -8,11 +8,11 @@ import { Bell, ClipboardList, MessageSquareText, PackageCheck, User } from "luci
 import { useMemo, useState } from "react";
 
 const links = [
-  { to: "/portfolio", label: "Portfolio", profiles: ["comprador"] },
+  { to: "/portfolio", label: "Portfólio", profiles: ["comprador"] },
   { to: "/orders", label: "Pedidos", profiles: ["comprador"] },
   { to: "/producer/orders", label: "Pedidos recebidos", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
-  { to: "/quotes", label: "Cotacoes", profiles: ["comprador", "produtor", "admin"] },
+  { to: "/quotes", label: "Cotações", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
 ] as const;
 
@@ -25,7 +25,12 @@ export function Navbar() {
   const { orders } = useOrders();
   const { quotes } = useQuoteRequests();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const profilePath = profile ? getProfileHome(profile.tipo) : "/login";
+  const profilePath =
+    profile?.tipo === "comprador"
+      ? "/profile/buyer"
+      : profile
+        ? getProfileHome(profile.tipo)
+        : "/login";
   const visibleLinks = links.filter((link) => visibleForProfile(link.profiles, profile?.tipo));
   const notifications = useMemo(
     () => buildNotifications(profile?.tipo, orders, quotes),
@@ -73,7 +78,7 @@ export function Navbar() {
                   <div className="border-b border-border px-4 py-3">
                     <p className="text-sm font-semibold text-brand-900">Notificacoes</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Alertas gerados pela operacao atual.
+                      Alertas gerados pela operação atual.
                     </p>
                   </div>
                   {notifications.length === 0 ? (
@@ -192,7 +197,7 @@ function buildNotifications(
         .slice(0, 2)
         .map((quote) => ({
           id: `producer-quote-${quote.id}`,
-          title: "Nova cotacao aberta",
+          title: "Nova cotação aberta",
           text: `${quote.productName}, ${quote.quantity} ${quote.unit}.`,
           to: "/quotes" as const,
           icon: MessageSquareText,

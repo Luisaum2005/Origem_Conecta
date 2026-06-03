@@ -52,7 +52,7 @@ function ProducerOrders() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
               Acompanhe os pedidos que possuem itens alocados para {producerName}, confirme a
-              separacao e avance o status operacional.
+              separação e avance o status operacional.
             </p>
           </div>
           <Link
@@ -122,11 +122,11 @@ function ProducerOrders() {
               )}
             </Panel>
 
-            <Panel title="Proximas acoes" icon={CheckCircle2}>
+            <Panel title="Próximas ações" icon={CheckCircle2}>
               <ul className="space-y-3">
-                <ActionItem title="Recebido" text="Revise os itens e confirme a separacao." />
-                <ActionItem title="Em separacao" text="Prepare lote, embalagem e conferencia." />
-                <ActionItem title="Em entrega" text="Acompanhe a saida ate a baixa do pedido." />
+                <ActionItem title="Recebido" text="Revise os itens e confirme a separação." />
+                <ActionItem title="Em separação" text="Prepare lote, embalagem e conferência." />
+                <ActionItem title="Em entrega" text="Acompanhe a saída até a baixa do pedido." />
               </ul>
             </Panel>
           </div>
@@ -141,7 +141,7 @@ function ProducerOrderCard({
   updateStatus,
 }: {
   order: SavedOrder;
-  updateStatus: (id: string, status: OrderStatus) => void;
+  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
 }) {
   const total = producerOrderTotal(order);
 
@@ -164,7 +164,7 @@ function ProducerOrderCard({
           <span className="text-xs font-semibold text-muted-foreground">Status</span>
           <select
             value={order.status}
-            onChange={(event) => updateStatus(order.id, event.target.value as OrderStatus)}
+            onChange={(event) => void updateStatus(order.id, event.target.value as OrderStatus)}
             className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
           >
             {statusOptions.map((status) => (
@@ -196,15 +196,15 @@ function ProducerOrderCard({
       <div className="mt-4 grid gap-2 border-t border-border pt-4 sm:flex sm:flex-wrap">
         <button
           type="button"
-          onClick={() => updateStatus(order.id, "Em separação")}
+          onClick={() => void updateStatus(order.id, "Em separação")}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
         >
           <CheckCircle2 className="h-4 w-4 text-leaf-700" />
-          Confirmar separacao
+          Confirmar separação
         </button>
         <button
           type="button"
-          onClick={() => updateStatus(order.id, "Em entrega")}
+          onClick={() => void updateStatus(order.id, "Em entrega")}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
         >
           <Truck className="h-4 w-4 text-leaf-700" />
@@ -256,12 +256,6 @@ function EmptyState() {
       <p className="mt-2 text-sm text-muted-foreground">
         Quando um comprador escolher produtos deste produtor, o pedido aparece aqui.
       </p>
-      <Link
-        to="/portfolio"
-        className="mt-5 inline-flex h-10 items-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-      >
-        Criar pedido de teste
-      </Link>
     </div>
   );
 }

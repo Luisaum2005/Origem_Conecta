@@ -14,12 +14,12 @@ export type ProducerProfileDetails = {
 const PRODUCER_PROFILE_STORAGE_KEY = "origem-conecta-producer-profile";
 
 const DEFAULT_PRODUCER_PROFILE: ProducerProfileDetails = {
-  propertyName: "Ramy Pitayas",
-  responsibleName: "Ramy Pitayas",
+  propertyName: "",
+  responsibleName: "",
   cnpj: "",
   phone: "",
-  location: "Queiroz, SP",
-  products: ["Pitaya Roxa", "Pitaya Amarela", "Pitaya Branca"],
+  location: "",
+  products: [],
 };
 
 type RemoteProducerProfile = {
@@ -62,7 +62,7 @@ function mapRemoteProfile(row: RemoteProducerProfile): ProducerProfileDetails {
     cnpj: producer?.cnpj || "",
     phone: row.telefone || "",
     location: producer?.localizacao || DEFAULT_PRODUCER_PROFILE.location,
-    products: producer?.categorias_atendidas ?? DEFAULT_PRODUCER_PROFILE.products,
+    products: producer?.categorias_atendidas ?? [],
   };
 }
 
@@ -132,11 +132,11 @@ export function useProducerProfileDetails() {
 
   const saveDetails = async (nextDetails: ProducerProfileDetails) => {
     setSaving(true);
-    setDetails(nextDetails);
     try {
       if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
         await updateRemoteProducerProfile(profile.id, nextDetails);
       }
+      setDetails(nextDetails);
     } finally {
       setSaving(false);
     }

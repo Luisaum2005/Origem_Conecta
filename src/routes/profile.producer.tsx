@@ -77,7 +77,7 @@ function ProducerProfile() {
               {producerName}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Produtor verificado - {details.location || "localizacao pendente"}
+              Produtor verificado - {details.location || "localização pendente"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -142,7 +142,7 @@ function ProducerProfile() {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {item.notes || "Sem observacoes adicionais"}
+                        {item.notes || "Sem observações adicionais"}
                       </p>
                     </div>
                     <div className="text-right">
@@ -197,22 +197,22 @@ function ProducerProfile() {
               <Mini label="Potencial do estoque ativo" value={`R$ ${stockPotential.toFixed(2)}`} />
               <Mini label="Pedidos recebidos" value={`${producerOrders.length}`} />
               <Mini label="Produtos pausados" value={`${pausedStock.length}`} />
-              <Mini label="Proxima entrega" value={nextDeliveryLabel(openOrders)} />
+              <Mini label="Próxima entrega" value={nextDeliveryLabel(openOrders)} />
             </dl>
           </Panel>
 
-          <Panel title="Alertas de operacao" icon={AlertTriangle}>
+          <Panel title="Alertas de operação" icon={AlertTriangle}>
             <div className="space-y-3">
               {openOrders.length > 0 && (
                 <Alert
-                  title="Pedidos aguardando acao"
+                  title="Pedidos aguardando ação"
                   text={`${openOrders.length} pedido(s) ainda em andamento.`}
                 />
               )}
               {pausedStock.length > 0 && (
                 <Alert
                   title="Produtos pausados"
-                  text={`${pausedStock.length} produto(s) fora do portfolio.`}
+                  text={`${pausedStock.length} produto(s) fora do portfólio.`}
                 />
               )}
               {activeStock.length === 0 && (
@@ -223,14 +223,14 @@ function ProducerProfile() {
               )}
               {openOrders.length === 0 && pausedStock.length === 0 && activeStock.length > 0 && (
                 <Alert
-                  title="Operacao em dia"
+                  title="Operação em dia"
                   text="Estoque ativo e nenhum pedido pendente no momento."
                 />
               )}
             </div>
           </Panel>
 
-          <Panel title="Historico operacional" icon={CalendarClock}>
+          <Panel title="Histórico operacional" icon={CalendarClock}>
             {activity.length === 0 ? (
               <EmptyMessage text="As movimentacoes aparecem quando houver estoque ou pedidos." />
             ) : (
@@ -313,6 +313,7 @@ function ProducerDetailsPanel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(details);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
   const productsText = draft.products.join(", ");
 
   useEffect(() => {
@@ -320,15 +321,20 @@ function ProducerDetailsPanel({
   }, [details]);
 
   const save = async () => {
-    await onSave({
-      ...draft,
-      products: productsText
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    });
-    setEditing(false);
-    setNotice("Dados do produtor atualizados.");
+    setError("");
+    try {
+      await onSave({
+        ...draft,
+        products: productsText
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      });
+      setEditing(false);
+      setNotice("Dados do produtor atualizados.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar os dados.");
+    }
   };
 
   return (
@@ -336,11 +342,11 @@ function ProducerDetailsPanel({
       {!editing ? (
         <div>
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Mini label="Propriedade" value={details.propertyName || "Nao informado"} />
-            <Mini label="Responsavel" value={details.responsibleName || "Nao informado"} />
-            <Mini label="CNPJ" value={details.cnpj || "Nao informado"} />
-            <Mini label="Telefone" value={details.phone || "Nao informado"} />
-            <Mini label="Localizacao" value={details.location || "Nao informado"} />
+            <Mini label="Propriedade" value={details.propertyName || "Não informado"} />
+            <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
+            <Mini label="CNPJ" value={details.cnpj || "Não informado"} />
+            <Mini label="Telefone" value={details.phone || "Não informado"} />
+            <Mini label="Localização" value={details.location || "Não informado"} />
           </dl>
           <div className="mt-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -368,6 +374,7 @@ function ProducerDetailsPanel({
             type="button"
             onClick={() => {
               setNotice("");
+              setError("");
               setEditing(true);
             }}
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -387,7 +394,7 @@ function ProducerDetailsPanel({
             />
             <TextField
               icon={User}
-              label="Responsavel"
+              label="Responsável"
               value={draft.responsibleName}
               onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
             />
@@ -406,7 +413,7 @@ function ProducerDetailsPanel({
             />
             <TextField
               icon={MapPin}
-              label="Localizacao"
+              label="Localização"
               value={draft.location}
               onChange={(location) => setDraft({ ...draft, location })}
               placeholder="Cidade, UF"
@@ -429,10 +436,15 @@ function ProducerDetailsPanel({
               className="mt-2 min-h-[92px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
             />
             <span className="mt-1.5 block text-xs text-muted-foreground">
-              Separe os produtos por virgula.
+              Separe os produtos por vírgula.
             </span>
           </label>
           <div className="flex flex-wrap gap-2">
+            {error && (
+              <p className="w-full rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
+                {error}
+              </p>
+            )}
             <button
               type="button"
               onClick={save}
@@ -446,6 +458,7 @@ function ProducerDetailsPanel({
               type="button"
               onClick={() => {
                 setDraft(details);
+                setError("");
                 setEditing(false);
               }}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { type BuyerProfileDetails, useBuyerProfileDetails } from "@/lib/buyer-profile";
-import { BUYER_HISTORY } from "@/lib/market-data";
+import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import {
   Building2,
   CalendarClock,
@@ -18,7 +18,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export const Route = createFileRoute("/profile/buyer")({
   component: () => (
@@ -28,14 +28,16 @@ export const Route = createFileRoute("/profile/buyer")({
   ),
 });
 
-const recentTotal = BUYER_HISTORY.reduce((sum, order) => sum + order.total, 0);
-const onTimeRate = Math.round(
-  (BUYER_HISTORY.filter((order) => order.onTime).length / BUYER_HISTORY.length) * 100,
-);
-
 function BuyerProfile() {
   const { details, saveDetails, saving } = useBuyerProfileDetails();
+  const { orders } = useOrders();
   const location = [details.city, details.state].filter(Boolean).join(", ");
+  const deliveredOrders = orders.filter((order) => order.status === "Entregue");
+  const openOrders = orders.filter((order) => order.status !== "Entregue");
+  const recentTotal = orders.reduce((sum, order) => sum + order.total, 0);
+  const onTimeRate = orders.length ? Math.round((deliveredOrders.length / orders.length) * 100) : 0;
+  const nextDelivery = openOrders[0]?.deliveryEta || "Sem pedidos abertos";
+  const productSummary = useMemo(() => summarizeProducts(orders), [orders]);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -50,7 +52,8 @@ function BuyerProfile() {
               {details.companyName}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {details.businessType} verificado - {location || "localizacao pendente"}
+              {details.businessType || "Comprador"} verificado -{" "}
+              {location || "localização pendente"}
             </p>
           </div>
           <Link
@@ -63,13 +66,13 @@ function BuyerProfile() {
         </div>
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Metric icon={ShieldCheck} label="Atendimento no prazo" value={`${onTimeRate}%`} />
+          <Metric icon={ShieldCheck} label="Pedidos entregues" value={`${onTimeRate}%`} />
           <Metric
             icon={ShoppingBasket}
-            label="Compras recentes"
+            label="Compras registradas"
             value={`R$ ${recentTotal.toFixed(2)}`}
           />
-          <Metric icon={CalendarClock} label="Proxima entrega" value="terca" />
+          <Metric icon={CalendarClock} label="Próxima entrega" value={nextDelivery} />
         </section>
 
         <section className="mt-6">
@@ -77,35 +80,42 @@ function BuyerProfile() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Historico de compras" icon={History}>
-            <ul className="divide-y divide-border">
-              {BUYER_HISTORY.map((order) => (
-                <li key={order.id} className="py-4 first:pt-0 last:pb-0">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-brand-900">Pedido #{order.id}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {order.date} - {order.producers.join(", ")}
-                      </p>
+          <Panel title="Histórico de compras" icon={History}>
+            {orders.length ? (
+              <ul className="divide-y divide-border">
+                {orders.map((order) => (
+                  <li key={order.id} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-brand-900">Pedido #{order.id}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatOrderDate(order.createdAt)} -{" "}
+                          {producerNames(order) || "Produtor a definir"}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-surface-brand-soft px-3 py-1 text-xs font-medium text-brand-700">
+                        {order.status}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-surface-brand-soft px-3 py-1 text-xs font-medium text-brand-700">
-                      {order.status}
-                    </span>
-                  </div>
-                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                    <Mini label="Total" value={`R$ ${order.total.toFixed(2)}`} />
-                    <Mini label="Prazo" value={order.onTime ? "No prazo" : "Com atraso"} />
-                  </dl>
-                </li>
-              ))}
-            </ul>
+                    <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                      <Mini label="Total" value={`R$ ${order.total.toFixed(2)}`} />
+                      <Mini label="Entrega" value={order.deliveryEta || "A combinar"} />
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-xl bg-canvas p-4 text-sm text-muted-foreground">
+                Nenhum pedido registrado ainda.
+              </p>
+            )}
           </Panel>
 
           <Panel title="Pedido recorrente" icon={Repeat}>
             <div className="rounded-xl border border-[var(--border-strong)] bg-surface-brand-soft p-4">
-              <p className="text-sm font-semibold text-brand-900">Cesta semanal do restaurante</p>
+              <p className="text-sm font-semibold text-brand-900">Pedidos recorrentes</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Entrega preferida toda terca, com confirmacao antes do fechamento.
+                Acompanhe modelos salvos e pedidos frequentes na área de pedidos.
               </p>
               <Link
                 to="/orders"
@@ -119,19 +129,25 @@ function BuyerProfile() {
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <Panel title="Produtos mais comprados" icon={TrendingDown}>
-            <ul className="space-y-3">
-              {["Laranja Pera Rio", "Cafe especial", "Pao caseiro", "Pitaya Roxa"].map(
-                (name, index) => (
+            {productSummary.length ? (
+              <ul className="space-y-3">
+                {productSummary.map((item) => (
                   <li
-                    key={name}
+                    key={item.name}
                     className="flex items-center justify-between rounded-xl bg-canvas px-4 py-3"
                   >
-                    <span className="font-medium text-brand-900">{name}</span>
-                    <span className="text-xs text-muted-foreground">{18 - index * 3} pedidos</span>
+                    <span className="font-medium text-brand-900">{item.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {item.quantity.toLocaleString("pt-BR")} {item.unit}
+                    </span>
                   </li>
-                ),
-              )}
-            </ul>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-xl bg-canvas p-4 text-sm text-muted-foreground">
+                Os produtos mais comprados aparecem depois do primeiro pedido.
+              </p>
+            )}
           </Panel>
 
           <Panel title="Contato principal" icon={Phone}>
@@ -158,15 +174,21 @@ function BuyerDetailsPanel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(details);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setDraft(details);
   }, [details]);
 
   const save = async () => {
-    await onSave(draft);
-    setEditing(false);
-    setNotice("Dados da empresa atualizados.");
+    setError("");
+    try {
+      await onSave(draft);
+      setEditing(false);
+      setNotice("Dados da empresa atualizados.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar os dados.");
+    }
   };
 
   return (
@@ -174,19 +196,20 @@ function BuyerDetailsPanel({
       {!editing ? (
         <div>
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Mini label="Nome fantasia" value={details.companyName || "Nao informado"} />
-            <Mini label="Tipo" value={details.businessType || "Nao informado"} />
-            <Mini label="Responsavel" value={details.responsibleName || "Nao informado"} />
-            <Mini label="Telefone" value={details.phone || "Nao informado"} />
-            <Mini label="Cidade" value={details.city || "Nao informado"} />
-            <Mini label="Estado" value={details.state || "Nao informado"} />
-            <Mini label="Fornecedor atual" value={details.currentSupplier || "Nao informado"} />
+            <Mini label="Nome fantasia" value={details.companyName || "Não informado"} />
+            <Mini label="Tipo" value={details.businessType || "Não informado"} />
+            <Mini label="CNPJ" value={details.cnpj || "Não informado"} />
+            <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
+            <Mini label="Telefone" value={details.phone || "Não informado"} />
+            <Mini label="Cidade" value={details.city || "Não informado"} />
+            <Mini label="Estado" value={details.state || "Não informado"} />
+            <Mini label="Fornecedor atual" value={details.currentSupplier || "Não informado"} />
             <Mini
               label="Gasto medio mensal"
               value={
                 details.monthlySpend
                   ? `R$ ${Number(details.monthlySpend).toFixed(2)}`
-                  : "Nao informado"
+                  : "Não informado"
               }
             />
           </dl>
@@ -197,6 +220,7 @@ function BuyerDetailsPanel({
             type="button"
             onClick={() => {
               setNotice("");
+              setError("");
               setEditing(true);
             }}
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -221,8 +245,15 @@ function BuyerDetailsPanel({
               onChange={(businessType) => setDraft({ ...draft, businessType })}
             />
             <TextField
+              icon={Building2}
+              label="CNPJ"
+              value={draft.cnpj}
+              onChange={(cnpj) => setDraft({ ...draft, cnpj })}
+              placeholder="00.000.000/0000-00"
+            />
+            <TextField
               icon={User}
-              label="Responsavel"
+              label="Responsável"
               value={draft.responsibleName}
               onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
             />
@@ -260,6 +291,11 @@ function BuyerDetailsPanel({
               type="number"
             />
           </div>
+          {error && (
+            <p className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
+              {error}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -274,6 +310,7 @@ function BuyerDetailsPanel({
               type="button"
               onClick={() => {
                 setDraft(details);
+                setError("");
                 setEditing(false);
               }}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -285,6 +322,33 @@ function BuyerDetailsPanel({
         </div>
       )}
     </Panel>
+  );
+}
+
+function summarizeProducts(orders: SavedOrder[]) {
+  const totals = new Map<string, { name: string; quantity: number; unit: string }>();
+
+  for (const order of orders) {
+    for (const item of order.items) {
+      const key = `${item.productName}-${item.unit}`;
+      const current = totals.get(key) ?? {
+        name: item.productName,
+        quantity: 0,
+        unit: item.unit,
+      };
+      current.quantity += Number(item.quantity || 0);
+      totals.set(key, current);
+    }
+  }
+
+  return Array.from(totals.values())
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 4);
+}
+
+function producerNames(order: SavedOrder) {
+  return Array.from(new Set(order.items.map((item) => item.producerName).filter(Boolean))).join(
+    ", ",
   );
 }
 

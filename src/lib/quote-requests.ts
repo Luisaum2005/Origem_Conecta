@@ -133,9 +133,11 @@ async function loadRemoteQuotes(
 }
 
 async function createRemoteQuote(profileId: string, quote: QuoteRequest) {
-  if (!supabase) return;
+  if (!supabase) return null;
   const buyerId = await getBuyerId(profileId);
-  if (!buyerId) return;
+  if (!buyerId) {
+    throw new Error("Cadastro de comprador nao encontrado para este usuario.");
+  }
 
   const { data, error } = await supabase
     .from("quote_requests")
@@ -163,7 +165,9 @@ async function respondRemoteQuote(
 ) {
   if (!supabase) return;
   const producerId = await getProducerId(profileId);
-  if (!producerId) return;
+  if (!producerId) {
+    throw new Error("Cadastro de produtor nao encontrado para este usuario.");
+  }
 
   const { error } = await supabase
     .from("quote_requests")
@@ -214,37 +218,33 @@ export function useQuoteRequests() {
     };
   }, [isSupabaseConfigured, profile]);
 
-  const addQuote = (quote: Omit<QuoteRequest, "id" | "createdAt" | "status">) => {
+  const addQuote = async (quote: Omit<QuoteRequest, "id" | "createdAt" | "status">) => {
     const next: QuoteRequest = {
       ...quote,
       id: String(Math.floor(1000 + Math.random() * 9000)),
       createdAt: new Date().toISOString(),
       status: "Aberta",
     };
-    setQuotes((current) => [next, ...current]);
 
     if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      createRemoteQuote(profile.id, next)
-        .then((remote) => {
-          if (!remote) return;
-          setQuotes((current) =>
-            current.map((item) =>
-              item.id === next.id ? { ...item, id: remote.id, createdAt: remote.createdAt } : item,
-            ),
-          );
-        })
-        .catch((error) => {
-          console.warn("Nao foi possivel salvar cotacao no Supabase.", error);
-        });
+      const remote = await createRemoteQuote(profile.id, next);
+      const savedQuote = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
+      setQuotes((current) => [savedQuote, ...current]);
+      return savedQuote;
     }
 
+    setQuotes((current) => [next, ...current]);
     return next;
   };
 
-  const respondQuote = (
+  const respondQuote = async (
     id: string,
     response: Pick<QuoteRequest, "producerName" | "responsePrice" | "responseNotes">,
   ) => {
+    if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
+      await respondRemoteQuote(profile.id, id, response);
+    }
+
     setQuotes((current) =>
       current.map((quote) =>
         quote.id === id
@@ -256,23 +256,15 @@ export function useQuoteRequests() {
           : quote,
       ),
     );
-
-    if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
-      respondRemoteQuote(profile.id, id, response).catch((error) => {
-        console.warn("Nao foi possivel responder cotacao no Supabase.", error);
-      });
-    }
   };
 
-  const updateStatus = (id: string, status: QuoteStatus) => {
+  const updateStatus = async (id: string, status: QuoteStatus) => {
+    if (supabase && isSupabaseConfigured && profile?.tipo !== "produtor") {
+      await updateRemoteQuoteStatus(id, status);
+    }
     setQuotes((current) =>
       current.map((quote) => (quote.id === id ? { ...quote, status } : quote)),
     );
-    if (supabase && isSupabaseConfigured && profile?.tipo !== "produtor") {
-      updateRemoteQuoteStatus(id, status).catch((error) => {
-        console.warn("Nao foi possivel atualizar cotacao no Supabase.", error);
-      });
-    }
   };
 
   return { quotes, addQuote, respondQuote, updateStatus };

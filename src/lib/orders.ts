@@ -94,7 +94,7 @@ function mapRemoteOrder(order: RemoteOrder): SavedOrder {
     subtotal: Number(order.subtotal || 0),
     delivery: Number(order.delivery || 0),
     total: Number(order.total || 0),
-    deliveryEta: order.entrega_label || "Próximo ciclo",
+    deliveryEta: order.entrega_label || "Proximo ciclo",
     items: (order.order_items ?? []).map((item) => ({
       productId: item.product_ref || item.product_name,
       productName: item.product_name,
@@ -167,9 +167,11 @@ async function loadRemoteOrders(
 }
 
 async function createRemoteOrder(profileId: string, order: SavedOrder) {
-  if (!supabase) return;
+  if (!supabase) return null;
   const buyerId = await getBuyerId(profileId);
-  if (!buyerId) return;
+  if (!buyerId) {
+    throw new Error("Cadastro de comprador nao encontrado para este usuario.");
+  }
 
   const { data, error } = await supabase
     .from("orders")
@@ -234,7 +236,7 @@ export function useOrders() {
         if (active && remoteOrders) setOrders(remoteOrders);
       })
       .catch((error) => {
-        console.warn("Não foi possível carregar pedidos do Supabase.", error);
+        console.warn("Nao foi possivel carregar pedidos do Supabase.", error);
       });
 
     return () => {
@@ -242,42 +244,32 @@ export function useOrders() {
     };
   }, [isSupabaseConfigured, profile]);
 
-  const addOrder = (order: Omit<SavedOrder, "id" | "createdAt" | "status">) => {
+  const addOrder = async (order: Omit<SavedOrder, "id" | "createdAt" | "status">) => {
     const next: SavedOrder = {
       ...order,
       id: String(Math.floor(1000 + Math.random() * 9000)),
       createdAt: new Date().toISOString(),
       status: "Recebido",
     };
-    setOrders((current) => [next, ...current]);
 
     if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      createRemoteOrder(profile.id, next)
-        .then((remote) => {
-          if (!remote) return;
-          setOrders((current) =>
-            current.map((item) =>
-              item.id === next.id ? { ...item, id: remote.id, createdAt: remote.createdAt } : item,
-            ),
-          );
-        })
-        .catch((error) => {
-          console.warn("Não foi possível salvar pedido no Supabase.", error);
-        });
+      const remote = await createRemoteOrder(profile.id, next);
+      const savedOrder = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
+      setOrders((current) => [savedOrder, ...current]);
+      return savedOrder;
     }
 
+    setOrders((current) => [next, ...current]);
     return next;
   };
 
-  const updateStatus = (id: string, status: OrderStatus) => {
+  const updateStatus = async (id: string, status: OrderStatus) => {
+    if (supabase && isSupabaseConfigured) {
+      await updateRemoteStatus(id, status);
+    }
     setOrders((current) =>
       current.map((order) => (order.id === id ? { ...order, status } : order)),
     );
-    if (supabase && isSupabaseConfigured) {
-      updateRemoteStatus(id, status).catch((error) => {
-        console.warn("Não foi possível atualizar status do pedido no Supabase.", error);
-      });
-    }
   };
 
   return { orders, addOrder, updateStatus };

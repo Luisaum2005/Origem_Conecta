@@ -3,7 +3,7 @@ import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
-import { formatOrderDate, type OrderStatus, useOrders } from "@/lib/orders";
+import { formatOrderDate, useOrders } from "@/lib/orders";
 import { type RecurringOrder, useRecurringOrders } from "@/lib/recurring-orders";
 import {
   CalendarClock,
@@ -24,10 +24,8 @@ export const Route = createFileRoute("/orders")({
   ),
 });
 
-const statusOptions: OrderStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
-
 function Orders() {
-  const { orders, updateStatus } = useOrders();
+  const { orders } = useOrders();
   const { recurringOrders, toggleRecurringOrder, removeRecurringOrder } = useRecurringOrders();
   const products = useAvailableProducts();
   const { replaceCart } = useCart();
@@ -56,12 +54,12 @@ function Orders() {
     replaceCart(nextCart, nextProducerChoices);
     if (!Object.keys(nextCart).length) {
       setRepeatNotice(
-        "Nenhum item deste pedido esta disponivel no estoque atual. Escolha novos produtos no portfolio.",
+        "Nenhum item deste pedido está disponível no estoque atual. Escolha novos produtos no portfólio.",
       );
     } else if (skippedItems > 0) {
       window.sessionStorage.setItem(
         "origem-conecta-repeat-notice",
-        `${skippedItems} item(ns) nao entraram porque nao estao disponiveis no estoque atual.`,
+        `${skippedItems} item(ns) não entraram porque não estão disponíveis no estoque atual.`,
       );
     } else {
       window.sessionStorage.setItem("origem-conecta-repeat-notice", successMessage);
@@ -72,11 +70,11 @@ function Orders() {
   const repeatOrder = (orderId: string) => {
     const order = orders.find((item) => item.id === orderId);
     if (!order) return;
-    loadItemsToCart(order.items, "Pedido anterior carregado para revisao.");
+    loadItemsToCart(order.items, "Pedido anterior carregado para revisão.");
   };
 
   const loadRecurringOrder = (recurringOrder: RecurringOrder) => {
-    loadItemsToCart(recurringOrder.items, "Pedido recorrente carregado para revisao.");
+    loadItemsToCart(recurringOrder.items, "Pedido recorrente carregado para revisão.");
   };
 
   return (
@@ -90,7 +88,7 @@ function Orders() {
               Meus pedidos
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Acompanhe pedidos em andamento, produtores envolvidos e historico de compra.
+              Acompanhe pedidos em andamento, produtores envolvidos e histórico de compra.
             </p>
           </div>
           <Link
@@ -183,13 +181,13 @@ function Orders() {
           <div className="mt-8 rounded-2xl border border-border bg-white p-12 text-center">
             <h3 className="text-lg font-semibold text-brand-900">Nenhum pedido criado ainda</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Monte um pedido no portfolio para acompanhar por aqui.
+              Monte um pedido no portfólio para acompanhar por aqui.
             </p>
             <Link
               to="/portfolio"
               className="mt-6 inline-flex h-11 items-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
             >
-              Ver portfolio
+              Ver portfólio
             </Link>
           </div>
         ) : (
@@ -227,22 +225,12 @@ function Orders() {
                       Repetir pedido
                     </button>
                   </div>
-                  <label className="block min-w-[180px]">
+                  <div className="min-w-[180px]">
                     <span className="text-xs font-semibold text-muted-foreground">Status</span>
-                    <select
-                      value={order.status}
-                      onChange={(event) =>
-                        updateStatus(order.id, event.target.value as OrderStatus)
-                      }
-                      className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-                    >
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <p className="mt-1 inline-flex h-10 items-center rounded-lg border border-border bg-canvas px-3 text-sm font-semibold text-brand-900">
+                      {order.status}
+                    </p>
+                  </div>
                 </div>
 
                 <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-canvas">
@@ -255,7 +243,7 @@ function Orders() {
                         <p className="font-semibold text-brand-900">{item.productName}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {item.producerName} -{" "}
-                          {item.manualProducerChoice ? "produtor escolhido" : "produtor automatico"}
+                          {item.manualProducerChoice ? "produtor escolhido" : "produtor automático"}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-brand-900">

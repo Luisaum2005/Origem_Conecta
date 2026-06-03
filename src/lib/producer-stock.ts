@@ -68,7 +68,7 @@ export const INITIAL_PRODUCER_STOCK: ProducerStockItem[] = [
     price: "18.50",
     harvestDate: "2026-05-24",
     expiryDate: "2026-05-31",
-    notes: "Frutas selecionadas para entrega no próximo ciclo.",
+    notes: "Frutas selecionadas para entrega no proximo ciclo.",
     status: "ativo",
   },
   {
@@ -266,7 +266,7 @@ export function useProducerStock() {
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
       } catch (error) {
-        console.warn("Não foi possível carregar o estoque do Supabase.", error);
+        console.warn("Nao foi possivel carregar o estoque do Supabase.", error);
         remoteLoadedRef.current = false;
       }
     }
@@ -285,7 +285,7 @@ export function useProducerStock() {
 
     lastSyncedRef.current = serialized;
     syncProducerInventory(producerId, items).catch((error) => {
-      console.warn("Não foi possível sincronizar o estoque com o Supabase.", error);
+      console.warn("Nao foi possivel sincronizar o estoque com o Supabase.", error);
     });
   }, [isSupabaseConfigured, items, producerId]);
 
@@ -330,15 +330,11 @@ export function useProducerStock() {
       const normalized = normalizeDecrementItems(orderItems);
       if (!normalized.length) return;
 
-      setItemsState((current) => applyStockDecrement(current, normalized));
-
       if (supabase && isSupabaseConfigured) {
-        try {
-          await decrementRemoteInventory(normalized);
-        } catch (error) {
-          console.warn("Não foi possível baixar o estoque no Supabase.", error);
-        }
+        await decrementRemoteInventory(normalized);
       }
+
+      setItemsState((current) => applyStockDecrement(current, normalized));
     },
     [isSupabaseConfigured],
   );

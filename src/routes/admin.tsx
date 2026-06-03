@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/lib/auth";
@@ -7,7 +7,6 @@ import { useProducerStock } from "@/lib/producer-stock";
 import { useRegisteredProducers } from "@/lib/producers";
 import { useQuoteRequests } from "@/lib/quote-requests";
 import {
-  CheckCircle2,
   ClipboardList,
   MessageSquareText,
   Package,
@@ -27,11 +26,9 @@ export const Route = createFileRoute("/admin")({
   ),
 });
 
-const statusOptions: OrderStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
-
 function Admin() {
   const { isSupabaseConfigured } = useAuth();
-  const { orders, updateStatus } = useOrders();
+  const { orders } = useOrders();
   const [stock] = useProducerStock();
   const { quotes } = useQuoteRequests();
   const { producers, loading: producersLoading } = useRegisteredProducers();
@@ -62,19 +59,20 @@ function Admin() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Central de operação
+              Central de acompanhamento
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Gerencie pedidos, alocação de produtores, estoque publicado e andamento das entregas.
+              Acompanhe pedidos, produtores, estoque publicado e andamento das entregas. O status
+              dos pedidos é alterado pelo produtor.
             </p>
           </div>
-          <Link
-            to="/production"
+          <a
+            href="#admin-stock"
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
           >
             <Sprout className="h-4 w-4 text-leaf-700" />
             Ver estoque
-          </Link>
+          </a>
         </div>
 
         <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -104,7 +102,7 @@ function Admin() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <Panel title="Gestão de pedidos" icon={ClipboardList}>
+          <Panel title="Acompanhamento de pedidos" icon={ClipboardList}>
             {orders.length === 0 ? (
               <EmptyState />
             ) : (
@@ -120,36 +118,30 @@ function Admin() {
                           Pedido #{order.id}
                         </p>
                         <h3 className="mt-1 text-lg font-bold text-brand-900">
-                          {order.buyerName} · R$ {order.total.toFixed(2)}
+                          {order.buyerName} - R$ {order.total.toFixed(2)}
                         </h3>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {formatOrderDate(order.createdAt)} · {order.items.length} item
+                          {formatOrderDate(order.createdAt)} - {order.items.length} item
                           {order.items.length > 1 ? "s" : ""}
                         </p>
                       </div>
 
-                      <label className="block w-full sm:w-auto sm:min-w-[180px]">
+                      <div className="block w-full sm:w-auto sm:min-w-[180px]">
                         <span className="text-xs font-semibold text-muted-foreground">
                           Status operacional
                         </span>
-                        <select
-                          value={order.status}
-                          onChange={(event) =>
-                            updateStatus(order.id, event.target.value as OrderStatus)
-                          }
-                          className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+                        <span
+                          className={`mt-1 inline-flex h-10 w-full items-center rounded-lg px-3 text-sm font-semibold sm:w-auto ${statusClass(
+                            order.status,
+                          )}`}
                         >
-                          {statusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          {order.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-                      <table className="min-w-[680px] w-full text-sm">
+                      <table className="w-full min-w-[680px] text-sm">
                         <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <tr>
                             <th className="px-4 py-3 font-semibold">Produto</th>
@@ -182,32 +174,10 @@ function Admin() {
                       </table>
                     </div>
 
-                    <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(order.id, "Em separação")}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
-                      >
-                        <CheckCircle2 className="h-4 w-4 text-leaf-700" />
-                        Confirmar alocação
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(order.id, "Em entrega")}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
-                      >
-                        <Truck className="h-4 w-4 text-leaf-700" />
-                        Enviar para entrega
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(order.id, "Entregue")}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
-                      >
-                        <Package className="h-4 w-4 text-leaf-700" />
-                        Marcar entregue
-                      </button>
-                    </div>
+                    <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-xs text-muted-foreground">
+                      O admin apenas acompanha. Confirmacao, separacao, entrega e baixa final sao
+                      feitas pelo produtor no painel de pedidos recebidos.
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -229,7 +199,7 @@ function Admin() {
                     >
                       <p className="font-semibold text-brand-900">{producer.name}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {producer.items} item{producer.items > 1 ? "s" : ""} · R${" "}
+                        {producer.items} item{producer.items > 1 ? "s" : ""} - R${" "}
                         {producer.total.toFixed(2)}
                       </p>
                     </li>
@@ -289,22 +259,24 @@ function Admin() {
               )}
             </Panel>
 
-            <Panel title="Estoque publicado" icon={Sprout}>
-              <ul className="space-y-3">
-                {activeStock.slice(0, 6).map((item) => (
-                  <li key={item.id} className="rounded-xl border border-border bg-canvas p-4">
-                    <p className="text-sm font-semibold text-brand-900">{item.product}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.quantity} {item.unit} · R$ {Number(item.price || 0).toFixed(2)}/
-                      {item.unit}
-                    </p>
-                  </li>
-                ))}
-                {activeStock.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nenhum produto ativo publicado.</p>
-                )}
-              </ul>
-            </Panel>
+            <div id="admin-stock" className="scroll-mt-24">
+              <Panel title="Estoque publicado" icon={Sprout}>
+                <ul className="space-y-3">
+                  {activeStock.slice(0, 6).map((item) => (
+                    <li key={item.id} className="rounded-xl border border-border bg-canvas p-4">
+                      <p className="text-sm font-semibold text-brand-900">{item.product}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.quantity} {item.unit} - R$ {Number(item.price || 0).toFixed(2)}/
+                        {item.unit}
+                      </p>
+                    </li>
+                  ))}
+                  {activeStock.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhum produto ativo publicado.</p>
+                  )}
+                </ul>
+              </Panel>
+            </div>
 
             <Panel title="Cotações recentes" icon={MessageSquareText}>
               <ul className="space-y-3">
@@ -370,16 +342,17 @@ function EmptyState() {
     <div className="rounded-2xl border border-border bg-canvas p-8 text-center">
       <h3 className="text-base font-semibold text-brand-900">Nenhum pedido criado ainda</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Quando o comprador confirmar um pedido, ele aparece aqui para alocação e operação.
+        Quando o comprador confirmar um pedido, ele aparece aqui para acompanhamento.
       </p>
-      <Link
-        to="/portfolio"
-        className="mt-5 inline-flex h-10 items-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-      >
-        Criar pedido de teste
-      </Link>
     </div>
   );
+}
+
+function statusClass(status: OrderStatus) {
+  if (status === "Recebido") return "bg-orange-100 text-orange-700";
+  if (status === "Em separação") return "bg-[var(--color-info-bg)] text-[var(--color-info-fg)]";
+  if (status === "Em entrega") return "bg-[var(--color-warning-bg)] text-brand-900";
+  return "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]";
 }
 
 function Panel({
