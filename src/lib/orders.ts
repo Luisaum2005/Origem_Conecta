@@ -173,6 +173,13 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
     throw new Error("Cadastro de comprador nao encontrado para este usuario.");
   }
 
+  const itemsWithoutProducer = order.items.filter((item) => !isUuid(item.producerId));
+  if (itemsWithoutProducer.length) {
+    throw new Error(
+      "Um ou mais produtos nao estao vinculados a um produtor real. Atualize o portfolio e tente novamente.",
+    );
+  }
+
   const { data, error } = await supabase
     .from("orders")
     .insert({
@@ -195,7 +202,7 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
     quantidade: item.quantity,
     unidade: item.unit,
     preco_unitario: item.unitPrice,
-    producer_id: isUuid(item.producerId) ? item.producerId : null,
+    producer_id: item.producerId,
     producer_ref: item.producerId,
     producer_name: item.producerName,
     escolha_manual_produtor: item.manualProducerChoice,
@@ -204,7 +211,10 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
 
   if (payload.length) {
     const { error: itemsError } = await supabase.from("order_items").insert(payload);
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      await supabase.from("orders").delete().eq("id", data.id);
+      throw itemsError;
+    }
   }
 
   return { id: data.id as string, createdAt: data.criado_em as string };

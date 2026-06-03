@@ -85,6 +85,7 @@ export const INITIAL_PRODUCER_STOCK: ProducerStockItem[] = [
 ];
 
 function readStoredStock() {
+  if (supabase) return [];
   if (typeof window === "undefined") return INITIAL_PRODUCER_STOCK;
   const stored = window.localStorage.getItem(PRODUCER_STOCK_STORAGE_KEY);
   if (!stored) return INITIAL_PRODUCER_STOCK;

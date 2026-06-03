@@ -230,11 +230,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (input.tipo === "produtor" && input.producer) {
+          const location = [input.cidade, input.estado].filter(Boolean).join(", ");
           const { error: producerError } = await supabase.from("producers").insert({
             profile_id: profileData.id,
             nome_propriedade: input.producer.nomePropriedade,
             responsavel: input.producer.responsavel,
             cnpj: input.producer.cnpj,
+            localizacao: location || null,
             categorias_atendidas: input.producer.produtos,
           });
           if (producerError) throw producerError;

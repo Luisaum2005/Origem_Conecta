@@ -60,7 +60,8 @@ Use este roteiro antes de enviar o link para compradores e produtores reais.
 - Entrar como admin.
 - Ver painel geral.
 - Ver pedidos em aberto.
-- Alterar status de pedido.
+- Confirmar que o admin apenas acompanha os pedidos.
+- Confirmar que a alteracao de status fica no painel do produtor.
 - Ver estoque publicado.
 - Ver cotacoes recentes.
 - Editar referencias de mercado em `/quotes`.

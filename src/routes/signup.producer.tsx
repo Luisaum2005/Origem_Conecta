@@ -31,6 +31,8 @@ function SignupProducer() {
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
         telefone: String(form.get("telefone") ?? ""),
+        cidade: String(form.get("municipio") ?? ""),
+        estado: String(form.get("uf") ?? ""),
         producer: {
           nomePropriedade: String(form.get("nomePropriedade") ?? ""),
           responsavel: String(form.get("responsavel") ?? ""),
