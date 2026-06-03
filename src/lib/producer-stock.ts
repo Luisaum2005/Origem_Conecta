@@ -262,9 +262,7 @@ export function useProducerStock() {
         const remoteItems = await loadInventory(nextProducerId);
         if (!active || !remoteItems) return;
         setProducerId(nextProducerId);
-        setItemsState(
-          remoteItems.length ? remoteItems : profile?.tipo === "produtor" ? [] : readStoredStock(),
-        );
+        setItemsState(remoteItems.length ? remoteItems : profile?.tipo ? [] : readStoredStock());
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
       } catch (error) {
