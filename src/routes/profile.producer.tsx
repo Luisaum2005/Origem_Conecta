@@ -34,8 +34,8 @@ export const Route = createFileRoute("/profile/producer")({
   ),
 });
 
-const PRODUCER_ID = "ramy-pitayas";
-const PRODUCER_NAME = "Ramy Pitayas";
+const PRODUCER_ID = "produtor";
+const PRODUCER_NAME = "Produtor";
 
 function ProducerProfile() {
   const { profile, isSupabaseConfigured } = useAuth();
@@ -403,7 +403,7 @@ function ProducerDetailsPanel({
               label="CNPJ"
               value={draft.cnpj}
               onChange={(cnpj) => setDraft({ ...draft, cnpj })}
-              placeholder="00.000.000/0000-00"
+              placeholder="Digite o CNPJ"
             />
             <TextField
               icon={Phone}
@@ -416,7 +416,7 @@ function ProducerDetailsPanel({
               label="Localização"
               value={draft.location}
               onChange={(location) => setDraft({ ...draft, location })}
-              placeholder="Cidade, UF"
+              placeholder="Digite a cidade e UF"
             />
           </div>
           <label className="block">

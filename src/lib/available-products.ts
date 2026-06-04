@@ -3,10 +3,10 @@ import { CATALOG, type Product } from "@/lib/catalog";
 import { useProducerStock } from "@/lib/producer-stock";
 
 const DEFAULT_PRODUCER = {
-  id: "ramy-pitayas",
-  name: "Ramy Pitayas",
-  property: "Ramy Pitayas",
-  origin: "Queiroz, SP",
+  id: "produtor",
+  name: "Produtor",
+  property: "Produtor",
+  origin: "Localizacao nao informada",
   onTimeRate: 97,
   reliabilityScore: 4.9,
   eta: "próximo ciclo",
@@ -50,6 +50,7 @@ export function useAvailableProducts() {
                 id: item.producerId ?? DEFAULT_PRODUCER.id,
                 name: item.producerName ?? DEFAULT_PRODUCER.name,
                 property: item.producerName ?? DEFAULT_PRODUCER.property,
+                origin: item.producerLocation ?? DEFAULT_PRODUCER.origin,
                 price: Number(item.price || 0),
                 stock: Number(item.quantity || 0),
               },

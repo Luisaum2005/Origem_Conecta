@@ -53,8 +53,8 @@ function SignupAdmin() {
       <FormProgress step={1} total={1} hint="Acesso interno" />
       <form className="space-y-6" onSubmit={onSubmit}>
         <FormSection title="Dados do admin">
-          <Field name="nome" label="Nome" placeholder="Admin Origem" required />
-          <Field name="telefone" label="Telefone" type="tel" placeholder="(11) 99999-9999" />
+          <Field name="nome" label="Nome" placeholder="Digite o nome" required />
+          <Field name="telefone" label="Telefone" type="tel" placeholder="Digite o telefone" />
           <Field name="email" label="E-mail" type="email" required />
         </FormSection>
 

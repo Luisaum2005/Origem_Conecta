@@ -8,6 +8,7 @@ export type ProducerStockItem = {
   id: string;
   producerId?: string;
   producerName?: string;
+  producerLocation?: string;
   imageUrl?: string;
   product: string;
   quantity: string;
@@ -42,6 +43,7 @@ type InventoryRow = {
   } | null;
   producers?: {
     nome_propriedade?: string | null;
+    localizacao?: string | null;
   } | null;
 };
 
@@ -59,30 +61,7 @@ export const EMPTY_STOCK_ITEM: ProducerStockItem = {
   status: "ativo",
 };
 
-export const INITIAL_PRODUCER_STOCK: ProducerStockItem[] = [
-  {
-    id: "demo-pitaya-roxa",
-    product: "Pitaya Roxa",
-    quantity: "42",
-    unit: "kg",
-    price: "18.50",
-    harvestDate: "2026-05-24",
-    expiryDate: "2026-05-31",
-    notes: "Frutas selecionadas para entrega no proximo ciclo.",
-    status: "ativo",
-  },
-  {
-    id: "demo-doce-figo",
-    product: "Doce Figo Ramy",
-    quantity: "70",
-    unit: "pote",
-    price: "18.00",
-    harvestDate: "",
-    expiryDate: "2026-08-30",
-    notes: "Lote artesanal pronto para venda.",
-    status: "ativo",
-  },
-];
+export const INITIAL_PRODUCER_STOCK: ProducerStockItem[] = [];
 
 function readStoredStock() {
   if (supabase) return [];
@@ -126,6 +105,7 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
     id: row.id,
     producerId: row.producer_id ?? undefined,
     producerName: row.producers?.nome_propriedade ?? undefined,
+    producerLocation: row.producers?.localizacao ?? undefined,
     imageUrl: row.imagem_url ?? undefined,
     product: row.nome_produto || row.products?.nome || "Produto sem nome",
     quantity: String(row.quantidade_disponivel ?? ""),
@@ -154,7 +134,7 @@ async function loadInventory(producerId?: string | null) {
   let query = supabase
     .from("producer_inventory")
     .select(
-      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo,products(nome,unidade),producers(nome_propriedade)",
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao)",
     )
     .order("atualizado_em", { ascending: false });
 

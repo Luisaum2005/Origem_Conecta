@@ -141,12 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: `local-${tipo}`,
             userId: `local-user-${tipo}`,
             tipo,
-            nome:
-              tipo === "produtor"
-                ? "Ramy Pitayas"
-                : tipo === "admin"
-                  ? "Admin Origem"
-                  : "Cozinha Atelier",
+            nome: tipo === "produtor" ? "Produtor" : tipo === "admin" ? "Admin" : "Comprador",
             email,
           };
           window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(localProfile));

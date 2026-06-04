@@ -67,11 +67,16 @@ function SignupProducer() {
           <Field
             name="nomePropriedade"
             label="Nome da propriedade"
-            placeholder="Sítio Esperança"
+            placeholder="Digite o nome da propriedade"
             required
           />
-          <Field name="responsavel" label="Responsável" placeholder="Nome completo" required />
-          <Field name="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" required />
+          <Field
+            name="responsavel"
+            label="Responsável"
+            placeholder="Digite o nome completo"
+            required
+          />
+          <Field name="cnpj" label="CNPJ" placeholder="Digite o CNPJ" required />
         </FormSection>
 
         <FormSection title="Contato">
@@ -79,7 +84,7 @@ function SignupProducer() {
             name="telefone"
             label="WhatsApp"
             type="tel"
-            placeholder="(11) 99999-9999"
+            placeholder="Digite o telefone"
             required
           />
           <Field name="email" label="E-mail" type="email" required />
@@ -177,7 +182,7 @@ function ProductPicker({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar produto..."
+              placeholder="Buscar produto"
               className="h-9 w-full bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
             />
           </div>

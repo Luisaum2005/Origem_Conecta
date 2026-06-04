@@ -63,20 +63,25 @@ function SignupBuyer() {
           <Field
             name="nomeEmpresa"
             label="Nome do estabelecimento"
-            placeholder="Cozinha Atelier"
+            placeholder="Digite o nome do estabelecimento"
             required
           />
-          <Field name="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" required />
+          <Field name="cnpj" label="CNPJ" placeholder="Digite o CNPJ" required />
         </FormSection>
 
         <FormSection title="Contato">
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field name="responsavel" label="Responsável" placeholder="Nome completo" required />
+            <Field
+              name="responsavel"
+              label="Responsável"
+              placeholder="Digite o nome completo"
+              required
+            />
             <Field
               name="telefone"
               label="Telefone"
               type="tel"
-              placeholder="(11) 99999-9999"
+              placeholder="Digite o telefone"
               required
             />
           </div>

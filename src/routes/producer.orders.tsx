@@ -20,8 +20,8 @@ export const Route = createFileRoute("/producer/orders")({
   ),
 });
 
-const PRODUCER_ID = "ramy-pitayas";
-const PRODUCER_NAME = "Ramy Pitayas";
+const PRODUCER_ID = "produtor";
+const PRODUCER_NAME = "Produtor";
 const statusOptions: OrderStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
 
 function ProducerOrders() {

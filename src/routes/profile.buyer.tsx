@@ -249,7 +249,7 @@ function BuyerDetailsPanel({
               label="CNPJ"
               value={draft.cnpj}
               onChange={(cnpj) => setDraft({ ...draft, cnpj })}
-              placeholder="00.000.000/0000-00"
+              placeholder="Digite o CNPJ"
             />
             <TextField
               icon={User}
