@@ -5,14 +5,14 @@ import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useOrders } from "@/lib/orders";
 import { useQuoteRequests } from "@/lib/quote-requests";
 import { Bell, ClipboardList, MessageSquareText, PackageCheck, User } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const links = [
   { to: "/portfolio", label: "Portfólio", profiles: ["comprador"] },
   { to: "/orders", label: "Pedidos", profiles: ["comprador"] },
   { to: "/producer/orders", label: "Pedidos recebidos", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
-  { to: "/quotes", label: "Cotações", profiles: ["comprador", "produtor", "admin"] },
+  { to: "/quotes", label: "Solicitações", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
 ] as const;
 
@@ -25,6 +25,16 @@ export function Navbar() {
   const { orders } = useOrders();
   const { quotes } = useQuoteRequests();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const readStorageKey = profile?.id ? `origem-conecta-read-notifications-${profile.id}` : "";
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(window.localStorage.getItem("origem-conecta-read-notifications") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [visibleNotifications, setVisibleNotifications] = useState<NotificationItem[]>([]);
   const profilePath =
     profile?.tipo === "comprador"
       ? "/profile/buyer"
@@ -36,6 +46,42 @@ export function Navbar() {
     () => buildNotifications(profile?.tipo, orders, quotes),
     [orders, profile?.tipo, quotes],
   );
+
+  useEffect(() => {
+    if (!readStorageKey || typeof window === "undefined") return;
+    try {
+      setReadNotificationIds(JSON.parse(window.localStorage.getItem(readStorageKey) || "[]"));
+    } catch {
+      setReadNotificationIds([]);
+    }
+    setVisibleNotifications([]);
+    setNotificationsOpen(false);
+  }, [readStorageKey]);
+
+  const unreadNotifications = notifications.filter(
+    (notification) => !readNotificationIds.includes(notification.id),
+  );
+
+  const toggleNotifications = () => {
+    if (notificationsOpen) {
+      setNotificationsOpen(false);
+      setVisibleNotifications([]);
+      return;
+    }
+
+    setVisibleNotifications(unreadNotifications);
+    const nextReadIds = Array.from(
+      new Set([...readNotificationIds, ...unreadNotifications.map((item) => item.id)]),
+    );
+    setReadNotificationIds(nextReadIds);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        readStorageKey || "origem-conecta-read-notifications",
+        JSON.stringify(nextReadIds),
+      );
+    }
+    setNotificationsOpen(true);
+  };
 
   return (
     <>
@@ -60,15 +106,15 @@ export function Navbar() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setNotificationsOpen((open) => !open)}
+                onClick={toggleNotifications}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
                 aria-label="Notificacoes"
                 aria-expanded={notificationsOpen}
               >
                 <Bell className="h-5 w-5" />
-                {notifications.length > 0 && (
+                {unreadNotifications.length > 0 && (
                   <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-orange-600 px-1 text-[10px] font-bold leading-none text-white">
-                    {notifications.length}
+                    {unreadNotifications.length}
                   </span>
                 )}
               </button>
@@ -81,13 +127,13 @@ export function Navbar() {
                       Alertas gerados pela operação atual.
                     </p>
                   </div>
-                  {notifications.length === 0 ? (
+                  {visibleNotifications.length === 0 ? (
                     <div className="px-4 py-5 text-sm text-muted-foreground">
                       Nenhuma notificacao importante no momento.
                     </div>
                   ) : (
                     <ul className="max-h-[360px] divide-y divide-border overflow-y-auto">
-                      {notifications.map((notification) => {
+                      {visibleNotifications.map((notification) => {
                         const Icon = notification.icon;
                         return (
                           <li key={notification.id}>
@@ -172,8 +218,8 @@ function buildNotifications(
         .slice(0, 2)
         .map((quote) => ({
           id: `buyer-quote-${quote.id}`,
-          title: "Cotacao respondida",
-          text: `${quote.productName} recebeu resposta de ${quote.producerName ?? "um produtor"}.`,
+          title: "Solicitação aceita",
+          text: `${quote.productName} foi aceito por ${quote.producerName ?? "um produtor"}.`,
           to: "/quotes" as const,
           icon: MessageSquareText,
         })),
@@ -197,7 +243,7 @@ function buildNotifications(
         .slice(0, 2)
         .map((quote) => ({
           id: `producer-quote-${quote.id}`,
-          title: "Nova cotação aberta",
+          title: "Nova solicitação aberta",
           text: `${quote.productName}, ${quote.quantity} ${quote.unit}.`,
           to: "/quotes" as const,
           icon: MessageSquareText,
@@ -221,7 +267,7 @@ function buildNotifications(
       .slice(0, 3)
       .map((quote) => ({
         id: `admin-quote-${quote.id}`,
-        title: `Cotacao ${quote.status.toLowerCase()}`,
+        title: `Solicitação ${quote.status.toLowerCase()}`,
         text: `${quote.productName} para ${quote.buyerName}.`,
         to: "/quotes" as const,
         icon: MessageSquareText,

@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/lib/auth";
-import { useAvailableProducts } from "@/lib/available-products";
 import {
   type MarketReference,
   type MarketTrend,
@@ -30,19 +29,8 @@ export const Route = createFileRoute("/quotes")({
 
 function Quotes() {
   const { profile } = useAuth();
-  const products = useAvailableProducts();
   const { quotes, addQuote, respondQuote, updateStatus } = useQuoteRequests();
   const { references, saveReference, removeReference } = useMarketReferences();
-  const productOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...products.map((product) => product.name),
-          ...references.map((row) => row.productName),
-        ]),
-      ),
-    [products, references],
-  );
 
   const openQuotes = quotes.filter((quote) => quote.status === "Aberta");
   const answeredQuotes = quotes.filter((quote) => quote.status === "Respondida");
@@ -71,7 +59,7 @@ function Quotes() {
           <Metric icon={Send} label="Abertas" value={`${openQuotes.length}`} />
           <Metric
             icon={CheckCircle2}
-            label={profile?.tipo === "admin" ? "Aprovadas" : "Respondidas"}
+            label={profile?.tipo === "admin" ? "Aprovadas" : "Aceitas"}
             value={`${profile?.tipo === "admin" ? approvedQuotes.length : answeredQuotes.length}`}
           />
         </section>
@@ -84,7 +72,6 @@ function Quotes() {
           <BuyerQuotes
             quotes={quotes}
             buyerName={profile?.nome ?? "Comprador"}
-            productOptions={productOptions}
             addQuote={addQuote}
             updateStatus={updateStatus}
           />
@@ -104,18 +91,16 @@ function Quotes() {
 function BuyerQuotes({
   quotes,
   buyerName,
-  productOptions,
   addQuote,
   updateStatus,
 }: {
   quotes: QuoteRequest[];
   buyerName: string;
-  productOptions: string[];
   addQuote: ReturnType<typeof useQuoteRequests>["addQuote"];
   updateStatus: ReturnType<typeof useQuoteRequests>["updateStatus"];
 }) {
   const [draft, setDraft] = useState({
-    productName: productOptions[0] ?? "",
+    productName: "",
     quantity: "",
     unit: "kg",
     deliveryDate: "",
@@ -141,7 +126,7 @@ function BuyerQuotes({
         notes: draft.notes,
       });
       setDraft({
-        productName: productOptions[0] ?? "",
+        productName: "",
         quantity: "",
         unit: "kg",
         deliveryDate: "",
@@ -149,7 +134,7 @@ function BuyerQuotes({
         notes: "",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível salvar a cotação.");
+      setError(err instanceof Error ? err.message : "Não foi possível salvar a solicitação.");
     } finally {
       setSaving(false);
     }
@@ -160,7 +145,7 @@ function BuyerQuotes({
     try {
       await updateStatus(id, status);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível atualizar a cotação.");
+      setError(err instanceof Error ? err.message : "Não foi possível atualizar a solicitação.");
     }
   };
 
@@ -170,17 +155,12 @@ function BuyerQuotes({
         <div className="grid gap-4">
           <label className="block">
             <span className="text-sm font-medium text-brand-900">Produto</span>
-            <select
+            <input
               value={draft.productName}
               onChange={(event) => setDraft({ ...draft, productName: event.target.value })}
+              placeholder="Digite o produto desejado"
               className="mt-2 h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-            >
-              {productOptions.map((product) => (
-                <option key={product} value={product}>
-                  {product}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
             <TextInput
@@ -232,13 +212,13 @@ function BuyerQuotes({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
           >
             <Send className="h-4 w-4" />
-            {saving ? "Salvando..." : "Solicitar cotação"}
+            {saving ? "Salvando..." : "Enviar solicitação"}
           </button>
         </div>
       </Panel>
 
-      <Panel title="Minhas cotações" icon={ClipboardList}>
-        <QuoteList empty="Nenhuma cotação solicitada ainda.">
+      <Panel title="Minhas solicitações" icon={ClipboardList}>
+        <QuoteList empty="Nenhuma solicitação enviada ainda.">
           {quotes.map((quote) => (
             <QuoteCard key={quote.id} quote={quote}>
               {quote.status === "Respondida" && (
@@ -279,9 +259,7 @@ function ProducerQuotes({
   respondQuote: ReturnType<typeof useQuoteRequests>["respondQuote"];
 }) {
   const actionable = quotes.filter((quote) => quote.status === "Aberta");
-  const history = quotes.filter(
-    (quote) => quote.producerName === producerName && quote.status !== "Aberta",
-  );
+  const history = quotes.filter((quote) => quote.status !== "Aberta");
   const [responses, setResponses] = useState<
     Record<string, { producerName: string; responsePrice: string; responseNotes: string }>
   >({});
@@ -297,7 +275,7 @@ function ProducerQuotes({
     try {
       await respondQuote(id, response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível enviar a resposta.");
+      setError(err instanceof Error ? err.message : "Não foi possível aceitar a solicitação.");
     } finally {
       setSavingId("");
     }
@@ -311,7 +289,7 @@ function ProducerQuotes({
             {error}
           </p>
         )}
-        <QuoteList empty="Nenhuma cotação aberta no momento.">
+        <QuoteList empty="Nenhuma solicitação aberta no momento.">
           {actionable.map((quote) => {
             const response = responses[quote.id] ?? {
               producerName,
@@ -320,17 +298,7 @@ function ProducerQuotes({
             };
             return (
               <QuoteCard key={quote.id} quote={quote}>
-                <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_120px]">
-                  <TextInput
-                    label="Produtor"
-                    value={response.producerName}
-                    onChange={(nextProducerName) =>
-                      setResponses((current) => ({
-                        ...current,
-                        [quote.id]: { ...response, producerName: nextProducerName },
-                      }))
-                    }
-                  />
+                <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[120px_1fr]">
                   <TextInput
                     label="Preço"
                     value={response.responsePrice}
@@ -343,7 +311,7 @@ function ProducerQuotes({
                     placeholder="18.50"
                   />
                   <label className="block sm:col-span-2">
-                    <span className="text-sm font-medium text-brand-900">Resposta</span>
+                    <span className="text-sm font-medium text-brand-900">Observação</span>
                     <textarea
                       value={response.responseNotes}
                       onChange={(event) =>
@@ -363,7 +331,7 @@ function ProducerQuotes({
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)] sm:col-span-2 sm:w-fit"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    {savingId === quote.id ? "Enviando..." : "Enviar resposta"}
+                    {savingId === quote.id ? "Aceitando..." : "Aceitar solicitação"}
                   </button>
                 </div>
               </QuoteCard>
@@ -372,8 +340,8 @@ function ProducerQuotes({
         </QuoteList>
       </Panel>
 
-      <Panel title="Minhas respostas" icon={ClipboardList}>
-        <QuoteList empty="As respostas enviadas aparecem aqui.">
+      <Panel title="Solicitações aceitas" icon={ClipboardList}>
+        <QuoteList empty="As solicitações aceitas aparecem aqui.">
           {history.map((quote) => (
             <QuoteCard key={quote.id} quote={quote} compact />
           ))}
@@ -386,8 +354,8 @@ function ProducerQuotes({
 function AdminQuotes({ quotes }: { quotes: QuoteRequest[] }) {
   return (
     <section className="mt-8">
-      <Panel title="Monitoramento de cotações" icon={ClipboardList}>
-        <QuoteList empty="Nenhuma cotação cadastrada ainda.">
+      <Panel title="Monitoramento de solicitações" icon={ClipboardList}>
+        <QuoteList empty="Nenhuma solicitação cadastrada ainda.">
           {quotes.map((quote) => (
             <QuoteCard key={quote.id} quote={quote} compact />
           ))}
@@ -419,7 +387,7 @@ function QuoteCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Cotação #{quote.id}
+            Solicitação #{quote.id}
           </p>
           <h3 className="mt-1 text-lg font-bold text-brand-900">{quote.productName}</h3>
           <p className="mt-1 text-sm text-muted-foreground">

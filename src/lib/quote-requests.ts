@@ -127,6 +127,12 @@ async function loadRemoteQuotes(
     query = query.eq("buyer_id", buyerId);
   }
 
+  if (profileType === "produtor") {
+    const producerId = await getProducerId(profileId);
+    if (!producerId) return [];
+    query = query.or(`status.eq.aberta,producer_id.eq.${producerId}`);
+  }
+
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((row) => mapRemoteQuote(row as RemoteQuoteRequest));
@@ -169,7 +175,7 @@ async function respondRemoteQuote(
     throw new Error("Cadastro de produtor nao encontrado para este usuario.");
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("quote_requests")
     .update({
       producer_id: producerId,
@@ -180,8 +186,15 @@ async function respondRemoteQuote(
       status: "respondida",
       respondido_em: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "aberta")
+    .is("producer_id", null)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    throw new Error("Esta cotacao ja foi respondida por outro produtor.");
+  }
 }
 
 async function updateRemoteQuoteStatus(id: string, status: QuoteStatus) {

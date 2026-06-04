@@ -203,15 +203,6 @@ function BuyerDetailsPanel({
             <Mini label="Telefone" value={details.phone || "Não informado"} />
             <Mini label="Cidade" value={details.city || "Não informado"} />
             <Mini label="Estado" value={details.state || "Não informado"} />
-            <Mini label="Fornecedor atual" value={details.currentSupplier || "Não informado"} />
-            <Mini
-              label="Gasto medio mensal"
-              value={
-                details.monthlySpend
-                  ? `R$ ${Number(details.monthlySpend).toFixed(2)}`
-                  : "Não informado"
-              }
-            />
           </dl>
           {notice && (
             <p className="mt-4 text-sm font-semibold text-[var(--color-success-fg)]">{notice}</p>
@@ -275,20 +266,6 @@ function BuyerDetailsPanel({
               value={draft.state}
               onChange={(state) => setDraft({ ...draft, state })}
               placeholder="SP"
-            />
-            <TextField
-              icon={Building2}
-              label="Fornecedor atual"
-              value={draft.currentSupplier}
-              onChange={(currentSupplier) => setDraft({ ...draft, currentSupplier })}
-            />
-            <TextField
-              icon={ShoppingBasket}
-              label="Gasto medio mensal"
-              value={draft.monthlySpend}
-              onChange={(monthlySpend) => setDraft({ ...draft, monthlySpend })}
-              placeholder="2500.00"
-              type="number"
             />
           </div>
           {error && (

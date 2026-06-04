@@ -38,15 +38,11 @@ type RemoteBuyerProfile = {
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
         cnpj?: string | null;
-        fornecedor_atual?: string | null;
-        gasto_medio_mensal?: number | string | null;
       }
     | Array<{
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
         cnpj?: string | null;
-        fornecedor_atual?: string | null;
-        gasto_medio_mensal?: number | string | null;
       }>
     | null;
 };
@@ -72,8 +68,8 @@ function mapRemoteProfile(row: RemoteBuyerProfile): BuyerProfileDetails {
     phone: row.telefone || "",
     city: row.cidade || "",
     state: row.estado || "",
-    currentSupplier: buyer?.fornecedor_atual || "",
-    monthlySpend: buyer?.gasto_medio_mensal == null ? "" : String(buyer.gasto_medio_mensal),
+    currentSupplier: "",
+    monthlySpend: "",
   };
 }
 
@@ -81,9 +77,7 @@ async function loadRemoteBuyerProfile(profileId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select(
-      "nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,cnpj,fornecedor_atual,gasto_medio_mensal)",
-    )
+    .select("nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,cnpj)")
     .eq("id", profileId)
     .maybeSingle();
   if (error) throw error;
@@ -110,10 +104,6 @@ async function updateRemoteBuyerProfile(profileId: string, details: BuyerProfile
       nome_empresa: details.companyName,
       tipo_empresa: details.businessType,
       cnpj: details.cnpj || null,
-      fornecedor_atual: details.currentSupplier || null,
-      gasto_medio_mensal: details.monthlySpend
-        ? Number(details.monthlySpend.replace(",", "."))
-        : null,
     })
     .eq("profile_id", profileId);
   if (buyerError) throw buyerError;
