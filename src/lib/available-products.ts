@@ -6,7 +6,7 @@ const DEFAULT_PRODUCER = {
   id: "produtor",
   name: "Produtor",
   property: "Produtor",
-  origin: "Localizacao nao informada",
+  origin: "Localização não informada",
   onTimeRate: 97,
   reliabilityScore: 4.9,
   eta: "próximo ciclo",
@@ -42,6 +42,7 @@ export function useAvailableProducts() {
               item.notes || match?.description || "Produto disponível no estoque do produtor.",
             emoji: inferEmoji(item.product),
             imageUrl: item.imageUrl,
+            videoUrl: item.videoUrl,
             risk: "baixo",
             substitutes: [],
             producers: [

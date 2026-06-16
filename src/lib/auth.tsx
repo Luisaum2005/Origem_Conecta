@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, throwSupabaseError } from "@/lib/supabase";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type ProfileType = "comprador" | "produtor" | "admin";
@@ -157,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("id,user_id,tipo,nome,email,telefone")
           .eq("user_id", userId)
           .maybeSingle();
-        if (profileError) throw profileError;
+        throwSupabaseError(profileError);
         if (!profileData) throw new Error("Perfil não encontrado para este usuário.");
         const nextProfile: AuthProfile = {
           id: profileData.id,
@@ -212,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           .select("id,user_id,tipo,nome,email,telefone")
           .single();
-        if (profileError) throw profileError;
+        throwSupabaseError(profileError);
 
         if (input.tipo === "comprador" && input.buyer) {
           const { error: buyerError } = await supabase.from("buyers").insert({
@@ -221,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             tipo_empresa: input.buyer.tipoEmpresa,
             cnpj: input.buyer.cnpj,
           });
-          if (buyerError) throw buyerError;
+          throwSupabaseError(buyerError);
         }
 
         if (input.tipo === "produtor" && input.producer) {
@@ -234,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localizacao: location || null,
             categorias_atendidas: input.producer.produtos,
           });
-          if (producerError) throw producerError;
+          throwSupabaseError(producerError);
         }
 
         const nextProfile: AuthProfile = {

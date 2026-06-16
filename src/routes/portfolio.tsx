@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { ProductCard } from "@/components/marketplace/ProductCard";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
-import { ShoppingBag, Search } from "lucide-react";
+import { Search, ShoppingBag } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/portfolio")({
@@ -39,36 +39,11 @@ function Portfolio() {
     <div className="min-h-screen bg-canvas">
       <Navbar />
       <main className="mx-auto max-w-[1200px] px-4 py-6 pb-44 sm:px-8 sm:py-10 md:pb-10">
-        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-[var(--border-strong)] bg-surface-brand-soft p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-leaf-600 text-white">
-              ⏱
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-brand-900">
-                Pedidos abertos até segunda às 18h
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Produtos ativos publicados pelos produtores.
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-white px-3 py-1 text-[11px] font-medium text-brand-700 sm:self-auto">
-            <span className="h-1.5 w-1.5 rounded-full bg-leaf-600" /> Estoques sincronizados
-          </span>
-        </div>
-
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-              Ciclo semanal · próxima entrega no próximo dia útil
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Portfólio da semana
+            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
+              Portfólio
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-              Catálogo gerado a partir da disponibilidade publicada pelos produtores.
-            </p>
           </div>
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -131,7 +106,7 @@ function Portfolio() {
           <ShoppingBag className="h-5 w-5" />
           Ver pedido
           <span className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-orange-600 px-2 text-sm font-bold">
-            {totalItems}
+            {totalItems.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </span>
         </Link>
       )}

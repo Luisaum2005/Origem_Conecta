@@ -46,8 +46,8 @@ function SignupBuyer() {
 
   return (
     <AuthLayout
-      title="Criar conta · Comprador"
-      subtitle="Restaurante, hotel ou catering. Leva menos de 3 minutos, sem burocracia."
+      title="Criar conta de comprador"
+      subtitle="Para restaurantes, mercados, hotéis e cozinhas que compram direto de produtores."
       footer={
         <>
           Já tem conta?{" "}
@@ -63,10 +63,10 @@ function SignupBuyer() {
           <Field
             name="nomeEmpresa"
             label="Nome do estabelecimento"
-            placeholder="Digite o nome do estabelecimento"
+            placeholder="Ex: Mercado Central"
             required
           />
-          <Field name="cnpj" label="CNPJ" placeholder="Digite o CNPJ" required />
+          <Field name="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" required />
         </FormSection>
 
         <FormSection title="Contato">
@@ -74,18 +74,20 @@ function SignupBuyer() {
             <Field
               name="responsavel"
               label="Responsável"
-              placeholder="Digite o nome completo"
+              placeholder="Nome completo"
+              autoComplete="name"
               required
             />
             <Field
               name="telefone"
               label="Telefone"
               type="tel"
-              placeholder="Digite o telefone"
+              placeholder="(11) 99999-9999"
+              autoComplete="tel"
               required
             />
           </div>
-          <Field name="email" label="E-mail" type="email" required />
+          <Field name="email" label="E-mail" type="email" autoComplete="email" required />
         </FormSection>
 
         <AddressFields />
@@ -96,6 +98,7 @@ function SignupBuyer() {
             label="Senha"
             type="password"
             helper="Mínimo 8 caracteres"
+            autoComplete="new-password"
             required
           />
         </FormSection>

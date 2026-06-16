@@ -123,11 +123,33 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  html[data-font-scale="large"] {
+    font-size: 112.5%;
+  }
+
   h1,
   h2,
   h3,
   h4 {
     letter-spacing: -0.01em;
     color: var(--foreground);
+  }
+}
+
+@layer components {
+  .form-input {
+    height: 44px;
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: #ffffff;
+    padding: 0 12px;
+    font-size: 0.875rem;
+    color: var(--color-brand-900);
+    outline: none;
+  }
+
+  .form-input:focus {
+    border-color: var(--color-leaf-600);
   }
 }

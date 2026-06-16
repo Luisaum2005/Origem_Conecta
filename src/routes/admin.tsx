@@ -2,13 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/lib/auth";
+import { useDemandRequests } from "@/lib/demands";
 import { formatOrderDate, type OrderStatus, useOrders } from "@/lib/orders";
 import { useProducerStock } from "@/lib/producer-stock";
 import { useRegisteredProducers } from "@/lib/producers";
-import { useQuoteRequests } from "@/lib/quote-requests";
 import {
   ClipboardList,
-  MessageSquareText,
+  Megaphone,
   Package,
   RotateCcw,
   Route as RouteIcon,
@@ -30,14 +30,13 @@ function Admin() {
   const { isSupabaseConfigured } = useAuth();
   const { orders } = useOrders();
   const [stock] = useProducerStock();
-  const { quotes } = useQuoteRequests();
+  const { demands } = useDemandRequests();
   const { producers, loading: producersLoading } = useRegisteredProducers();
   const activeStock = stock.filter((item) => item.status === "ativo");
-  const openOrders = orders.filter((order) => order.status !== "Entregue");
-  const openQuotes = quotes.filter(
-    (quote) => quote.status === "Aberta" || quote.status === "Respondida",
-  );
-  const totalValue = orders.reduce((sum, order) => sum + order.total, 0);
+  const activeOrders = orders.filter((order) => order.status !== "Cancelado");
+  const openOrders = activeOrders.filter((order) => order.status !== "Entregue");
+  const openDemands = demands.filter((demand) => demand.status !== "Aprovada");
+  const totalValue = activeOrders.reduce((sum, order) => sum + order.total, 0);
 
   const clearLocalTestData = () => {
     if (typeof window === "undefined") return;
@@ -80,9 +79,9 @@ function Admin() {
           <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
           <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
           <Metric
-            icon={MessageSquareText}
-            label="Cotações abertas"
-            value={`${openQuotes.length}`}
+            icon={Megaphone}
+            label="Demandas abertas"
+            value={`${openDemands.length}`}
           />
         </section>
 
@@ -175,7 +174,7 @@ function Admin() {
                     </div>
 
                     <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-xs text-muted-foreground">
-                      O admin apenas acompanha. Confirmacao, separacao, entrega e baixa final sao
+                      O admin apenas acompanha. Confirmação, separação, entrega e baixa final são
                       feitas pelo produtor no painel de pedidos recebidos.
                     </p>
                   </li>
@@ -278,27 +277,27 @@ function Admin() {
               </Panel>
             </div>
 
-            <Panel title="Cotações recentes" icon={MessageSquareText}>
+            <Panel title="Demandas recentes" icon={Megaphone}>
               <ul className="space-y-3">
-                {quotes.slice(0, 5).map((quote) => (
-                  <li key={quote.id} className="rounded-xl border border-border bg-canvas p-4">
+                {demands.slice(0, 5).map((demand) => (
+                  <li key={demand.id} className="rounded-xl border border-border bg-canvas p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-brand-900">
-                          {quote.productName}
+                          {demand.items.length} item(ns)
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {quote.quantity} {quote.unit} - {quote.buyerName}
+                          {demand.buyerName} - {demand.urgency === "urgente" ? "urgente" : "normal"}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-brand-700">
-                        {quote.status}
+                        {demand.status}
                       </span>
                     </div>
                   </li>
                 ))}
-                {quotes.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nenhuma cotação criada ainda.</p>
+                {demands.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhuma demanda criada ainda.</p>
                 )}
               </ul>
             </Panel>

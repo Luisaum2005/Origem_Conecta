@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
+import { AccessibilityControls } from "@/components/layout/AccessibilityControls";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { SupportButton } from "@/components/layout/SupportButton";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
+import { useDemandRequests } from "@/lib/demands";
 import { useOrders } from "@/lib/orders";
-import { useQuoteRequests } from "@/lib/quote-requests";
-import { Bell, ClipboardList, MessageSquareText, PackageCheck, User } from "lucide-react";
+import { Bell, ClipboardList, Megaphone, PackageCheck, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const links = [
@@ -12,7 +14,7 @@ const links = [
   { to: "/orders", label: "Pedidos", profiles: ["comprador"] },
   { to: "/producer/orders", label: "Pedidos recebidos", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
-  { to: "/quotes", label: "Solicitações", profiles: ["comprador", "produtor", "admin"] },
+  { to: "/demands", label: "Demandas", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
 ] as const;
 
@@ -23,7 +25,7 @@ function visibleForProfile(profiles: readonly ProfileType[], profileType?: Profi
 export function Navbar() {
   const { profile, signOut } = useAuth();
   const { orders } = useOrders();
-  const { quotes } = useQuoteRequests();
+  const { demands } = useDemandRequests();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const readStorageKey = profile?.id ? `origem-conecta-read-notifications-${profile.id}` : "";
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
@@ -43,8 +45,8 @@ export function Navbar() {
         : "/login";
   const visibleLinks = links.filter((link) => visibleForProfile(link.profiles, profile?.tipo));
   const notifications = useMemo(
-    () => buildNotifications(profile?.tipo, orders, quotes),
-    [orders, profile?.tipo, quotes],
+    () => buildNotifications(profile?.tipo, orders, demands),
+    [demands, orders, profile?.tipo],
   );
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function Navbar() {
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
         <div className="mx-auto flex h-full max-w-[1200px] items-center justify-between px-4 sm:px-8">
           <div className="flex items-center gap-6 sm:gap-10">
-            <Logo />
+            <Logo compactOnMobile />
             <nav className="hidden items-center gap-1 md:flex">
               {visibleLinks.map((link) => (
                 <Link
@@ -102,13 +104,16 @@ export function Navbar() {
               ))}
             </nav>
           </div>
+
           <div className="relative flex items-center gap-2">
+            <SupportButton compact />
+            <AccessibilityControls />
             <div className="relative">
               <button
                 type="button"
                 onClick={toggleNotifications}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
-                aria-label="Notificacoes"
+                aria-label="Notificações"
                 aria-expanded={notificationsOpen}
               >
                 <Bell className="h-5 w-5" />
@@ -122,14 +127,14 @@ export function Navbar() {
               {notificationsOpen && (
                 <div className="absolute right-0 top-12 z-50 w-[min(calc(100vw-2rem),360px)] overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
                   <div className="border-b border-border px-4 py-3">
-                    <p className="text-sm font-semibold text-brand-900">Notificacoes</p>
+                    <p className="text-sm font-semibold text-brand-900">Notificações</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Alertas gerados pela operação atual.
                     </p>
                   </div>
                   {visibleNotifications.length === 0 ? (
                     <div className="px-4 py-5 text-sm text-muted-foreground">
-                      Nenhuma notificacao importante no momento.
+                      Nenhuma notificação importante no momento.
                     </div>
                   ) : (
                     <ul className="max-h-[360px] divide-y divide-border overflow-y-auto">
@@ -162,6 +167,7 @@ export function Navbar() {
                 </div>
               )}
             </div>
+
             <Link
               to={profilePath}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900"
@@ -190,14 +196,14 @@ type NotificationItem = {
   id: string;
   title: string;
   text: string;
-  to: "/orders" | "/producer/orders" | "/quotes" | "/admin";
+  to: "/orders" | "/producer/orders" | "/demands" | "/admin";
   icon: React.ComponentType<{ className?: string }>;
 };
 
 function buildNotifications(
   profileType: ProfileType | undefined,
   orders: ReturnType<typeof useOrders>["orders"],
-  quotes: ReturnType<typeof useQuoteRequests>["quotes"],
+  demands: ReturnType<typeof useDemandRequests>["demands"],
 ): NotificationItem[] {
   if (!profileType) return [];
 
@@ -213,15 +219,15 @@ function buildNotifications(
           to: "/orders" as const,
           icon: PackageCheck,
         })),
-      ...quotes
-        .filter((quote) => quote.status === "Respondida")
-        .slice(0, 2)
-        .map((quote) => ({
-          id: `buyer-quote-${quote.id}`,
-          title: "Solicitação aceita",
-          text: `${quote.productName} foi aceito por ${quote.producerName ?? "um produtor"}.`,
-          to: "/quotes" as const,
-          icon: MessageSquareText,
+      ...demands
+        .filter((demand) => demand.responses.some((response) => response.status === "Enviada"))
+        .slice(0, 3)
+        .map((demand) => ({
+          id: `buyer-demand-${demand.id}`,
+          title: "Demanda com resposta",
+          text: `${demand.items.length} item(ns) com proposta de produtor.`,
+          to: "/demands" as const,
+          icon: Megaphone,
         })),
     ].slice(0, 5);
   }
@@ -230,7 +236,7 @@ function buildNotifications(
     return [
       ...orders
         .filter((order) => order.status !== "Entregue")
-        .slice(0, 4)
+        .slice(0, 3)
         .map((order) => ({
           id: `producer-order-${order.id}`,
           title: `Pedido recebido #${order.id}`,
@@ -238,15 +244,15 @@ function buildNotifications(
           to: "/producer/orders" as const,
           icon: ClipboardList,
         })),
-      ...quotes
-        .filter((quote) => quote.status === "Aberta")
-        .slice(0, 2)
-        .map((quote) => ({
-          id: `producer-quote-${quote.id}`,
-          title: "Nova solicitação aberta",
-          text: `${quote.productName}, ${quote.quantity} ${quote.unit}.`,
-          to: "/quotes" as const,
-          icon: MessageSquareText,
+      ...demands
+        .filter((demand) => demand.status === "Aberta" || demand.status === "Respondida")
+        .slice(0, 3)
+        .map((demand) => ({
+          id: `producer-demand-${demand.id}`,
+          title: demand.urgency === "urgente" ? "Demanda urgente" : "Nova demanda aberta",
+          text: `${demand.items.length} produto(s) para ${demand.buyerName}.`,
+          to: "/demands" as const,
+          icon: Megaphone,
         })),
     ].slice(0, 5);
   }
@@ -258,19 +264,19 @@ function buildNotifications(
       .map((order) => ({
         id: `admin-order-${order.id}`,
         title: `Pedido em aberto #${order.id}`,
-        text: `${order.buyerName} - ${order.status} - R$ ${order.total.toFixed(2)}.`,
+        text: `${order.buyerName} · ${order.status} · R$ ${order.total.toFixed(2)}.`,
         to: "/admin" as const,
         icon: ClipboardList,
       })),
-    ...quotes
-      .filter((quote) => quote.status === "Aberta" || quote.status === "Respondida")
+    ...demands
+      .filter((demand) => demand.status !== "Aprovada")
       .slice(0, 3)
-      .map((quote) => ({
-        id: `admin-quote-${quote.id}`,
-        title: `Solicitação ${quote.status.toLowerCase()}`,
-        text: `${quote.productName} para ${quote.buyerName}.`,
-        to: "/quotes" as const,
-        icon: MessageSquareText,
+      .map((demand) => ({
+        id: `admin-demand-${demand.id}`,
+        title: `Demanda ${demand.status.toLowerCase()}`,
+        text: `${demand.items.length} item(ns) para ${demand.buyerName}.`,
+        to: "/demands" as const,
+        icon: Megaphone,
       })),
   ].slice(0, 6);
 }

@@ -34,13 +34,13 @@ function Login() {
 
   return (
     <AuthLayout
-      title="Bem-vindo de volta"
-      subtitle="Acesse sua conta para ver o portfólio da semana."
+      title="Entrar na Origem Conecta"
+      subtitle="Acesse sua conta para acompanhar portfólio, pedidos, solicitações e estoque."
       footer={
         <>
           Novo por aqui?{" "}
           <Link to="/signup/buyer" className="font-semibold text-brand-900 hover:underline">
-            Criar conta
+            Criar conta de comprador
           </Link>
         </>
       }
@@ -56,10 +56,18 @@ function Login() {
           name="email"
           label="E-mail"
           type="email"
-          placeholder="voce@restaurante.com"
+          placeholder="voce@empresa.com.br"
+          autoComplete="email"
           required
         />
-        <Field name="password" label="Senha" type="password" placeholder="••••••••" required />
+        <Field
+          name="password"
+          label="Senha"
+          type="password"
+          placeholder="Digite sua senha"
+          autoComplete="current-password"
+          required
+        />
         <div className="flex justify-end">
           <Link to="/reset" className="text-sm font-medium text-brand-700 hover:underline">
             Esqueci a senha

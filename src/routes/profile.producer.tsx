@@ -51,15 +51,16 @@ function ProducerProfile() {
     orders,
     Boolean(isSupabaseConfigured && profile?.tipo === "produtor"),
   );
-  const openOrders = producerOrders.filter((order) => order.status !== "Entregue");
-  const deliveredOrders = producerOrders.filter((order) => order.status === "Entregue");
+  const activeOrders = producerOrders.filter((order) => order.status !== "Cancelado");
+  const openOrders = activeOrders.filter((order) => order.status !== "Entregue");
+  const deliveredOrders = activeOrders.filter((order) => order.status === "Entregue");
   const stockPotential = activeStock.reduce(
     (sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0),
     0,
   );
-  const orderRevenue = producerOrders.reduce((sum, order) => sum + producerOrderTotal(order), 0);
-  const deliveryRate = producerOrders.length
-    ? Math.round((deliveredOrders.length / producerOrders.length) * 100)
+  const orderRevenue = activeOrders.reduce((sum, order) => sum + producerOrderTotal(order), 0);
+  const deliveryRate = activeOrders.length
+    ? Math.round((deliveredOrders.length / activeOrders.length) * 100)
     : 0;
   const topProducts = productSummary(producerOrders);
   const activity = buildActivity(producerOrders, stock);

@@ -20,6 +20,7 @@ export type Product = {
   description: string;
   emoji: string;
   imageUrl?: string;
+  videoUrl?: string;
   risk: RiskLevel;
   substitutes: string[];
   producers: ProducerOption[];
@@ -40,7 +41,7 @@ const producerBase = {
     id: "produtor-cadastrado-1",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 98,
     reliabilityScore: 4.8,
     eta: "proximo ciclo",
@@ -49,7 +50,7 @@ const producerBase = {
     id: "produtor-cadastrado-2",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 94,
     reliabilityScore: 4.6,
     eta: "proximo ciclo",
@@ -58,7 +59,7 @@ const producerBase = {
     id: "produtor-cadastrado-3",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 96,
     reliabilityScore: 4.7,
     eta: "proximo ciclo",
@@ -67,7 +68,7 @@ const producerBase = {
     id: "produtor-cadastrado-4",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 97,
     reliabilityScore: 4.9,
     eta: "proximo ciclo",
@@ -76,7 +77,7 @@ const producerBase = {
     id: "produtor-cadastrado-5",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 95,
     reliabilityScore: 4.6,
     eta: "proximo ciclo",
@@ -85,7 +86,7 @@ const producerBase = {
     id: "produtor-cadastrado-6",
     name: "Produtor cadastrado",
     property: "Produtor cadastrado",
-    origin: "Localizacao nao informada",
+    origin: "Localização não informada",
     onTimeRate: 93,
     reliabilityScore: 4.5,
     eta: "proximo ciclo",

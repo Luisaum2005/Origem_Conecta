@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
-import { ClipboardList, Package, Store, TrendingUp, Truck, User } from "lucide-react";
+import { ClipboardList, Megaphone, Package, Store, Truck, User } from "lucide-react";
 
 const items = [
   { to: "/portfolio", label: "Portfólio", icon: Store, profiles: ["comprador"] },
@@ -8,9 +8,9 @@ const items = [
   { to: "/producer/orders", label: "Pedidos", icon: ClipboardList, profiles: ["produtor"] },
   { to: "/production", label: "Estoque", icon: Package, profiles: ["produtor"] },
   {
-    to: "/quotes",
-    label: "Cotações",
-    icon: TrendingUp,
+    to: "/demands",
+    label: "Demandas",
+    icon: Megaphone,
     profiles: ["comprador", "produtor", "admin"],
   },
   { to: "/admin", label: "Admin", icon: ClipboardList, profiles: ["admin"] },
@@ -40,7 +40,7 @@ export function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white/95 backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Navegacao principal"
+      aria-label="Navegação principal"
     >
       <ul className="mx-auto flex h-[68px] max-w-md items-stretch justify-around px-1">
         {visibleItems.map((item) => {

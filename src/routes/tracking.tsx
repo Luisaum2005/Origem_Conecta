@@ -13,10 +13,12 @@ export const Route = createFileRoute("/tracking")({
   ),
 });
 
-const statusFlow: OrderStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
+type TrackingStatus = Exclude<OrderStatus, "Cancelado">;
+
+const statusFlow: TrackingStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
 
 const stepConfig: Record<
-  OrderStatus,
+  TrackingStatus,
   {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
@@ -58,7 +60,7 @@ function Tracking() {
     return orders.find((order) => order.id === selectedId) ?? orders[0];
   }, [orders, selectedId]);
 
-  const currentIndex = selectedOrder ? statusFlow.indexOf(selectedOrder.status) : -1;
+  const currentIndex = selectedOrder?.status === "Cancelado" ? -1 : selectedOrder ? statusFlow.indexOf(selectedOrder.status) : -1;
   const producers = selectedOrder ? groupByProducer(selectedOrder) : [];
   const timeline = selectedOrder ? buildTimeline(selectedOrder) : [];
 
@@ -107,6 +109,17 @@ function Tracking() {
               Status atual: {selectedOrder.status} - entrega {selectedOrder.deliveryEta}
             </div>
 
+            {selectedOrder.status === "Cancelado" && (
+              <div className="mt-6 rounded-2xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-5 text-sm text-[var(--color-error-fg)]">
+                <h2 className="font-semibold">Pedido cancelado</h2>
+                <p className="mt-1">
+                  Cancelado por {selectedOrder.canceledBy ?? "usuário"}:{" "}
+                  {selectedOrder.cancellationReason ?? "sem motivo informado"}.
+                </p>
+              </div>
+            )}
+
+            {selectedOrder.status !== "Cancelado" && (
             <section className="mt-8 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
               <ol className="relative grid grid-cols-1 gap-8 md:grid-cols-4">
                 {statusFlow.map((status, index) => {
@@ -184,6 +197,7 @@ function Tracking() {
                 </ul>
               </div>
             </section>
+            )}
 
             <section className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-[var(--border-strong)] bg-surface-brand-soft p-6">
@@ -207,12 +221,23 @@ function Tracking() {
               </div>
 
               <div className="rounded-2xl border border-border bg-white p-6">
-                <h3 className="font-semibold text-brand-900">Avaliação pós-entrega</h3>
+                <h3 className="font-semibold text-brand-900">Segurança da entrega</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {selectedOrder.status === "Entregue"
-                    ? "Pedido entregue. A avaliação já pode ser registrada."
-                    : "Disponível quando o pedido for marcado como entregue."}
+                  Informe o código ao produtor somente quando receber e conferir os produtos.
                 </p>
+                <p className="mt-3 inline-flex rounded-lg bg-canvas px-3 py-2 text-lg font-bold tracking-widest text-brand-900">
+                  Código: {selectedOrder.deliveryCode ?? "gerando"}
+                </p>
+                {selectedOrder.receiptCode && (
+                  <p className="mt-2 text-sm font-semibold text-brand-900">
+                    Recibo: {selectedOrder.receiptCode}
+                  </p>
+                )}
+                {selectedOrder.complaint && (
+                  <p className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800">
+                    Reclamação aberta: {selectedOrder.complaint}
+                  </p>
+                )}
                 <Link
                   to="/rating"
                   className={`mt-4 inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${
@@ -261,12 +286,21 @@ function groupByProducer(order: SavedOrder) {
 }
 
 function buildTimeline(order: SavedOrder) {
+  if (order.status === "Cancelado") {
+    return [
+      {
+        label: `Pedido cancelado por ${order.canceledBy ?? "usuário"}`,
+        time: order.canceledAt ? formatOrderDate(order.canceledAt) : "Atualizado",
+        done: true,
+      },
+    ];
+  }
   const currentIndex = statusFlow.indexOf(order.status);
   const createdAt = formatOrderDate(order.createdAt);
 
   return statusFlow.map((status, index) => {
     const done = index <= currentIndex;
-    const labelByStatus: Record<OrderStatus, string> = {
+    const labelByStatus: Record<TrackingStatus, string> = {
       Recebido: "Pedido confirmado",
       "Em separação": "Separação iniciada com os produtores",
       "Em entrega": "Saiu para entrega",

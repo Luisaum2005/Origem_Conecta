@@ -18,6 +18,7 @@ export type QuoteRequest = {
   producerName?: string;
   responsePrice?: string;
   responseNotes?: string;
+  createdOrderId?: string;
 };
 
 type RemoteQuoteStatus = "aberta" | "respondida" | "aprovada" | "recusada";
@@ -25,6 +26,8 @@ type RemoteQuoteStatus = "aberta" | "respondida" | "aprovada" | "recusada";
 type RemoteQuoteRequest = {
   id: string;
   criado_em: string;
+  buyer_id?: string;
+  producer_id?: string | null;
   nome_produto: string;
   quantidade: number | string;
   unidade: string;
@@ -39,7 +42,9 @@ type RemoteQuoteRequest = {
   } | null;
   producers?: {
     nome_propriedade?: string | null;
+    responsavel?: string | null;
   } | null;
+  created_order?: { id: string }[] | null;
 };
 
 export const QUOTE_REQUESTS_STORAGE_KEY = "origem-conecta-quote-requests";
@@ -84,6 +89,7 @@ function mapRemoteQuote(row: RemoteQuoteRequest): QuoteRequest {
     producerName: row.producers?.nome_propriedade ?? undefined,
     responsePrice: row.preco_resposta == null ? "" : String(row.preco_resposta),
     responseNotes: row.observacoes_resposta ?? "",
+    createdOrderId: row.created_order?.[0]?.id,
   };
 }
 
@@ -109,6 +115,17 @@ async function getProducerId(profileId: string) {
   return data?.id ?? null;
 }
 
+async function getProducerDetails(profileId: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("producers")
+    .select("id,nome_propriedade,responsavel")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 async function loadRemoteQuotes(
   profileId: string,
   profileType: "comprador" | "produtor" | "admin",
@@ -117,7 +134,7 @@ async function loadRemoteQuotes(
   let query = supabase
     .from("quote_requests")
     .select(
-      "id,criado_em,nome_produto,quantidade,unidade,entrega_desejada,preco_alvo,observacoes,status,preco_resposta,observacoes_resposta,buyers(nome_empresa),producers(nome_propriedade)",
+      "id,criado_em,nome_produto,quantidade,unidade,entrega_desejada,preco_alvo,observacoes,status,preco_resposta,observacoes_resposta,buyers(nome_empresa),producers(nome_propriedade,responsavel),created_order:orders(id)",
     )
     .order("criado_em", { ascending: false });
 
@@ -170,18 +187,23 @@ async function respondRemoteQuote(
   response: Pick<QuoteRequest, "producerName" | "responsePrice" | "responseNotes">,
 ) {
   if (!supabase) return;
-  const producerId = await getProducerId(profileId);
-  if (!producerId) {
+  const producer = await getProducerDetails(profileId);
+  if (!producer?.id) {
     throw new Error("Cadastro de produtor nao encontrado para este usuario.");
+  }
+
+  const price = response.responsePrice
+    ? Number(String(response.responsePrice).replace(",", "."))
+    : null;
+  if (!price || price <= 0) {
+    throw new Error("Informe um preço válido para aceitar a solicitação.");
   }
 
   const { data, error } = await supabase
     .from("quote_requests")
     .update({
-      producer_id: producerId,
-      preco_resposta: response.responsePrice
-        ? Number(String(response.responsePrice).replace(",", "."))
-        : null,
+      producer_id: producer.id,
+      preco_resposta: price,
       observacoes_resposta: response.responseNotes || null,
       status: "respondida",
       respondido_em: new Date().toISOString(),
@@ -189,12 +211,62 @@ async function respondRemoteQuote(
     .eq("id", id)
     .eq("status", "aberta")
     .is("producer_id", null)
-    .select("id")
+    .select("id,buyer_id,nome_produto,quantidade,unidade,entrega_desejada,observacoes,buyers(nome_empresa)")
     .maybeSingle();
   if (error) throw error;
   if (!data) {
     throw new Error("Esta cotacao ja foi respondida por outro produtor.");
   }
+
+  const quantity = Number(data.quantidade || 0);
+  const subtotal = quantity * price;
+  const producerName =
+    response.producerName || producer.nome_propriedade || producer.responsavel || "Produtor";
+  const deliveryLabel = data.entrega_desejada
+    ? `Solicitado para ${new Date(`${data.entrega_desejada}T12:00:00`).toLocaleDateString("pt-BR")}`
+    : "Aguardando data e hora do produtor";
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert({
+      buyer_id: data.buyer_id,
+      buyer_name: data.buyers?.nome_empresa || "Comprador",
+      status: "recebido",
+      subtotal,
+      delivery: 0,
+      total: subtotal,
+      entrega_label: deliveryLabel,
+      origem_solicitacao_id: data.id,
+    })
+    .select("id")
+    .single();
+  if (orderError) throw orderError;
+
+  const { error: itemError } = await supabase.from("order_items").insert({
+    order_id: order.id,
+    product_ref: data.nome_produto,
+    product_name: data.nome_produto,
+    quantidade: quantity,
+    unidade: data.unidade,
+    preco_unitario: price,
+    producer_id: producer.id,
+    producer_ref: producer.id,
+    producer_name: producerName,
+    escolha_manual_produtor: true,
+    line_total: subtotal,
+    observacoes: [
+      data.observacoes ? `Solicitação: ${data.observacoes}` : "",
+      response.responseNotes ? `Resposta do produtor: ${response.responseNotes}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | "),
+  });
+  if (itemError) {
+    await supabase.from("orders").delete().eq("id", order.id);
+    throw itemError;
+  }
+
+  return order.id as string;
 }
 
 async function updateRemoteQuoteStatus(id: string, status: QuoteStatus) {
@@ -255,7 +327,20 @@ export function useQuoteRequests() {
     response: Pick<QuoteRequest, "producerName" | "responsePrice" | "responseNotes">,
   ) => {
     if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
-      await respondRemoteQuote(profile.id, id, response);
+      const createdOrderId = await respondRemoteQuote(profile.id, id, response);
+      setQuotes((current) =>
+        current.map((quote) =>
+          quote.id === id
+            ? {
+                ...quote,
+                ...response,
+                status: "Respondida",
+                createdOrderId,
+              }
+            : quote,
+        ),
+      );
+      return;
     }
 
     setQuotes((current) =>

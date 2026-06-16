@@ -12,12 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrackingRouteImport } from './routes/tracking'
 import { Route as ResetRouteImport } from './routes/reset'
 import { Route as RatingRouteImport } from './routes/rating'
-import { Route as QuotesRouteImport } from './routes/quotes'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderRouteImport } from './routes/order'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DemandsRouteImport } from './routes/demands'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignupProducerRouteImport } from './routes/signup.producer'
@@ -40,11 +40,6 @@ const ResetRoute = ResetRouteImport.update({
 const RatingRoute = RatingRouteImport.update({
   id: '/rating',
   path: '/rating',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const QuotesRoute = QuotesRouteImport.update({
-  id: '/quotes',
-  path: '/quotes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductionRoute = ProductionRouteImport.update({
@@ -70,6 +65,11 @@ const OrderRoute = OrderRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemandsRoute = DemandsRouteImport.update({
+  id: '/demands',
+  path: '/demands',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -116,12 +116,12 @@ const ProducerOrdersRoute = ProducerOrdersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demands': typeof DemandsRoute
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
-  '/quotes': typeof QuotesRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
@@ -135,12 +135,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demands': typeof DemandsRoute
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
-  '/quotes': typeof QuotesRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
@@ -155,12 +155,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demands': typeof DemandsRoute
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
-  '/quotes': typeof QuotesRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
@@ -176,12 +176,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/demands'
     | '/login'
     | '/order'
     | '/orders'
     | '/portfolio'
     | '/production'
-    | '/quotes'
     | '/rating'
     | '/reset'
     | '/tracking'
@@ -195,12 +195,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/demands'
     | '/login'
     | '/order'
     | '/orders'
     | '/portfolio'
     | '/production'
-    | '/quotes'
     | '/rating'
     | '/reset'
     | '/tracking'
@@ -214,12 +214,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/demands'
     | '/login'
     | '/order'
     | '/orders'
     | '/portfolio'
     | '/production'
-    | '/quotes'
     | '/rating'
     | '/reset'
     | '/tracking'
@@ -234,12 +234,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  DemandsRoute: typeof DemandsRoute
   LoginRoute: typeof LoginRoute
   OrderRoute: typeof OrderRoute
   OrdersRoute: typeof OrdersRoute
   PortfolioRoute: typeof PortfolioRoute
   ProductionRoute: typeof ProductionRoute
-  QuotesRoute: typeof QuotesRoute
   RatingRoute: typeof RatingRoute
   ResetRoute: typeof ResetRoute
   TrackingRoute: typeof TrackingRoute
@@ -272,13 +272,6 @@ declare module '@tanstack/react-router' {
       path: '/rating'
       fullPath: '/rating'
       preLoaderRoute: typeof RatingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/quotes': {
-      id: '/quotes'
-      path: '/quotes'
-      fullPath: '/quotes'
-      preLoaderRoute: typeof QuotesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/production': {
@@ -314,6 +307,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demands': {
+      id: '/demands'
+      path: '/demands'
+      fullPath: '/demands'
+      preLoaderRoute: typeof DemandsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -378,12 +378,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  DemandsRoute: DemandsRoute,
   LoginRoute: LoginRoute,
   OrderRoute: OrderRoute,
   OrdersRoute: OrdersRoute,
   PortfolioRoute: PortfolioRoute,
   ProductionRoute: ProductionRoute,
-  QuotesRoute: QuotesRoute,
   RatingRoute: RatingRoute,
   ResetRoute: ResetRoute,
   TrackingRoute: TrackingRoute,

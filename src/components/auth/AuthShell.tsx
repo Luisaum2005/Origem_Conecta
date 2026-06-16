@@ -16,7 +16,7 @@ export function AuthLayout({
 }) {
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-8 py-6">
+      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-5 sm:px-8 sm:py-6">
         <Logo />
         <Link
           to="/"
@@ -25,11 +25,17 @@ export function AuthLayout({
           <ArrowLeft className="h-4 w-4" /> Início
         </Link>
       </header>
-      <main className="mx-auto flex max-w-[560px] flex-col px-6 pb-16 pt-8">
-        <h1 className="text-3xl font-bold tracking-tight text-brand-900">{title}</h1>
-        {subtitle && <p className="mt-2 text-base text-muted-foreground">{subtitle}</p>}
-        <div className="mt-8">{children}</div>
-        {footer && <div className="mt-6 text-sm text-muted-foreground">{footer}</div>}
+      <main className="mx-auto flex max-w-[620px] flex-col px-4 pb-16 pt-4 sm:px-6 sm:pt-8">
+        <div className="rounded-2xl border border-border bg-white/70 p-5 shadow-xs sm:p-8">
+          <h1 className="text-2xl font-bold tracking-tight text-brand-900 sm:text-3xl">{title}</h1>
+          {subtitle && (
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+              {subtitle}
+            </p>
+          )}
+          <div className="mt-7">{children}</div>
+          {footer && <div className="mt-6 text-sm text-muted-foreground">{footer}</div>}
+        </div>
       </main>
     </div>
   );
@@ -77,7 +83,7 @@ export function PrimaryButton({
       {...rest}
       className="inline-flex h-[52px] w-full items-center justify-center rounded-xl bg-brand-900 px-6 text-base font-semibold text-white shadow-xs transition-colors hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
     >
-      {loading ? "Enviando…" : children}
+      {loading ? "Enviando..." : children}
     </button>
   );
 }

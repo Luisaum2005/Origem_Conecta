@@ -13,6 +13,7 @@ import {
   ImagePlus,
   Package,
   Pencil,
+  PlayCircle,
   Plus,
   Sprout,
   Trash2,
@@ -31,11 +32,13 @@ export const Route = createFileRoute("/production")({
 const UNITS = ["kg", "unidade", "caixa", "pacote", "pote", "litro", "maço"];
 
 function Production() {
-  const [items, setItems, { uploadImage }] = useProducerStock();
+  const [items, setItems, { uploadImage, uploadVideo }] = useProducerStock();
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [videoError, setVideoError] = useState("");
 
   const isValid = draft.product && draft.quantity && draft.unit && draft.price;
   const activeItems = items.filter((item) => item.status === "ativo");
@@ -56,6 +59,7 @@ function Production() {
     }
     setDraft(EMPTY_STOCK_ITEM);
     setImageError("");
+    setVideoError("");
   };
 
   const edit = (item: ProducerStockItem) => {
@@ -67,11 +71,27 @@ function Production() {
     setDraft(EMPTY_STOCK_ITEM);
     setEditingId(null);
     setImageError("");
+    setVideoError("");
   };
 
   const remove = (id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
     if (editingId === id) cancelEdit();
+  };
+
+  const handleVideoChange = async (file?: File) => {
+    if (!file) return;
+    setVideoError("");
+    setUploadingVideo(true);
+    try {
+      const itemId = draft.id || editingId || crypto.randomUUID();
+      const videoUrl = await uploadVideo(file, itemId);
+      setDraft((current) => ({ ...current, id: itemId, videoUrl }));
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : "Não foi possível carregar o vídeo.");
+    } finally {
+      setUploadingVideo(false);
+    }
   };
 
   const toggleStatus = (id: string) => {
@@ -183,6 +203,13 @@ function Production() {
                 error={imageError}
                 onChange={handleImageChange}
                 onRemove={() => setDraft({ ...draft, imageUrl: undefined })}
+              />
+              <VideoField
+                videoUrl={draft.videoUrl}
+                uploading={uploadingVideo}
+                error={videoError}
+                onChange={handleVideoChange}
+                onRemove={() => setDraft({ ...draft, videoUrl: undefined })}
               />
               <div className="grid grid-cols-[1fr_120px] gap-3">
                 <NumberField
@@ -322,11 +349,11 @@ function PhotoField({
         {imageUrl ? (
           <img src={imageUrl} alt="Foto do produto" className="h-44 w-full object-cover" />
         ) : (
-          <div className="grid h-44 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
+        <div className="grid h-44 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
             <div>
               <ImagePlus className="mx-auto h-8 w-8 text-leaf-700" />
               <p className="mt-2 text-sm font-semibold text-brand-900">Adicionar foto</p>
-              <p className="mt-1 text-xs text-muted-foreground">JPG, PNG ou WebP ate 5 MB</p>
+              <p className="mt-1 text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB</p>
             </div>
           </div>
         )}
@@ -343,6 +370,62 @@ function PhotoField({
             />
           </label>
           {imageUrl && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-brand-900"
+            >
+              Remover
+            </button>
+          )}
+        </div>
+      </div>
+      {error && <p className="mt-2 text-xs font-semibold text-[var(--color-error-fg)]">{error}</p>}
+    </div>
+  );
+}
+
+function VideoField({
+  videoUrl,
+  uploading,
+  error,
+  onChange,
+  onRemove,
+}: {
+  videoUrl?: string;
+  uploading: boolean;
+  error: string;
+  onChange: (file?: File) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div>
+      <span className="block text-sm font-medium text-brand-900">Vídeo curto do produto</span>
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-canvas">
+        {videoUrl ? (
+          <video src={videoUrl} controls muted playsInline className="h-44 w-full object-cover" />
+        ) : (
+          <div className="grid h-36 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
+            <div>
+              <PlayCircle className="mx-auto h-8 w-8 text-leaf-700" />
+              <p className="mt-2 text-sm font-semibold text-brand-900">Adicionar vídeo</p>
+              <p className="mt-1 text-xs text-muted-foreground">MP4, WebM ou MOV até 30 MB</p>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-white p-3">
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
+            <PlayCircle className="h-4 w-4 text-leaf-700" />
+            {uploading ? "Carregando..." : videoUrl ? "Trocar vídeo" : "Selecionar vídeo"}
+            <input
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(event) => onChange(event.target.files?.[0])}
+            />
+          </label>
+          {videoUrl && (
             <button
               type="button"
               onClick={onRemove}
@@ -498,6 +581,12 @@ function StockRow({
             Colheita {fmt(item.harvestDate)} · Validade {fmt(item.expiryDate)}
           </p>
           {item.notes && <p className="mt-2 text-sm text-brand-900">{item.notes}</p>}
+          {item.videoUrl && (
+            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
+              <PlayCircle className="h-3.5 w-3.5" />
+              Vídeo disponível
+            </p>
+          )}
         </div>
         <div className="text-left sm:text-right">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

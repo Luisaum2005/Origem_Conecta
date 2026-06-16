@@ -31,7 +31,7 @@ function SignupAdmin() {
       });
       navigate({ to: getProfileHome(profile.tipo) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel criar o admin.");
+      setError(err instanceof Error ? err.message : "Não foi possível criar o admin.");
     } finally {
       setLoading(false);
     }

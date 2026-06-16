@@ -32,10 +32,13 @@ function BuyerProfile() {
   const { details, saveDetails, saving } = useBuyerProfileDetails();
   const { orders } = useOrders();
   const location = [details.city, details.state].filter(Boolean).join(", ");
-  const deliveredOrders = orders.filter((order) => order.status === "Entregue");
-  const openOrders = orders.filter((order) => order.status !== "Entregue");
-  const recentTotal = orders.reduce((sum, order) => sum + order.total, 0);
-  const onTimeRate = orders.length ? Math.round((deliveredOrders.length / orders.length) * 100) : 0;
+  const activeOrders = orders.filter((order) => order.status !== "Cancelado");
+  const deliveredOrders = activeOrders.filter((order) => order.status === "Entregue");
+  const openOrders = activeOrders.filter((order) => order.status !== "Entregue");
+  const recentTotal = activeOrders.reduce((sum, order) => sum + order.total, 0);
+  const onTimeRate = activeOrders.length
+    ? Math.round((deliveredOrders.length / activeOrders.length) * 100)
+    : 0;
   const nextDelivery = openOrders[0]?.deliveryEta || "Sem pedidos abertos";
   const productSummary = useMemo(() => summarizeProducts(orders), [orders]);
 

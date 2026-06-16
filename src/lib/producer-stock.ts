@@ -10,6 +10,7 @@ export type ProducerStockItem = {
   producerName?: string;
   producerLocation?: string;
   imageUrl?: string;
+  videoUrl?: string;
   product: string;
   quantity: string;
   unit: string;
@@ -36,6 +37,7 @@ type InventoryRow = {
   validade: string | null;
   observacoes: string | null;
   imagem_url: string | null;
+  video_url?: string | null;
   ativo: boolean | null;
   products?: {
     nome?: string | null;
@@ -107,6 +109,7 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
     producerName: row.producers?.nome_propriedade ?? undefined,
     producerLocation: row.producers?.localizacao ?? undefined,
     imageUrl: row.imagem_url ?? undefined,
+    videoUrl: row.video_url ?? undefined,
     product: row.nome_produto || row.products?.nome || "Produto sem nome",
     quantity: String(row.quantidade_disponivel ?? ""),
     unit: row.unidade || row.products?.unidade || "kg",
@@ -134,7 +137,7 @@ async function loadInventory(producerId?: string | null) {
   let query = supabase
     .from("producer_inventory")
     .select(
-      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao)",
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao)",
     )
     .order("atualizado_em", { ascending: false });
 
@@ -184,6 +187,7 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     validade: item.expiryDate || null,
     observacoes: item.notes || null,
     imagem_url: item.imageUrl || null,
+    video_url: item.videoUrl || null,
     ativo: item.status === "ativo",
     atualizado_em: new Date().toISOString(),
   }));
@@ -205,9 +209,14 @@ async function decrementRemoteInventory(items: StockDecrementItem[]) {
 
 function extensionFromFile(file: File) {
   const explicit = file.name.split(".").pop()?.toLowerCase();
-  if (explicit && ["jpg", "jpeg", "png", "webp"].includes(explicit)) return explicit;
+  if (explicit && ["jpg", "jpeg", "png", "webp", "mp4", "webm", "mov"].includes(explicit)) {
+    return explicit;
+  }
   if (file.type === "image/png") return "png";
   if (file.type === "image/webp") return "webp";
+  if (file.type === "video/webm") return "webm";
+  if (file.type === "video/quicktime") return "mov";
+  if (file.type === "video/mp4") return "mp4";
   return "jpg";
 }
 
@@ -280,20 +289,25 @@ export function useProducerStock() {
     });
   }, []);
 
-  const uploadImage = useCallback(
-    async (file: File, itemId: string) => {
-      if (!file.type.startsWith("image/")) {
-        throw new Error("Selecione um arquivo de imagem.");
+  const uploadMedia = useCallback(
+    async (file: File, itemId: string, mediaType: "image" | "video" = "image") => {
+      const expectedPrefix = mediaType === "image" ? "image/" : "video/";
+      if (!file.type.startsWith(expectedPrefix)) {
+        throw new Error(
+          mediaType === "image" ? "Selecione um arquivo de imagem." : "Selecione um vídeo.",
+        );
       }
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error("A imagem deve ter ate 5 MB.");
+      const maxSize = mediaType === "image" ? 5 * 1024 * 1024 : 30 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new Error(mediaType === "image" ? "A imagem deve ter até 5 MB." : "O vídeo deve ter até 30 MB.");
       }
 
       if (!supabase || !isSupabaseConfigured || !producerId) {
         return readFileAsDataUrl(file);
       }
 
-      const path = `${producerId}/${itemId}-${Date.now()}.${extensionFromFile(file)}`;
+      const folder = mediaType === "image" ? "photos" : "videos";
+      const path = `${producerId}/${folder}/${itemId}-${Date.now()}.${extensionFromFile(file)}`;
       const { error } = await supabase.storage.from("product-photos").upload(path, file, {
         cacheControl: "3600",
         upsert: true,
@@ -323,6 +337,11 @@ export function useProducerStock() {
   return [
     items,
     setItems,
-    { uploadImage, canUploadRemoteImage: Boolean(producerId), decrementStock },
+    {
+      uploadImage: (file: File, itemId: string) => uploadMedia(file, itemId, "image"),
+      uploadVideo: (file: File, itemId: string) => uploadMedia(file, itemId, "video"),
+      canUploadRemoteImage: Boolean(producerId),
+      decrementStock,
+    },
   ] as const;
 }
