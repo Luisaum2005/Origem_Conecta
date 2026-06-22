@@ -148,7 +148,24 @@ async function loadInventory(producerId?: string | null) {
   }
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    let fallbackQuery = supabase
+      .from("producer_inventory")
+      .select(
+        "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo",
+      )
+      .order("atualizado_em", { ascending: false });
+
+    if (producerId) {
+      fallbackQuery = fallbackQuery.eq("producer_id", producerId);
+    } else {
+      fallbackQuery = fallbackQuery.eq("ativo", true);
+    }
+
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    if (fallbackError) throw fallbackError;
+    return (fallbackData ?? []).map((row) => mapInventoryRow(row as InventoryRow));
+  }
   return (data ?? []).map((row) => mapInventoryRow(row as InventoryRow));
 }
 
