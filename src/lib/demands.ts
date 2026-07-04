@@ -373,6 +373,7 @@ export function useDemandRequests() {
       ...response,
       id: String(Date.now()),
       demandId,
+      producerId: profile?.id || "produtor",
       status: "Enviada",
       createdAt: new Date().toISOString(),
     };
@@ -404,9 +405,61 @@ export function useDemandRequests() {
 
     let orderId: string | undefined;
     if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      orderId = await approveRemoteResponse(profile.id, demand, response);
+      const remoteOrderId = await approveRemoteResponse(profile.id, demand, response);
+      orderId = remoteOrderId ?? undefined;
     } else {
       orderId = String(Date.now());
+      try {
+        const acceptedItems = response.items.filter((item) => item.canSupply);
+        const subtotal = acceptedItems.reduce((sum, item) => sum + item.price, 0);
+        const delivery = 35;
+        const total = subtotal + delivery;
+        const deliveryLabel = demand.deliveryDate
+          ? new Date(`${demand.deliveryDate}T12:00:00`).toLocaleDateString("pt-BR")
+          : "A combinar";
+
+        const newOrder = {
+          id: orderId,
+          createdAt: new Date().toISOString(),
+          buyerName: demand.buyerName,
+          status: "Recebido",
+          subtotal,
+          delivery,
+          total,
+          deliveryEta: `Entrega solicitada para ${deliveryLabel}`,
+          deliveryCode: String(Math.floor(1000 + Math.random() * 9000)),
+          originQuoteId: demand.id,
+          paymentMethod: demand.paymentMethod ?? "A combinar",
+          paymentNotes: demand.paymentNotes ?? undefined,
+          items: acceptedItems.map((item) => ({
+            productId: item.demandItemId ?? item.productName,
+            productName: item.productName,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: item.quantity > 0 ? item.price / item.quantity : item.price,
+            producerId: response.producerId || "produtor",
+            producerName: response.producerName,
+            manualProducerChoice: true,
+            lineTotal: item.price,
+            notes: item.notes ?? undefined,
+          })),
+        };
+
+        const existingOrdersStr = window.localStorage.getItem("origem-conecta-orders") || "[]";
+        let existingOrders = [];
+        try {
+          existingOrders = JSON.parse(existingOrdersStr);
+          if (!Array.isArray(existingOrders)) existingOrders = [];
+        } catch {
+          existingOrders = [];
+        }
+        window.localStorage.setItem(
+          "origem-conecta-orders",
+          JSON.stringify([newOrder, ...existingOrders]),
+        );
+      } catch (err) {
+        console.warn("Erro ao salvar pedido mock no localStorage:", err);
+      }
     }
 
     setDemands((current) =>

@@ -213,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("id,user_id,tipo,nome,email,telefone")
           .single();
         throwSupabaseError(profileError);
+        if (!profileData) throw new Error("Falha ao criar o perfil.");
 
         if (input.tipo === "comprador" && input.buyer) {
           const { error: buyerError } = await supabase.from("buyers").insert({

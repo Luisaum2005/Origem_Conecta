@@ -39,6 +39,7 @@ function ProducerOrders() {
   const producerOrders = getProducerOrders(
     orders,
     Boolean(isSupabaseConfigured && profile?.tipo === "produtor"),
+    profile?.id,
   );
 
   const openOrders = producerOrders.filter(
@@ -399,12 +400,13 @@ function productSummary(orders: SavedOrder[]) {
     .slice(0, 5);
 }
 
-function getProducerOrders(orders: SavedOrder[], alreadyScoped: boolean) {
+function getProducerOrders(orders: SavedOrder[], alreadyScoped: boolean, currentProducerId?: string) {
   if (alreadyScoped) return orders.filter((order) => order.items.length > 0);
+  const targetId = currentProducerId || PRODUCER_ID;
   return orders
     .map((order) => ({
       ...order,
-      items: order.items.filter((item) => item.producerId === PRODUCER_ID),
+      items: order.items.filter((item) => item.producerId === targetId || item.producerId === "produtor"),
     }))
     .filter((order) => order.items.length > 0);
 }

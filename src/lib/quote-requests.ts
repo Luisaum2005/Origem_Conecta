@@ -230,7 +230,7 @@ async function respondRemoteQuote(
     .from("orders")
     .insert({
       buyer_id: data.buyer_id,
-      buyer_name: data.buyers?.nome_empresa || "Comprador",
+      buyer_name: (Array.isArray(data.buyers) ? data.buyers[0]?.nome_empresa : (data.buyers as any)?.nome_empresa) || "Comprador",
       status: "recebido",
       subtotal,
       delivery: 0,

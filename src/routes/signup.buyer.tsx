@@ -66,6 +66,23 @@ function SignupBuyer() {
             placeholder="Ex: Mercado Central"
             required
           />
+          <label className="block">
+            <span className="block text-sm font-medium text-brand-900">
+              Tipo do estabelecimento <span className="ml-1 text-orange-600">*</span>
+            </span>
+            <select
+              name="tipoEmpresa"
+              required
+              className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-4 text-base text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
+            >
+              <option value="Supermercado">Supermercado</option>
+              <option value="Restaurante">Restaurante</option>
+              <option value="Quitanda / Sacolão">Quitanda / Sacolão</option>
+              <option value="Hotel">Hotel</option>
+              <option value="Cozinha Industrial">Cozinha Industrial</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </label>
           <Field name="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" required />
         </FormSection>
 

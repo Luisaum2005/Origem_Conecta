@@ -361,7 +361,7 @@ function DemandItemEditor({
         </Field>
         <Field label="Quantidade">
           <input
-            value={String(item.quantity)}
+            value={item.quantity === 0 ? "" : String(item.quantity)}
             onChange={(event) => onChange({ ...item, quantity: parseDecimal(event.target.value) })}
             inputMode="decimal"
             className="form-input"
@@ -580,7 +580,7 @@ function ProducerDemandCard({
           </p>
           <div className="mt-3 space-y-3">
             {items.map((item) => {
-              const requested = requestedItems.get(item.demandItemId);
+              const requested = item.demandItemId ? requestedItems.get(item.demandItemId) : undefined;
               return (
                 <div key={item.id} className="rounded-xl border border-border bg-white p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -611,7 +611,7 @@ function ProducerDemandCard({
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <Field label={`Quantidade que vou entregar (${item.unit})`}>
                       <input
-                        value={String(item.quantity)}
+                        value={item.quantity === 0 ? "" : String(item.quantity)}
                         onChange={(event) =>
                           setItems((current) =>
                             current.map((currentItem) =>
