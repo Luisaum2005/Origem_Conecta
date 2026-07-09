@@ -9,6 +9,7 @@ export type ProducerStockItem = {
   producerId?: string;
   producerName?: string;
   producerLocation?: string;
+  producerResponsible?: string;
   imageUrl?: string;
   videoUrl?: string;
   product: string;
@@ -46,6 +47,7 @@ type InventoryRow = {
   producers?: {
     nome_propriedade?: string | null;
     localizacao?: string | null;
+    responsavel?: string | null;
   } | null;
 };
 
@@ -108,6 +110,7 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
     producerId: row.producer_id ?? undefined,
     producerName: row.producers?.nome_propriedade ?? undefined,
     producerLocation: row.producers?.localizacao ?? undefined,
+    producerResponsible: row.producers?.responsavel ?? undefined,
     imageUrl: row.imagem_url ?? undefined,
     videoUrl: row.video_url ?? undefined,
     product: row.nome_produto || row.products?.nome || "Produto sem nome",
@@ -137,7 +140,7 @@ async function loadInventory(producerId?: string | null) {
   let query = supabase
     .from("producer_inventory")
     .select(
-      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao)",
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel)",
     )
     .order("atualizado_em", { ascending: false });
 
@@ -299,10 +302,39 @@ export function useProducerStock() {
   const setItems = useCallback((next: SetStateAction<ProducerStockItem[]>) => {
     setItemsState((current) => {
       const resolved = typeof next === "function" ? next(current) : next;
-      return resolved.map((item) => ({
-        ...item,
-        id: item.id || crypto.randomUUID(),
-      }));
+
+      let localProducerDetails: { nome_propriedade: string; localizacao: string; responsavel: string } | null = null;
+      if (!supabase && typeof window !== "undefined") {
+        try {
+          const profileJson = window.localStorage.getItem("origem-conecta-auth-profile");
+          if (profileJson) {
+            const prof = JSON.parse(profileJson);
+            const detailsJson = window.localStorage.getItem(`origem-conecta-local-producer-${prof.id}`);
+            if (detailsJson) {
+              localProducerDetails = JSON.parse(detailsJson);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      return resolved.map((item) => {
+        const id = item.id || crypto.randomUUID();
+        if (!item.producerName && localProducerDetails) {
+          return {
+            ...item,
+            id,
+            producerName: localProducerDetails.nome_propriedade,
+            producerLocation: localProducerDetails.localizacao,
+            producerResponsible: localProducerDetails.responsavel,
+          };
+        }
+        return {
+          ...item,
+          id,
+        };
+      });
     });
   }, []);
 

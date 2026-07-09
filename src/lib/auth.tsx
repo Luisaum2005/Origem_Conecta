@@ -145,6 +145,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email,
           };
           window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(localProfile));
+          if (tipo === "produtor") {
+            window.localStorage.setItem(
+              `origem-conecta-local-producer-${localProfile.id}`,
+              JSON.stringify({
+                nome_propriedade: "Sítio das Laranjas",
+                responsavel: "Produtor Teste",
+                localizacao: "Atibaia, SP",
+              })
+            );
+          }
           setProfile(localProfile);
           return localProfile;
         }
@@ -188,6 +198,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             telefone: input.telefone,
           };
           window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(localProfile));
+          if (input.tipo === "produtor" && input.producer) {
+            const location = [input.cidade, input.estado].filter(Boolean).join(", ");
+            window.localStorage.setItem(
+              `origem-conecta-local-producer-${localProfile.id}`,
+              JSON.stringify({
+                nome_propriedade: input.producer.nomePropriedade,
+                responsavel: input.producer.responsavel,
+                localizacao: location || "Localização não informada",
+              })
+            );
+          }
           setProfile(localProfile);
           return localProfile;
         }

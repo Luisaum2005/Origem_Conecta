@@ -3,11 +3,10 @@ import {
   ChevronRight,
   Info,
   MapPin,
-  Minus,
   PlayCircle,
-  Plus,
+  MessageSquare,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { preferredProducer, type Product } from "@/lib/catalog";
 
 function formatQuantity(value: number) {
@@ -38,21 +37,24 @@ export function ProductCard({
   onChange,
   producerChoice,
   onProducerChange,
+  selectedUnit,
+  onUnitChange,
 }: {
   product: Product;
   qty: number;
   onChange: (qty: number) => void;
   producerChoice?: string;
   onProducerChange?: (producerId: string) => void;
+  selectedUnit: string;
+  onUnitChange: (unit: string) => void;
 }) {
   const [hover, setHover] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
-  const [profileOpen, setProfileOpen] = useState(false);
   const recommended = preferredProducer(product);
   const selectedProducer =
     product.producers.find((producer) => producer.id === producerChoice) ?? recommended;
   const availableStock = Math.max(0, selectedProducer.stock);
-  const canIncrease = qty < availableStock;
+
   const media = [
     product.imageUrl ? { type: "image" as const, url: product.imageUrl } : null,
     product.videoUrl ? { type: "video" as const, url: product.videoUrl } : null,
@@ -60,9 +62,28 @@ export function ProductCard({
   const currentMedia = media[mediaIndex] ?? null;
 
   const updateQuantity = (value: number) => onChange(clampQuantity(value, availableStock));
+  
   const changeMedia = (direction: number) => {
     if (media.length <= 1) return;
     setMediaIndex((current) => (current + direction + media.length) % media.length);
+  };
+
+  // Smooth decimal input state
+  const [inputValue, setInputValue] = useState(qty > 0 ? qty.toString().replace(".", ",") : "");
+
+  useEffect(() => {
+    const parsed = Number(inputValue.replace(",", "."));
+    if (parsed !== qty) {
+      setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
+    }
+  }, [qty]);
+
+  const handleInputChange = (valueStr: string) => {
+    setInputValue(valueStr);
+    const parsed = Number(valueStr.replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      updateQuantity(parsed);
+    }
   };
 
   return (
@@ -138,20 +159,31 @@ export function ProductCard({
         <StockBadge product={product} />
       </div>
 
-      <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <MapPin className="h-3.5 w-3.5" />
-        Produtor: {selectedProducer.name} · {selectedProducer.origin}
-      </p>
+      <div className="mt-2.5 space-y-1 text-sm text-muted-foreground">
+        <p className="flex items-center gap-1.5">
+          <span className="font-semibold text-brand-900">Produtor:</span> {selectedProducer.name}
+        </p>
+        <p className="flex items-center gap-1.5">
+          <span className="font-semibold text-brand-900">Propriedade:</span> {selectedProducer.property}
+        </p>
+        <p className="flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-leaf-700" />
+          <span className="font-semibold text-brand-900">Localização:</span> {selectedProducer.origin}
+        </p>
+      </div>
 
       <div className="mt-4 space-y-3">
         <button
           type="button"
-          onClick={() => setProfileOpen((current) => !current)}
-          className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-          aria-expanded={profileOpen}
+          onClick={() => {
+            alert(
+              `Negociação iniciada com o produtor ${selectedProducer.name} para o produto ${product.name}. A integração com o WhatsApp / chat de negociação estará disponível em breve!`
+            );
+          }}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 hover:bg-leaf-100 transition-colors cursor-pointer"
         >
-          <Info className="h-4 w-4 text-leaf-700" />
-          {profileOpen ? "Ocultar produtor" : "Ver produtor"}
+          <MessageSquare className="h-4 w-4 text-leaf-700" />
+          Negociar
         </button>
 
         {product.producers.length > 1 && (
@@ -171,52 +203,55 @@ export function ProductCard({
         )}
       </div>
 
-      {profileOpen && (
-        <ProducerProfilePreview product={product} producer={selectedProducer} />
-      )}
-
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mt-5 flex flex-col gap-3">
         <div className="min-w-0">
           <p className="text-2xl font-bold tracking-tight text-brand-900">
             R$ {selectedProducer.price.toFixed(2)}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">/{product.unit}</span>
+            <span className="ml-1 text-sm font-medium text-muted-foreground">/{selectedUnit}</span>
           </p>
         </div>
-        {qty === 0 ? (
-          <button
-            onClick={() => updateQuantity(Math.min(1, availableStock))}
-            disabled={availableStock <= 0}
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            {availableStock <= 0 ? "Indisponível" : "Adicionar"}
-          </button>
+        
+        {availableStock <= 0 ? (
+          <div className="text-center py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground">
+            Indisponível no momento
+          </div>
         ) : (
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <button
-              onClick={() => updateQuantity(qty - 1)}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:bg-secondary"
-              aria-label="Diminuir"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <label className="min-w-0 flex-1 sm:w-28 sm:flex-none">
-              <span className="sr-only">Quantidade em {product.unit}</span>
-              <input
-                value={formatQuantity(qty)}
-                onChange={(event) => updateQuantity(parseQuantity(event.target.value))}
-                inputMode="decimal"
-                className="h-11 w-full rounded-xl border border-border bg-white px-3 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-                aria-label={`Quantidade de ${product.name} em ${product.unit}`}
-              />
-            </label>
-            <button
-              onClick={() => updateQuantity(qty + 1)}
-              disabled={!canIncrease}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Aumentar"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+          <div className="space-y-2">
+            <div className="flex w-full items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(event) => handleInputChange(event.target.value)}
+                  placeholder="Quantidade"
+                  inputMode="decimal"
+                  className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+                  aria-label={`Quantidade de ${product.name}`}
+                />
+              </div>
+              <select
+                value={selectedUnit}
+                onChange={(event) => onUnitChange(event.target.value)}
+                className="h-11 w-28 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+              >
+                <option value="kg">kg</option>
+                <option value="caixa">caixa</option>
+                <option value="unidade">unid</option>
+                <option value="cacho">cacho</option>
+                <option value="pote">pote</option>
+                <option value="pacote">pacote</option>
+                <option value="saco">saco</option>
+              </select>
+            </div>
+            
+            {qty > 0 && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
+                  <span className="inline-block h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                  {inputValue || "0"} {selectedUnit} = 1 item no pedido
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -224,38 +259,3 @@ export function ProductCard({
   );
 }
 
-function ProducerProfilePreview({
-  product,
-  producer,
-}: {
-  product: Product;
-  producer: Product["producers"][number];
-}) {
-  return (
-    <div className="mt-3 rounded-xl border border-border bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Perfil do produtor
-          </p>
-          <h4 className="mt-1 text-base font-bold text-brand-900">{producer.name}</h4>
-          <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5" />
-            {producer.origin}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Produtos publicados
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="rounded-full bg-leaf-100 px-3 py-1 text-xs font-semibold text-brand-900">
-            {product.name}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}

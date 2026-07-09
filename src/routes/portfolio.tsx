@@ -21,7 +21,7 @@ function Portfolio() {
     () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
     [products],
   );
-  const { cart, producerChoices, setQty, setProducerChoice, totalItems } = useCart();
+  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, totalItems } = useCart();
   const [cat, setCat] = useState("Todos");
   const [q, setQ] = useState("");
 
@@ -40,10 +40,12 @@ function Portfolio() {
       <Navbar />
       <main className="mx-auto max-w-[1200px] px-4 py-6 pb-44 sm:px-8 sm:py-10 md:pb-10">
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Portfólio
-            </h1>
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
+                Portfólio
+              </h1>
+            </div>
           </div>
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -84,6 +86,8 @@ function Portfolio() {
               onChange={(qty) => setQty(product.id, qty)}
               producerChoice={producerChoices[product.id]}
               onProducerChange={(producerId) => setProducerChoice(product.id, producerId)}
+              selectedUnit={selectedUnits[product.id] ?? product.unit}
+              onUnitChange={(unit) => setUnit(product.id, unit)}
             />
           ))}
         </section>

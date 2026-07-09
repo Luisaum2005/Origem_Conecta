@@ -63,7 +63,7 @@ function clampQuantity(value: number, max: number) {
 function Order() {
   const products = useAvailableProducts();
   const operation = getOperationWindow();
-  const { cart, producerChoices, setQty, setProducerChoice, clear } = useCart();
+  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, clear } = useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const [, , { decrementStock }] = useProducerStock();
@@ -98,7 +98,7 @@ function Order() {
       productId: product.id,
       productName: product.name,
       quantity,
-      unit: product.unit,
+      unit: selectedUnits[product.id] ?? product.unit,
       unitPrice: selectedProducer.price,
       producerId: selectedProducer.id,
       producerName: selectedProducer.name,
@@ -322,6 +322,7 @@ function Order() {
                   product.producers.find((item) => item.id === producerChoices[product.id]) ??
                   preferredProducer(product);
                 const lineTotal = selectedProducer.price * cart[product.id];
+                const currentUnit = selectedUnits[product.id] ?? product.unit;
                 return (
                   <div
                     key={product.id}
@@ -352,13 +353,13 @@ function Order() {
                           </p>
                         )}
                         <p className="mt-1.5 text-sm font-medium text-brand-700">
-                          Unidade: {product.unit} · R$ {selectedProducer.price.toFixed(2)}/
-                          {product.unit}
+                          Unidade: {currentUnit} · R$ {selectedProducer.price.toFixed(2)}/
+                          {currentUnit}
                         </p>
                       </div>
                       <button
                         onClick={() => removeProduct(product.id)}
-                        className="hidden h-10 w-10 place-items-center rounded-lg text-muted-foreground hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error-fg)] sm:grid"
+                        className="hidden h-10 w-10 place-items-center rounded-lg text-muted-foreground hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error-fg)] sm:grid cursor-pointer"
                         aria-label="Remover item"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -395,59 +396,23 @@ function Order() {
                       <div className="flex flex-wrap items-end justify-between gap-3 sm:justify-end">
                         {cart[product.id] > selectedProducer.stock && (
                           <p className="text-xs font-semibold text-[var(--color-error-fg)]">
-                            Estoque: {formatQuantity(selectedProducer.stock)} {product.unit}
+                            Estoque: {formatQuantity(selectedProducer.stock)} {currentUnit}
                           </p>
                         )}
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateQuantity(
-                                product.id,
-                                cart[product.id] - 1,
-                                selectedProducer.stock,
-                              )
-                            }
-                            className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-white text-brand-900 transition-colors hover:bg-secondary active:scale-95"
-                            aria-label="Diminuir"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
-                          <label>
-                            <span className="sr-only">Quantidade em {product.unit}</span>
-                            <input
-                              value={formatQuantity(cart[product.id])}
-                              onChange={(event) =>
-                                updateQuantity(
-                                  product.id,
-                                  parseQuantity(event.target.value),
-                                  selectedProducer.stock,
-                                )
-                              }
-                              inputMode="decimal"
-                              className="h-11 w-28 rounded-xl border border-border bg-white px-3 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-                              aria-label={`Quantidade de ${product.name} em ${product.unit}`}
-                            />
-                          </label>
-                          <button
-                            onClick={() =>
-                              updateQuantity(
-                                product.id,
-                                cart[product.id] + 1,
-                                selectedProducer.stock,
-                              )
-                            }
-                            disabled={cart[product.id] >= selectedProducer.stock}
-                            className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-white text-brand-900 transition-colors hover:bg-secondary active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label="Aumentar"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
+                        
+                        <OrderItemControls
+                          productId={product.id}
+                          quantity={cart[product.id]}
+                          unit={currentUnit}
+                          maxStock={selectedProducer.stock}
+                          onQuantityChange={(qty) => updateQuantity(product.id, qty, selectedProducer.stock)}
+                          onUnitChange={(unit) => setUnit(product.id, unit)}
+                        />
 
                         <button
                           type="button"
                           onClick={() => removeProduct(product.id)}
-                          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] sm:hidden"
+                          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] sm:hidden cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
                           Excluir
@@ -627,6 +592,67 @@ function Order() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function OrderItemControls({
+  productId,
+  quantity,
+  unit,
+  maxStock,
+  onQuantityChange,
+  onUnitChange,
+}: {
+  productId: string;
+  quantity: number;
+  unit: string;
+  maxStock: number;
+  onQuantityChange: (qty: number) => void;
+  onUnitChange: (unit: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState(quantity > 0 ? quantity.toString().replace(".", ",") : "");
+
+  useEffect(() => {
+    const parsed = Number(inputValue.replace(",", "."));
+    if (parsed !== quantity) {
+      setInputValue(quantity > 0 ? quantity.toString().replace(".", ",") : "");
+    }
+  }, [quantity]);
+
+  const handleInputChange = (valueStr: string) => {
+    setInputValue(valueStr);
+    const parsed = Number(valueStr.replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      onQuantityChange(parsed);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative min-w-0 w-28">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(event) => handleInputChange(event.target.value)}
+          placeholder="Qtd"
+          inputMode="decimal"
+          className="h-11 w-full rounded-xl border border-border bg-white px-3 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+        />
+      </div>
+      <select
+        value={unit}
+        onChange={(event) => onUnitChange(event.target.value)}
+        className="h-11 w-24 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
+      >
+        <option value="kg">kg</option>
+        <option value="caixa">caixa</option>
+        <option value="unidade">unid</option>
+        <option value="cacho">cacho</option>
+        <option value="pote">pote</option>
+        <option value="pacote">pacote</option>
+        <option value="saco">saco</option>
+      </select>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export function useAvailableProducts() {
               {
                 ...DEFAULT_PRODUCER,
                 id: item.producerId ?? DEFAULT_PRODUCER.id,
-                name: item.producerName ?? DEFAULT_PRODUCER.name,
+                name: item.producerResponsible ?? item.producerName ?? DEFAULT_PRODUCER.name,
                 property: item.producerName ?? DEFAULT_PRODUCER.property,
                 origin: item.producerLocation ?? DEFAULT_PRODUCER.origin,
                 price: Number(item.price || 0),
