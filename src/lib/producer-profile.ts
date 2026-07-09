@@ -114,9 +114,30 @@ export function useProducerProfileDetails() {
   }, [details]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured || profile?.tipo !== "produtor") return;
-    let active = true;
+    if (profile?.tipo !== "produtor") return;
 
+    if (!supabase || !isSupabaseConfigured) {
+      // Local/mock mode: load signup details from local storage
+      try {
+        const detailsJson = window.localStorage.getItem(`origem-conecta-local-producer-${profile.id}`);
+        if (detailsJson) {
+          const localDetails = JSON.parse(detailsJson);
+          setDetails({
+            propertyName: localDetails.nome_propriedade || "",
+            responsibleName: localDetails.responsavel || profile.nome || "",
+            cnpj: localDetails.cnpj || "",
+            phone: profile.telefone || "",
+            location: localDetails.localizacao || "",
+            products: localDetails.produtos || [],
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
+
+    let active = true;
     loadRemoteProducerProfile(profile.id)
       .then((remoteDetails) => {
         if (active && remoteDetails) setDetails(remoteDetails);
@@ -128,13 +149,24 @@ export function useProducerProfileDetails() {
     return () => {
       active = false;
     };
-  }, [isSupabaseConfigured, profile?.id, profile?.tipo]);
+  }, [isSupabaseConfigured, profile?.id, profile?.tipo, profile?.nome, profile?.telefone]);
 
   const saveDetails = async (nextDetails: ProducerProfileDetails) => {
     setSaving(true);
     try {
       if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
         await updateRemoteProducerProfile(profile.id, nextDetails);
+      } else if (profile?.tipo === "produtor") {
+        window.localStorage.setItem(
+          `origem-conecta-local-producer-${profile.id}`,
+          JSON.stringify({
+            nome_propriedade: nextDetails.propertyName,
+            responsavel: nextDetails.responsibleName,
+            cnpj: nextDetails.cnpj,
+            localizacao: nextDetails.location,
+            produtos: nextDetails.products,
+          })
+        );
       }
       setDetails(nextDetails);
     } finally {
