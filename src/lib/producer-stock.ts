@@ -1,6 +1,7 @@
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { toast } from "sonner";
 
 export type StockStatus = "ativo" | "pausado";
 
@@ -201,8 +202,8 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     producer_id: producerId,
     nome_produto: item.product,
     unidade: item.unit,
-    quantidade_disponivel: Number(item.quantity || 0),
-    preco: Number(item.price || 0),
+    quantidade_disponivel: Number(String(item.quantity || 0).replace(",", ".")) || 0,
+    preco: Number(String(item.price || 0).replace(",", ".")) || 0,
     data_colheita: item.harvestDate || null,
     validade: item.expiryDate || null,
     observacoes: item.notes || null,
@@ -269,14 +270,18 @@ export function useProducerStock() {
       try {
         const nextProducerId =
           profile?.tipo === "produtor" ? await getProducerId(profile.id) : null;
+        if (profile?.tipo === "produtor" && !nextProducerId) {
+          toast.error("Erro: Seu perfil de produtor não foi encontrado nas tabelas do Supabase. Verifique o cadastro.");
+        }
         const remoteItems = await loadInventory(nextProducerId);
         if (!active || !remoteItems) return;
         setProducerId(nextProducerId);
         setItemsState(remoteItems.length ? remoteItems : profile?.tipo ? [] : readStoredStock());
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Nao foi possivel carregar o estoque do Supabase.", error);
+        toast.error(`Erro ao carregar estoque do Supabase: ${error?.message || error}`);
         remoteLoadedRef.current = false;
       }
     }
@@ -294,8 +299,9 @@ export function useProducerStock() {
     if (serialized === lastSyncedRef.current) return;
 
     lastSyncedRef.current = serialized;
-    syncProducerInventory(producerId, items).catch((error) => {
+    syncProducerInventory(producerId, items).catch((error: any) => {
       console.warn("Nao foi possivel sincronizar o estoque com o Supabase.", error);
+      toast.error(`Erro ao salvar estoque no Supabase: ${error?.message || error}`);
     });
   }, [isSupabaseConfigured, items, producerId]);
 
