@@ -22,20 +22,20 @@ As principais partes do sistema são:
 
 ## Tecnologias principais
 
-| Parte | Tecnologia usada | Para que serve |
-| --- | --- | --- |
-| Site/aplicação | React | Criar as telas e botões do sistema |
-| Organização do código | TypeScript | Evitar erros e deixar o projeto mais seguro |
-| Navegação | TanStack Router | Controlar as páginas do sistema |
-| Visual | Tailwind CSS | Criar o layout, cores, espaçamentos e responsividade |
-| Componentes prontos | Radix UI | Criar campos, menus, abas, botões e janelas |
-| Ícones | lucide-react | Usar ícones nos botões, menus e painéis |
-| Banco de dados | Supabase | Guardar usuários, produtos, pedidos e estoque |
-| Login e cadastro | Supabase Auth | Criar conta, entrar no sistema e controlar sessão |
-| Fotos dos produtos | Supabase Storage | Guardar imagens enviadas pelos produtores |
-| Hospedagem | Netlify | Deixar o sistema online para testes |
-| Aplicativo no celular | PWA | Permitir instalar o site como se fosse um app |
-| Build do projeto | Vite | Preparar o sistema para rodar localmente ou online |
+| Parte                 | Tecnologia usada | Para que serve                                       |
+| --------------------- | ---------------- | ---------------------------------------------------- |
+| Site/aplicação        | React            | Criar as telas e botões do sistema                   |
+| Organização do código | TypeScript       | Evitar erros e deixar o projeto mais seguro          |
+| Navegação             | TanStack Router  | Controlar as páginas do sistema                      |
+| Visual                | Tailwind CSS     | Criar o layout, cores, espaçamentos e responsividade |
+| Componentes prontos   | Radix UI         | Criar campos, menus, abas, botões e janelas          |
+| Ícones                | lucide-react     | Usar ícones nos botões, menus e painéis              |
+| Banco de dados        | Supabase         | Guardar usuários, produtos, pedidos e estoque        |
+| Login e cadastro      | Supabase Auth    | Criar conta, entrar no sistema e controlar sessão    |
+| Fotos dos produtos    | Supabase Storage | Guardar imagens enviadas pelos produtores            |
+| Hospedagem            | Netlify          | Deixar o sistema online para testes                  |
+| Aplicativo no celular | PWA              | Permitir instalar o site como se fosse um app        |
+| Build do projeto      | Vite             | Preparar o sistema para rodar localmente ou online   |
 
 ## Parte visual do sistema
 
@@ -177,36 +177,36 @@ Ele ajuda a:
 
 Também usamos algumas ferramentas para manter o projeto organizado:
 
-| Ferramenta | Para que serve |
-| --- | --- |
-| ESLint | Encontrar possíveis erros no código |
-| Prettier | Organizar a formatação do código |
-| npm | Instalar e rodar o projeto |
-| Vite | Rodar o projeto localmente e gerar a versão final |
+| Ferramenta | Para que serve                                    |
+| ---------- | ------------------------------------------------- |
+| ESLint     | Encontrar possíveis erros no código               |
+| Prettier   | Organizar a formatação do código                  |
+| npm        | Instalar e rodar o projeto                        |
+| Vite       | Rodar o projeto localmente e gerar a versão final |
 
 ## Variáveis de configuração
 
 O projeto usa algumas configurações importantes para se conectar ao Supabase e liberar o admin.
 
-| Variável | Para que serve |
-| --- | --- |
-| `VITE_SUPABASE_URL` | Conecta o projeto ao Supabase |
-| `VITE_SUPABASE_ANON_KEY` | Chave pública de acesso ao Supabase |
+| Variável                 | Para que serve                                 |
+| ------------------------ | ---------------------------------------------- |
+| `VITE_SUPABASE_URL`      | Conecta o projeto ao Supabase                  |
+| `VITE_SUPABASE_ANON_KEY` | Chave pública de acesso ao Supabase            |
 | `VITE_ADMIN_INVITE_CODE` | Código usado para criar conta de administrador |
-| `NITRO_PRESET` | Configuração usada para hospedar no Netlify |
+| `NITRO_PRESET`           | Configuração usada para hospedar no Netlify    |
 
 ## Estrutura do projeto
 
 De forma simples, o projeto está dividido assim:
 
-| Pasta | O que tem dentro |
-| --- | --- |
-| `src/routes` | Telas e páginas do sistema |
-| `src/components` | Botões, cards, menus e partes reutilizáveis |
-| `src/lib` | Regras de login, pedidos, estoque e Supabase |
-| `public` | Ícones, app mobile e arquivos públicos |
-| `supabase/migrations` | Estrutura do banco de dados |
-| `docs` | Documentos do projeto |
+| Pasta                 | O que tem dentro                             |
+| --------------------- | -------------------------------------------- |
+| `src/routes`          | Telas e páginas do sistema                   |
+| `src/components`      | Botões, cards, menus e partes reutilizáveis  |
+| `src/lib`             | Regras de login, pedidos, estoque e Supabase |
+| `public`              | Ícones, app mobile e arquivos públicos       |
+| `supabase/migrations` | Estrutura do banco de dados                  |
+| `docs`                | Documentos do projeto                        |
 
 ## Conclusão
 

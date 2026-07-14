@@ -4,18 +4,9 @@ import { useEffect, useState } from "react";
 
 export type PaymentMethod = "Pix" | "Dinheiro na entrega" | "A combinar";
 
-export const PAYMENT_METHODS: PaymentMethod[] = [
-  "Pix",
-  "Dinheiro na entrega",
-  "A combinar",
-];
+export const PAYMENT_METHODS: PaymentMethod[] = ["Pix", "Dinheiro na entrega", "A combinar"];
 
-export type OrderStatus =
-  | "Recebido"
-  | "Em separação"
-  | "Em entrega"
-  | "Entregue"
-  | "Cancelado";
+export type OrderStatus = "Recebido" | "Em separação" | "Em entrega" | "Entregue" | "Cancelado";
 
 export type SavedOrderItem = {
   productId: string;
@@ -32,6 +23,7 @@ export type SavedOrderItem = {
 
 export type SavedOrder = {
   id: string;
+  buyerId?: string;
   createdAt: string;
   buyerName: string;
   status: OrderStatus;
@@ -74,6 +66,7 @@ type RemoteOrderItem = {
 
 type RemoteOrder = {
   id: string;
+  buyer_id?: string | null;
   criado_em: string;
   buyer_name: string | null;
   status: "recebido" | "em_separacao" | "em_entrega" | "entregue" | "cancelado";
@@ -120,7 +113,7 @@ const dbToAppStatus: Record<RemoteOrder["status"], OrderStatus> = {
 };
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function readOrders() {
@@ -170,21 +163,23 @@ function generateReceiptCode() {
 }
 
 export function canCancelOrder(order: SavedOrder) {
-  if (order.status === "Em entrega" || order.status === "Entregue" || order.status === "Cancelado") {
+  if (order.status === "Entregue" || order.status === "Cancelado") {
     return false;
   }
-  const deadline = order.cancellationDeadline ?? addHours(order.createdAt, CANCELLATION_LIMIT_HOURS);
-  return Date.now() <= new Date(deadline).getTime();
+  return true;
 }
 
 export function formatCancellationDeadline(order: SavedOrder) {
-  return formatOrderDate(order.cancellationDeadline ?? addHours(order.createdAt, CANCELLATION_LIMIT_HOURS));
+  return formatDeliveryDateTime(
+    order.cancellationDeadline ?? addHours(order.createdAt, CANCELLATION_LIMIT_HOURS),
+  );
 }
 
 function mapRemoteOrder(order: RemoteOrder): SavedOrder {
   const deliveryAt = order.entrega_prevista ?? undefined;
   return {
     id: order.id,
+    buyerId: order.buyer_id ?? undefined,
     createdAt: order.criado_em,
     buyerName: order.buyer_name || "Comprador",
     status: dbToAppStatus[order.status],
@@ -210,7 +205,9 @@ function mapRemoteOrder(order: RemoteOrder): SavedOrder {
           ? "Aberta"
           : undefined,
     complaintCreatedAt: order.reclamacao_criada_em ?? undefined,
-    deliveryEta: order.entrega_label || (deliveryAt ? formatDeliveryDateTime(deliveryAt) : "Aguardando confirmação do produtor"),
+    deliveryEta:
+      order.entrega_label ||
+      (deliveryAt ? formatDeliveryDateTime(deliveryAt) : "Aguardando confirmação do produtor"),
     originQuoteId: order.origem_solicitacao_id ?? undefined,
     paymentMethod: normalizePaymentMethod(order.payment_method),
     paymentNotes: order.payment_notes ?? undefined,
@@ -229,7 +226,7 @@ function mapRemoteOrder(order: RemoteOrder): SavedOrder {
   };
 }
 
-async function getBuyerId(profileId: string) {
+export async function getBuyerId(profileId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("buyers")
@@ -240,7 +237,7 @@ async function getBuyerId(profileId: string) {
   return data?.id ?? null;
 }
 
-async function getProducerId(profileId: string) {
+export async function getProducerId(profileId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("producers")
@@ -257,13 +254,13 @@ async function loadRemoteOrders(
 ) {
   if (!supabase) return null;
   let select =
-    "id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
+    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
 
   if (profileType === "produtor") {
     const producerId = await getProducerId(profileId);
     if (!producerId) return [];
     select =
-      "id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
+      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
     const { data, error } = await supabase
       .from("orders")
       .select(select)
@@ -440,11 +437,13 @@ export function useOrders() {
   }, [isSupabaseConfigured, profile]);
 
   const addOrder = async (order: Omit<SavedOrder, "id" | "createdAt" | "status">) => {
+    const buyerId = profile?.tipo === "comprador" ? await getBuyerId(profile.id) : undefined;
     const next: SavedOrder = {
       ...order,
       id: String(Math.floor(1000 + Math.random() * 9000)),
       createdAt: new Date().toISOString(),
       status: "Recebido",
+      buyerId: buyerId ?? undefined,
       cancellationDeadline: addHours(new Date().toISOString(), CANCELLATION_LIMIT_HOURS),
       deliveryCode: generateDeliveryCode(),
     };
@@ -494,7 +493,9 @@ export function useOrders() {
     const order = orders.find((item) => item.id === id);
     if (!order) throw new Error("Pedido não encontrado.");
     if (!canCancelOrder(order)) {
-      throw new Error("O prazo de cancelamento terminou. Abra uma reclamação ou fale com o suporte.");
+      throw new Error(
+        "O prazo de cancelamento terminou. Abra uma reclamação ou fale com o suporte.",
+      );
     }
     const cancellationReason = reason.trim() || "Cancelado pelo usuário.";
     if (supabase && isSupabaseConfigured) {

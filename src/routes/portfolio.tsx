@@ -21,7 +21,8 @@ function Portfolio() {
     () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
     [products],
   );
-  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, totalItems } = useCart();
+  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, totalItems } =
+    useCart();
   const [cat, setCat] = useState("Todos");
   const [q, setQ] = useState("");
 

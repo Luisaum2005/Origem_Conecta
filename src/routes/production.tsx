@@ -349,7 +349,7 @@ function PhotoField({
         {imageUrl ? (
           <img src={imageUrl} alt="Foto do produto" className="h-44 w-full object-cover" />
         ) : (
-        <div className="grid h-44 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
+          <div className="grid h-44 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
             <div>
               <ImagePlus className="mx-auto h-8 w-8 text-leaf-700" />
               <p className="mt-2 text-sm font-semibold text-brand-900">Adicionar foto</p>

@@ -90,7 +90,11 @@ function DemandsHub() {
         )}
 
         {profile?.tipo === "produtor" && (
-          <ProducerDemandView demands={demands} respondDemand={respondDemand} producerName={profile.nome} />
+          <ProducerDemandView
+            demands={demands}
+            respondDemand={respondDemand}
+            producerName={profile.nome}
+          />
         )}
 
         {profile?.tipo === "admin" && <AdminDemandView demands={demands} />}
@@ -224,7 +228,9 @@ function BuyerDemandView({
                 }
                 onRemove={() =>
                   setItems((current) =>
-                    current.length === 1 ? [emptyItem()] : current.filter((currentItem) => currentItem.id !== item.id),
+                    current.length === 1
+                      ? [emptyItem()]
+                      : current.filter((currentItem) => currentItem.id !== item.id),
                   )
                 }
               />
@@ -284,7 +290,9 @@ function ProducerDemandView({
   respondDemand: ReturnType<typeof useDemandRequests>["respondDemand"];
   producerName: string;
 }) {
-  const openDemands = demands.filter((demand) => demand.status === "Aberta" || demand.status === "Respondida");
+  const openDemands = demands.filter(
+    (demand) => demand.status === "Aberta" || demand.status === "Respondida",
+  );
 
   return (
     <section className="mt-8 grid gap-4">
@@ -294,11 +302,15 @@ function ProducerDemandView({
         </p>
         <h2 className="mt-1 text-xl font-bold text-brand-900">Responda o que consegue entregar</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Confira quantidade, unidade, data e pagamento. Sua proposta deve ser o valor total para o que você vai fornecer.
+          Confira quantidade, unidade, data e pagamento. Sua proposta deve ser o valor total para o
+          que você vai fornecer.
         </p>
       </div>
       {openDemands.length === 0 ? (
-        <Empty title="Nenhuma demanda aberta" text="Quando compradores dispararem demandas, elas aparecem aqui." />
+        <Empty
+          title="Nenhuma demanda aberta"
+          text="Quando compradores dispararem demandas, elas aparecem aqui."
+        />
       ) : (
         openDemands.map((demand) => (
           <ProducerDemandCard
@@ -506,10 +518,16 @@ function DemandList({
         </DemandCard>
       ))}
       {demands.length === 0 && (
-        <Empty title="Nenhuma demanda enviada" text="Dispare uma demanda para todos os produtores verem." />
+        <Empty
+          title="Nenhuma demanda enviada"
+          text="Dispare uma demanda para todos os produtores verem."
+        />
       )}
       {demands.length > 0 && filteredDemands.length === 0 && (
-        <Empty title="Nenhuma demanda nesse filtro" text="Limpe o filtro ou escolha outra categoria para ver suas demandas." />
+        <Empty
+          title="Nenhuma demanda nesse filtro"
+          text="Limpe o filtro ou escolha outra categoria para ver suas demandas."
+        />
       )}
     </div>
   );
@@ -524,7 +542,9 @@ function ProducerDemandCard({
   producerName: string;
   respondDemand: ReturnType<typeof useDemandRequests>["respondDemand"];
 }) {
-  const alreadyResponded = demand.responses.some((response) => response.producerName === producerName);
+  const alreadyResponded = demand.responses.some(
+    (response) => response.producerName === producerName,
+  );
   const [items, setItems] = useState<DemandResponseItem[]>(
     demand.items.map((item) => ({
       id: crypto.randomUUID(),
@@ -576,18 +596,22 @@ function ProducerDemandCard({
         <div className="mt-4 rounded-2xl border border-border bg-canvas p-4">
           <p className="text-sm font-semibold text-brand-900">Sua proposta</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Marque os itens que consegue atender e informe o valor total para a quantidade oferecida.
+            Marque os itens que consegue atender e informe o valor total para a quantidade
+            oferecida.
           </p>
           <div className="mt-3 space-y-3">
             {items.map((item) => {
-              const requested = item.demandItemId ? requestedItems.get(item.demandItemId) : undefined;
+              const requested = item.demandItemId
+                ? requestedItems.get(item.demandItemId)
+                : undefined;
               return (
                 <div key={item.id} className="rounded-xl border border-border bg-white p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-brand-900">{item.productName}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Pedido do comprador: {(requested?.quantity ?? item.quantity).toLocaleString("pt-BR")} {item.unit}
+                        Pedido do comprador:{" "}
+                        {(requested?.quantity ?? item.quantity).toLocaleString("pt-BR")} {item.unit}
                       </p>
                     </div>
                     <label className="inline-flex items-center gap-2 rounded-full bg-surface-brand-soft px-3 py-2 text-xs font-bold text-brand-900">
@@ -687,18 +711,21 @@ function DemandCard({ demand, children }: { demand: DemandRequest; children?: Re
           <h2 className="mt-1 text-lg font-bold text-brand-900">{demandTitle(demand)}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{demandSubtitle(demand)}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Entrega desejada: {formatDate(demand.deliveryDate)} · Pagamento: {demand.paymentMethod ?? "A combinar"}
+            Entrega desejada: {formatDate(demand.deliveryDate)} · Pagamento:{" "}
+            {demand.paymentMethod ?? "A combinar"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-surface-brand-soft px-3 py-1 text-xs font-bold text-brand-900">
             {demand.status}
           </span>
-          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
-            demand.urgency === "urgente"
-              ? "bg-orange-100 text-orange-800"
-              : "bg-leaf-100 text-brand-900"
-          }`}>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+              demand.urgency === "urgente"
+                ? "bg-orange-100 text-orange-800"
+                : "bg-leaf-100 text-brand-900"
+            }`}
+          >
             {demand.urgency === "urgente" && <Zap className="h-3 w-3" />}
             {demand.urgency === "urgente" ? "Urgente" : "Normal"}
           </span>
@@ -722,7 +749,10 @@ function DemandCard({ demand, children }: { demand: DemandRequest; children?: Re
       </ul>
 
       <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-        <p>{totalResponses} proposta{totalResponses === 1 ? "" : "s"} recebida{totalResponses === 1 ? "" : "s"}</p>
+        <p>
+          {totalResponses} proposta{totalResponses === 1 ? "" : "s"} recebida
+          {totalResponses === 1 ? "" : "s"}
+        </p>
         {demand.notes && <p>{demand.notes}</p>}
       </div>
       {children}
@@ -730,9 +760,16 @@ function DemandCard({ demand, children }: { demand: DemandRequest; children?: Re
   );
 }
 
-function ResponseSummary({ response, action }: { response: DemandResponse; action?: React.ReactNode }) {
+function ResponseSummary({
+  response,
+  action,
+}: {
+  response: DemandResponse;
+  action?: React.ReactNode;
+}) {
   const total = useMemo(
-    () => response.items.filter((item) => item.canSupply).reduce((sum, item) => sum + item.price, 0),
+    () =>
+      response.items.filter((item) => item.canSupply).reduce((sum, item) => sum + item.price, 0),
     [response.items],
   );
   return (
@@ -755,7 +792,10 @@ function ResponseSummary({ response, action }: { response: DemandResponse; actio
               <li key={item.id}>
                 <span className="font-semibold">{item.productName}</span>: entrega{" "}
                 {item.quantity.toLocaleString("pt-BR")} {item.unit} por R$ {item.price.toFixed(2)}
-                <span className="text-muted-foreground"> · equivalente R$ {unitPrice.toFixed(2)}/{item.unit}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · equivalente R$ {unitPrice.toFixed(2)}/{item.unit}
+                </span>
               </li>
             );
           })}
@@ -787,7 +827,9 @@ function MiniStat({
           : "border-border bg-canvas"
       }`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-lg font-bold text-brand-900">{value}</p>
     </button>
   );

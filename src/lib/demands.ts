@@ -169,12 +169,18 @@ async function getProducer(profileId: string) {
   return data;
 }
 
-async function loadRemoteDemands(profileId: string, profileType: "comprador" | "produtor" | "admin") {
+async function loadRemoteDemands(
+  profileId: string,
+  profileType: "comprador" | "produtor" | "admin",
+) {
   if (!supabase) return null;
   const select =
     "id,buyer_id,buyer_name,delivery_date,urgency,status,payment_method,payment_notes,notes,created_at,demand_items(id,product_name,quantity,unit,product_state,notes),demand_responses(id,demand_id,producer_id,producer_name,status,notes,order_id,created_at,demand_response_items(id,demand_item_id,product_name,quantity,unit,price,can_supply,notes))";
 
-  let query = supabase.from("demand_requests").select(select).order("created_at", { ascending: false });
+  let query = supabase
+    .from("demand_requests")
+    .select(select)
+    .order("created_at", { ascending: false });
 
   if (profileType === "comprador") {
     const buyer = await getBuyer(profileId);
@@ -227,7 +233,11 @@ async function createRemoteDemand(profileId: string, profileName: string, input:
   return { id: data.id as string, createdAt: data.created_at as string };
 }
 
-async function respondRemoteDemand(profileId: string, demandId: string, response: NewDemandResponseInput) {
+async function respondRemoteDemand(
+  profileId: string,
+  demandId: string,
+  response: NewDemandResponseInput,
+) {
   if (!supabase) return null;
   const producer = await getProducer(profileId);
   if (!producer) throw new Error("Cadastro de produtor não encontrado.");
@@ -265,7 +275,11 @@ async function respondRemoteDemand(profileId: string, demandId: string, response
   return { id: data.id as string, createdAt: data.created_at as string };
 }
 
-async function approveRemoteResponse(profileId: string, demand: DemandRequest, response: DemandResponse) {
+async function approveRemoteResponse(
+  profileId: string,
+  demand: DemandRequest,
+  response: DemandResponse,
+) {
   if (!supabase) return null;
   const buyer = await getBuyer(profileId);
   if (!buyer) throw new Error("Cadastro de comprador não encontrado.");

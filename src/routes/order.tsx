@@ -63,7 +63,8 @@ function clampQuantity(value: number, max: number) {
 function Order() {
   const products = useAvailableProducts();
   const operation = getOperationWindow();
-  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, clear } = useCart();
+  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, clear } =
+    useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const [, , { decrementStock }] = useProducerStock();
@@ -348,9 +349,7 @@ function Order() {
                           Produtor: {selectedProducer.name}
                         </p>
                         {selectedProducer.origin && (
-                          <p className="text-xs text-muted-foreground">
-                            {selectedProducer.origin}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{selectedProducer.origin}</p>
                         )}
                         <p className="mt-1.5 text-sm font-medium text-brand-700">
                           Unidade: {currentUnit} · R$ {selectedProducer.price.toFixed(2)}/
@@ -399,13 +398,15 @@ function Order() {
                             Estoque: {formatQuantity(selectedProducer.stock)} {currentUnit}
                           </p>
                         )}
-                        
+
                         <OrderItemControls
                           productId={product.id}
                           quantity={cart[product.id]}
                           unit={currentUnit}
                           maxStock={selectedProducer.stock}
-                          onQuantityChange={(qty) => updateQuantity(product.id, qty, selectedProducer.stock)}
+                          onQuantityChange={(qty) =>
+                            updateQuantity(product.id, qty, selectedProducer.stock)
+                          }
                           onUnitChange={(unit) => setUnit(product.id, unit)}
                         />
 
@@ -521,7 +522,9 @@ function Order() {
                       Copiar
                     </button>
                   </div>
-                  <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas p-3 text-xs leading-relaxed text-brand-900">{summaryText}</pre>
+                  <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas p-3 text-xs leading-relaxed text-brand-900">
+                    {summaryText}
+                  </pre>
                   {copyNotice && (
                     <p className="mt-2 text-xs font-semibold text-leaf-700">{copyNotice}</p>
                   )}
@@ -611,7 +614,9 @@ function OrderItemControls({
   onQuantityChange: (qty: number) => void;
   onUnitChange: (unit: string) => void;
 }) {
-  const [inputValue, setInputValue] = useState(quantity > 0 ? quantity.toString().replace(".", ",") : "");
+  const [inputValue, setInputValue] = useState(
+    quantity > 0 ? quantity.toString().replace(".", ",") : "",
+  );
 
   useEffect(() => {
     const parsed = Number(inputValue.replace(",", "."));

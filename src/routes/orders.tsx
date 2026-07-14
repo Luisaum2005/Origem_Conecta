@@ -24,6 +24,15 @@ import {
   Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/orders")({
   component: () => (
@@ -266,14 +275,21 @@ function BuyerOrderCard({
   const [complaint, setComplaint] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const cancelAllowed = canCancelOrder(order);
 
   const cancel = async () => {
+    if (!cancelReason.trim()) {
+      setError("O motivo do cancelamento é obrigatório.");
+      return;
+    }
     setError("");
     setMessage("");
     try {
       await cancelOrder(order.id, "comprador", cancelReason);
       setMessage("Pedido cancelado.");
+      toast.success("Pedido cancelado com sucesso.");
+      setIsCancelModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível cancelar o pedido.");
     }
@@ -299,7 +315,8 @@ function BuyerOrderCard({
             Pedido #{order.id}
           </p>
           <h2 className="mt-1 text-xl font-bold text-brand-900">
-            {order.items.length} item{order.items.length > 1 ? "s" : ""} · R$ {order.total.toFixed(2)}
+            {order.items.length} item{order.items.length > 1 ? "s" : ""} · R${" "}
+            {order.total.toFixed(2)}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Criado em {formatOrderDate(order.createdAt)} · entrega {order.deliveryEta}
@@ -370,8 +387,8 @@ function BuyerOrderCard({
         <div className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 p-4 text-sm text-brand-900">
           <p className="font-semibold">Resumo confirmado pelo produtor</p>
           <p className="mt-1">
-            Entrega confirmada para {order.deliveryEta}. Informe o código abaixo ao produtor
-            somente no momento do recebimento.
+            Entrega confirmada para {order.deliveryEta}. Informe o código abaixo ao produtor somente
+            no momento do recebimento.
           </p>
           <p className="mt-3 inline-flex rounded-lg bg-white px-3 py-2 text-lg font-bold tracking-widest">
             Código: {order.deliveryCode ?? "gerando"}
@@ -391,34 +408,83 @@ function BuyerOrderCard({
       )}
 
       {order.status === "Cancelado" && (
-        <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error-fg)]">
-          <p className="font-semibold">Pedido cancelado</p>
-          <p className="mt-1">
-            Cancelado por {order.canceledBy ?? "usuário"}:{" "}
-            {order.cancellationReason ?? "sem motivo informado"}
+        <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error-fg)] space-y-1">
+          <p className="font-bold text-base">Pedido Cancelado</p>
+          <p>
+            <strong>Responsável pelo cancelamento:</strong>{" "}
+            {order.canceledBy === "comprador"
+              ? "Comprador"
+              : order.canceledBy === "produtor"
+                ? "Produtor"
+                : "Administrador"}
           </p>
+          <p>
+            <strong>Motivo:</strong> {order.cancellationReason ?? "sem motivo informado"}
+          </p>
+          {order.canceledAt && (
+            <p>
+              <strong>Data/Hora:</strong> {formatOrderDate(order.canceledAt)}
+            </p>
+          )}
         </div>
       )}
 
       {cancelAllowed && (
-        <div className="mt-4 grid gap-2 rounded-xl border border-border bg-canvas p-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <label className="block">
-            <span className="text-xs font-semibold text-brand-900">Motivo do cancelamento</span>
-            <input
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Opcional"
-              className="mt-1 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void cancel()}
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
-          >
-            Cancelar pedido
-          </button>
-        </div>
+        <>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
+            >
+              Cancelar Pedido
+            </button>
+          </div>
+
+          <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-brand-900 font-bold">
+                  Cancelar Pedido #{order.id}
+                </DialogTitle>
+                <DialogDescription>
+                  Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-brand-900">
+                    Motivo do cancelamento <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Informe o motivo do cancelamento"
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void cancel()}
+                  disabled={!cancelReason.trim()}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                >
+                  Confirmar Cancelamento
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
 
       {order.status !== "Cancelado" && (

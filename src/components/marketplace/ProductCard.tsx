@@ -1,11 +1,4 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  MapPin,
-  PlayCircle,
-  MessageSquare,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, MapPin, PlayCircle, MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
 import { preferredProducer, type Product } from "@/lib/catalog";
 
@@ -62,7 +55,7 @@ export function ProductCard({
   const currentMedia = media[mediaIndex] ?? null;
 
   const updateQuantity = (value: number) => onChange(clampQuantity(value, availableStock));
-  
+
   const changeMedia = (direction: number) => {
     if (media.length <= 1) return;
     setMediaIndex((current) => (current + direction + media.length) % media.length);
@@ -164,11 +157,13 @@ export function ProductCard({
           <span className="font-semibold text-brand-900">Produtor:</span> {selectedProducer.name}
         </p>
         <p className="flex items-center gap-1.5">
-          <span className="font-semibold text-brand-900">Propriedade:</span> {selectedProducer.property}
+          <span className="font-semibold text-brand-900">Propriedade:</span>{" "}
+          {selectedProducer.property}
         </p>
         <p className="flex items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-leaf-700" />
-          <span className="font-semibold text-brand-900">Localização:</span> {selectedProducer.origin}
+          <span className="font-semibold text-brand-900">Localização:</span>{" "}
+          {selectedProducer.origin}
         </p>
       </div>
 
@@ -177,7 +172,7 @@ export function ProductCard({
           type="button"
           onClick={() => {
             alert(
-              `Negociação iniciada com o produtor ${selectedProducer.name} para o produto ${product.name}. A integração com o WhatsApp / chat de negociação estará disponível em breve!`
+              `Negociação iniciada com o produtor ${selectedProducer.name} para o produto ${product.name}. A integração com o WhatsApp / chat de negociação estará disponível em breve!`,
             );
           }}
           className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 hover:bg-leaf-100 transition-colors cursor-pointer"
@@ -210,7 +205,7 @@ export function ProductCard({
             <span className="ml-1 text-sm font-medium text-muted-foreground">/{selectedUnit}</span>
           </p>
         </div>
-        
+
         {availableStock <= 0 ? (
           <div className="text-center py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground">
             Indisponível no momento
@@ -243,7 +238,7 @@ export function ProductCard({
                 <option value="saco">saco</option>
               </select>
             </div>
-            
+
             {qty > 0 && (
               <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
@@ -258,4 +253,3 @@ export function ProductCard({
     </article>
   );
 }
-

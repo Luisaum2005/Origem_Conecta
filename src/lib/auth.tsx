@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 nome_propriedade: "Sítio das Laranjas",
                 responsavel: "Produtor Teste",
                 localizacao: "Atibaia, SP",
-              })
+              }),
             );
           }
           setProfile(localProfile);
@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 nome_propriedade: input.producer.nomePropriedade,
                 responsavel: input.producer.responsavel,
                 localizacao: location || "Localização não informada",
-              })
+              }),
             );
           }
           setProfile(localProfile);

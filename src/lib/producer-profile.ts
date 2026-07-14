@@ -119,7 +119,9 @@ export function useProducerProfileDetails() {
     if (!supabase || !isSupabaseConfigured) {
       // Local/mock mode: load signup details from local storage
       try {
-        const detailsJson = window.localStorage.getItem(`origem-conecta-local-producer-${profile.id}`);
+        const detailsJson = window.localStorage.getItem(
+          `origem-conecta-local-producer-${profile.id}`,
+        );
         if (detailsJson) {
           const localDetails = JSON.parse(detailsJson);
           setDetails({
@@ -165,7 +167,7 @@ export function useProducerProfileDetails() {
             cnpj: nextDetails.cnpj,
             localizacao: nextDetails.location,
             produtos: nextDetails.products,
-          })
+          }),
         );
       }
       setDetails(nextDetails);

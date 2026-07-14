@@ -11,7 +11,7 @@ type Ctx = {
   replaceCart: (
     cart: CartState,
     producerChoices?: ProducerChoiceState,
-    selectedUnits?: UnitState
+    selectedUnits?: UnitState,
   ) => void;
   setProducerChoice: (productId: string, producerId: string) => void;
   setUnit: (productId: string, unit: string) => void;
@@ -47,7 +47,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const replaceCart = (
     nextCart: CartState,
     nextProducerChoices: ProducerChoiceState = {},
-    nextSelectedUnits: UnitState = {}
+    nextSelectedUnits: UnitState = {},
   ) => {
     setCart(nextCart);
     setProducerChoices(nextProducerChoices);

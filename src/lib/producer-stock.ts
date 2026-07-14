@@ -271,7 +271,9 @@ export function useProducerStock() {
         const nextProducerId =
           profile?.tipo === "produtor" ? await getProducerId(profile.id) : null;
         if (profile?.tipo === "produtor" && !nextProducerId) {
-          toast.error("Erro: Seu perfil de produtor não foi encontrado nas tabelas do Supabase. Verifique o cadastro.");
+          toast.error(
+            "Erro: Seu perfil de produtor não foi encontrado nas tabelas do Supabase. Verifique o cadastro.",
+          );
         }
         const remoteItems = await loadInventory(nextProducerId);
         if (!active || !remoteItems) return;
@@ -309,13 +311,19 @@ export function useProducerStock() {
     setItemsState((current) => {
       const resolved = typeof next === "function" ? next(current) : next;
 
-      let localProducerDetails: { nome_propriedade: string; localizacao: string; responsavel: string } | null = null;
+      let localProducerDetails: {
+        nome_propriedade: string;
+        localizacao: string;
+        responsavel: string;
+      } | null = null;
       if (!supabase && typeof window !== "undefined") {
         try {
           const profileJson = window.localStorage.getItem("origem-conecta-auth-profile");
           if (profileJson) {
             const prof = JSON.parse(profileJson);
-            const detailsJson = window.localStorage.getItem(`origem-conecta-local-producer-${prof.id}`);
+            const detailsJson = window.localStorage.getItem(
+              `origem-conecta-local-producer-${prof.id}`,
+            );
             if (detailsJson) {
               localProducerDetails = JSON.parse(detailsJson);
             }
@@ -354,7 +362,9 @@ export function useProducerStock() {
       }
       const maxSize = mediaType === "image" ? 5 * 1024 * 1024 : 30 * 1024 * 1024;
       if (file.size > maxSize) {
-        throw new Error(mediaType === "image" ? "A imagem deve ter até 5 MB." : "O vídeo deve ter até 30 MB.");
+        throw new Error(
+          mediaType === "image" ? "A imagem deve ter até 5 MB." : "O vídeo deve ter até 30 MB.",
+        );
       }
 
       if (!supabase || !isSupabaseConfigured || !producerId) {

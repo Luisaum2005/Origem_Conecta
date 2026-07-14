@@ -78,11 +78,7 @@ function Admin() {
           <Metric icon={ClipboardList} label="Pedidos criados" value={`${orders.length}`} />
           <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
           <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
-          <Metric
-            icon={Megaphone}
-            label="Demandas abertas"
-            value={`${openDemands.length}`}
-          />
+          <Metric icon={Megaphone} label="Demandas abertas" value={`${openDemands.length}`} />
         </section>
 
         <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

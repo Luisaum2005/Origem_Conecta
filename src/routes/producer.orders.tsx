@@ -6,6 +6,7 @@ import {
   canCancelOrder,
   formatCancellationDeadline,
   formatOrderDate,
+  getProducerId,
   type OrderStatus,
   type SavedOrder,
   useOrders,
@@ -18,8 +19,20 @@ import {
   ShoppingBag,
   Sprout,
   Truck,
+  Star,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { createBuyerRating, readLocalRatings } from "@/lib/ratings";
 
 export const Route = createFileRoute("/producer/orders")({
   component: () => (
@@ -41,6 +54,41 @@ function ProducerOrders() {
     Boolean(isSupabaseConfigured && profile?.tipo === "produtor"),
     profile?.id,
   );
+
+  const [ratedOrderIds, setRatedOrderIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!profile?.id || profile.tipo !== "produtor") return;
+    let active = true;
+    async function fetchRatedOrders() {
+      try {
+        const prodId = await getProducerId(profile.id);
+        if (!prodId) return;
+
+        if (supabase && isSupabaseConfigured) {
+          const { data, error } = await supabase
+            .from("buyer_ratings")
+            .select("order_id")
+            .eq("producer_id", prodId);
+          if (error) throw error;
+          if (active && data) {
+            setRatedOrderIds(new Set(data.map((r: { order_id: string }) => r.order_id)));
+          }
+        } else {
+          const localRatings = readLocalRatings().filter((r) => r.producerId === prodId);
+          if (active) {
+            setRatedOrderIds(new Set(localRatings.map((r) => r.orderId)));
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar avaliações feitas:", err);
+      }
+    }
+    fetchRatedOrders();
+    return () => {
+      active = false;
+    };
+  }, [profile, isSupabaseConfigured]);
 
   const openOrders = producerOrders.filter(
     (order) => order.status !== "Entregue" && order.status !== "Cancelado",
@@ -104,6 +152,14 @@ function ProducerOrders() {
                     confirmDelivery={confirmDelivery}
                     cancelOrder={cancelOrder}
                     completeDelivery={completeDelivery}
+                    isRated={ratedOrderIds.has(order.id)}
+                    onRate={(orderId) => {
+                      setRatedOrderIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(orderId);
+                        return next;
+                      });
+                    }}
                   />
                 ))}
               </ul>
@@ -142,7 +198,10 @@ function ProducerOrders() {
 
             <Panel title="Próximas ações" icon={CheckCircle2}>
               <ul className="space-y-3">
-                <ActionItem title="Recebido" text="Informe data e hora de entrega para confirmar." />
+                <ActionItem
+                  title="Recebido"
+                  text="Informe data e hora de entrega para confirmar."
+                />
                 <ActionItem title="Em separação" text="Prepare lote, embalagem e conferência." />
                 <ActionItem title="Em entrega" text="Acompanhe a saída até a baixa do pedido." />
               </ul>
@@ -160,19 +219,30 @@ function ProducerOrderCard({
   confirmDelivery,
   cancelOrder,
   completeDelivery,
+  isRated,
+  onRate,
 }: {
   order: SavedOrder;
   updateStatus: (id: string, status: OrderStatus) => Promise<void>;
   confirmDelivery: (id: string, deliveryAt: string) => Promise<void>;
   cancelOrder: (id: string, actor: "produtor", reason: string) => Promise<void>;
   completeDelivery: (id: string, code: string) => Promise<void>;
+  isRated: boolean;
+  onRate: (orderId: string) => void;
 }) {
+  const { profile } = useAuth();
   const total = producerOrderTotal(order);
   const [deliveryAt, setDeliveryAt] = useState("");
   const [deliveryCode, setDeliveryCode] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [ratingComment, setRatingComment] = useState("");
+  const [submittingRating, setSubmittingRating] = useState(false);
   const cancelAllowed = canCancelOrder(order);
 
   const confirmOrder = async () => {
@@ -192,14 +262,53 @@ function ProducerOrderCard({
   };
 
   const cancel = async () => {
+    if (!cancelReason.trim()) {
+      setError("O motivo do cancelamento é obrigatório.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       await cancelOrder(order.id, "produtor", cancelReason);
+      toast.success("Pedido cancelado com sucesso.");
+      setIsCancelModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível cancelar o pedido.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!order.buyerId) {
+      setError("Identificação do comprador não encontrada neste pedido.");
+      return;
+    }
+
+    setSubmittingRating(true);
+    setError("");
+    try {
+      const prodId = await getProducerId(profile?.id || "");
+      if (!prodId) {
+        throw new Error("Cadastro de produtor não encontrado para este usuário.");
+      }
+
+      await createBuyerRating({
+        orderId: order.id,
+        buyerId: order.buyerId,
+        producerId: prodId,
+        rating: ratingValue,
+        comment: ratingComment.trim() || undefined,
+      });
+
+      toast.success("Avaliação enviada com sucesso!");
+      setIsRatingModalOpen(false);
+      onRate(order.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível enviar a avaliação.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar a avaliação.");
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
@@ -239,10 +348,25 @@ function ProducerOrderCard({
             </p>
           )}
           {order.status === "Cancelado" && (
-            <p className="mt-1 text-xs font-semibold text-[var(--color-error-fg)]">
-              Cancelado por {order.canceledBy ?? "usuário"}:{" "}
-              {order.cancellationReason ?? "sem motivo informado"}
-            </p>
+            <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error-fg)] space-y-1 w-full">
+              <p className="font-bold text-base">Pedido Cancelado</p>
+              <p>
+                <strong>Responsável pelo cancelamento:</strong>{" "}
+                {order.canceledBy === "comprador"
+                  ? "Comprador"
+                  : order.canceledBy === "produtor"
+                    ? "Produtor"
+                    : "Administrador"}
+              </p>
+              <p>
+                <strong>Motivo:</strong> {order.cancellationReason ?? "sem motivo informado"}
+              </p>
+              {order.canceledAt && (
+                <p>
+                  <strong>Data/Hora:</strong> {formatOrderDate(order.canceledAt)}
+                </p>
+              )}
+            </div>
           )}
           <p className="mt-1 text-sm font-semibold text-brand-900">
             Pagamento: {order.paymentMethod ?? "A combinar"}
@@ -345,31 +469,159 @@ function ProducerOrderCard({
           </div>
         )}
         {cancelAllowed && (
-          <div className="grid w-full gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <label className="block">
-              <span className="text-xs font-semibold text-brand-900">Motivo do cancelamento</span>
-              <input
-                value={cancelReason}
-                onChange={(event) => setCancelReason(event.target.value)}
-                placeholder="Ex: sem disponibilidade para atender"
-                className="mt-1 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => void cancel()}
-              disabled={saving}
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] disabled:opacity-60"
-            >
-              Cancelar pedido
-            </button>
-          </div>
+          <>
+            <div className="w-full flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(true)}
+                disabled={saving}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer disabled:opacity-60"
+              >
+                Cancelar Pedido
+              </button>
+            </div>
+
+            <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="text-brand-900 font-bold">
+                    Cancelar Pedido #{order.id}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-brand-900">
+                      Motivo do cancelamento <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={cancelReason}
+                      onChange={(event) => setCancelReason(event.target.value)}
+                      placeholder="Informe o motivo do cancelamento"
+                      rows={3}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(false)}
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void cancel()}
+                    disabled={!cancelReason.trim() || saving}
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                  >
+                    Confirmar Cancelamento
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
         {order.status === "Entregue" && (
-          <div className="w-full rounded-xl border border-leaf-200 bg-leaf-50 p-3 text-sm text-brand-900">
-            <p className="font-semibold">Entrega concluída</p>
-            <p className="mt-1">Recibo: {order.receiptCode ?? "gerado na confirmação"}</p>
-          </div>
+          <>
+            <div className="w-full rounded-xl border border-leaf-200 bg-leaf-50 p-4 text-sm text-brand-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="font-semibold">Entrega concluída</p>
+                <p className="mt-1">Recibo: {order.receiptCode ?? "gerado na confirmação"}</p>
+              </div>
+              <div>
+                {isRated ? (
+                  <span className="inline-flex h-10 items-center justify-center rounded-lg bg-leaf-100 text-leaf-800 px-4 text-sm font-semibold">
+                    Comprador Avaliado
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsRatingModalOpen(true)}
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-900 text-white px-4 text-sm font-semibold hover:bg-brand-800 transition-colors cursor-pointer"
+                  >
+                    Avaliar Comprador
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <Dialog open={isRatingModalOpen} onOpenChange={setIsRatingModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-brand-900 font-bold">Avaliar Comprador</DialogTitle>
+                  <DialogDescription>
+                    Como foi sua experiência com o comprador <strong>{order.buyerName}</strong> no
+                    pedido #{order.id}?
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-sm font-semibold text-brand-900">
+                      Nota (1 a 5 estrelas)
+                    </span>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRatingValue(star)}
+                          onMouseEnter={() => setHoveredRating(star)}
+                          onMouseLeave={() => setHoveredRating(null)}
+                          className="text-amber-400 hover:scale-110 transition-transform cursor-pointer focus:outline-none"
+                        >
+                          <Star
+                            className="h-8 w-8"
+                            fill={
+                              (hoveredRating !== null ? star <= hoveredRating : star <= ratingValue)
+                                ? "currentColor"
+                                : "none"
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-brand-900">
+                      Comentário <span className="text-xs text-muted-foreground">(opcional)</span>
+                    </label>
+                    <textarea
+                      value={ratingComment}
+                      onChange={(e) => setRatingComment(e.target.value)}
+                      placeholder="Deixe um comentário sobre o comprador..."
+                      rows={3}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsRatingModalOpen(false)}
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitRating()}
+                    disabled={submittingRating}
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                  >
+                    {submittingRating ? "Enviando..." : "Enviar Avaliação"}
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
     </li>
@@ -400,13 +652,19 @@ function productSummary(orders: SavedOrder[]) {
     .slice(0, 5);
 }
 
-function getProducerOrders(orders: SavedOrder[], alreadyScoped: boolean, currentProducerId?: string) {
+function getProducerOrders(
+  orders: SavedOrder[],
+  alreadyScoped: boolean,
+  currentProducerId?: string,
+) {
   if (alreadyScoped) return orders.filter((order) => order.items.length > 0);
   const targetId = currentProducerId || PRODUCER_ID;
   return orders
     .map((order) => ({
       ...order,
-      items: order.items.filter((item) => item.producerId === targetId || item.producerId === "produtor"),
+      items: order.items.filter(
+        (item) => item.producerId === targetId || item.producerId === "produtor",
+      ),
     }))
     .filter((order) => order.items.length > 0);
 }

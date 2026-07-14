@@ -17,8 +17,10 @@ import {
   TrendingDown,
   User,
   X,
+  Star,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useBuyerRatings } from "@/lib/ratings";
 
 export const Route = createFileRoute("/profile/buyer")({
   component: () => (
@@ -41,6 +43,16 @@ function BuyerProfile() {
     : 0;
   const nextDelivery = openOrders[0]?.deliveryEta || "Sem pedidos abertos";
   const productSummary = useMemo(() => summarizeProducts(orders), [orders]);
+
+  const { ratings } = useBuyerRatings();
+
+  const avgRating = useMemo(() => {
+    if (!ratings.length) return "0.0";
+    const sum = ratings.reduce((acc, r) => acc + r.rating, 0);
+    return (sum / ratings.length).toFixed(1);
+  }, [ratings]);
+
+  const totalRatings = ratings.length;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -114,23 +126,77 @@ function BuyerProfile() {
             )}
           </Panel>
 
-          <Panel title="Pedido recorrente" icon={Repeat}>
-            <div className="rounded-xl border border-[var(--border-strong)] bg-surface-brand-soft p-4">
-              <p className="text-sm font-semibold text-brand-900">Pedidos recorrentes</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Acompanhe modelos salvos e pedidos frequentes na área de pedidos.
-              </p>
-              <Link
-                to="/orders"
-                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-              >
-                Ver recorrentes
-              </Link>
+          <Panel title="Sua reputação" icon={Star}>
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div className="text-center bg-canvas rounded-2xl p-4 min-w-[100px] border border-border shadow-xs">
+                  <p className="text-4xl font-black text-brand-900">{avgRating}</p>
+                  <p className="mt-1 text-[10px] uppercase font-semibold text-muted-foreground">
+                    {totalRatings} avaliações
+                  </p>
+                </div>
+                <div className="flex-1">
+                  <div className="flex gap-1 text-amber-500 mb-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className="h-5 w-5"
+                        fill={star <= Math.round(Number(avgRating)) ? "currentColor" : "none"}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sua pontuação média baseada nas avaliações enviadas pelos produtores após a
+                    entrega.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-brand-900 mb-3">
+                  Últimas avaliações dos produtores
+                </h3>
+                {ratings.length ? (
+                  <ul className="space-y-3">
+                    {ratings.slice(0, 3).map((r) => (
+                      <li
+                        key={r.id}
+                        className="rounded-xl bg-canvas p-3 border border-border shadow-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-xs text-brand-900">
+                            {r.producerName || "Produtor"}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatOrderDate(r.createdAt)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex gap-0.5 text-amber-500">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className="h-3.5 w-3.5"
+                              fill={star <= r.rating ? "currentColor" : "none"}
+                            />
+                          ))}
+                        </div>
+                        {r.comment && (
+                          <p className="mt-1.5 text-xs text-brand-800 italic">"{r.comment}"</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    Você ainda não recebeu avaliações.
+                  </p>
+                )}
+              </div>
             </div>
           </Panel>
         </section>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Panel title="Produtos mais comprados" icon={TrendingDown}>
             {productSummary.length ? (
               <ul className="space-y-3">
@@ -153,12 +219,29 @@ function BuyerProfile() {
             )}
           </Panel>
 
-          <Panel title="Contato principal" icon={Phone}>
-            <p className="text-sm text-muted-foreground">
-              Confirmacoes de pedido e entrega serao enviadas para{" "}
-              {details.phone || "o telefone cadastrado"}.
-            </p>
-          </Panel>
+          <div className="space-y-6">
+            <Panel title="Pedido recorrente" icon={Repeat}>
+              <div className="rounded-xl border border-[var(--border-strong)] bg-surface-brand-soft p-4">
+                <p className="text-sm font-semibold text-brand-900">Pedidos recorrentes</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Acompanhe modelos salvos e pedidos frequentes na área de pedidos.
+                </p>
+                <Link
+                  to="/orders"
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+                >
+                  Ver recorrentes
+                </Link>
+              </div>
+            </Panel>
+
+            <Panel title="Contato principal" icon={Phone}>
+              <p className="text-sm text-muted-foreground">
+                Confirmacoes de pedido e entrega serao enviadas para{" "}
+                {details.phone || "o telefone cadastrado"}.
+              </p>
+            </Panel>
+          </div>
         </section>
       </main>
     </div>

@@ -211,7 +211,9 @@ async function respondRemoteQuote(
     .eq("id", id)
     .eq("status", "aberta")
     .is("producer_id", null)
-    .select("id,buyer_id,nome_produto,quantidade,unidade,entrega_desejada,observacoes,buyers(nome_empresa)")
+    .select(
+      "id,buyer_id,nome_produto,quantidade,unidade,entrega_desejada,observacoes,buyers(nome_empresa)",
+    )
     .maybeSingle();
   if (error) throw error;
   if (!data) {
@@ -230,7 +232,10 @@ async function respondRemoteQuote(
     .from("orders")
     .insert({
       buyer_id: data.buyer_id,
-      buyer_name: (Array.isArray(data.buyers) ? data.buyers[0]?.nome_empresa : (data.buyers as any)?.nome_empresa) || "Comprador",
+      buyer_name:
+        (Array.isArray(data.buyers)
+          ? data.buyers[0]?.nome_empresa
+          : (data.buyers as any)?.nome_empresa) || "Comprador",
       status: "recebido",
       subtotal,
       delivery: 0,

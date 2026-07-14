@@ -60,7 +60,12 @@ function Tracking() {
     return orders.find((order) => order.id === selectedId) ?? orders[0];
   }, [orders, selectedId]);
 
-  const currentIndex = selectedOrder?.status === "Cancelado" ? -1 : selectedOrder ? statusFlow.indexOf(selectedOrder.status) : -1;
+  const currentIndex =
+    selectedOrder?.status === "Cancelado"
+      ? -1
+      : selectedOrder
+        ? statusFlow.indexOf(selectedOrder.status)
+        : -1;
   const producers = selectedOrder ? groupByProducer(selectedOrder) : [];
   const timeline = selectedOrder ? buildTimeline(selectedOrder) : [];
 
@@ -120,83 +125,83 @@ function Tracking() {
             )}
 
             {selectedOrder.status !== "Cancelado" && (
-            <section className="mt-8 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
-              <ol className="relative grid grid-cols-1 gap-8 md:grid-cols-4">
-                {statusFlow.map((status, index) => {
-                  const config = stepConfig[status];
-                  const done = index < currentIndex || selectedOrder.status === "Entregue";
-                  const current = index === currentIndex && selectedOrder.status !== "Entregue";
-                  const Icon = config.icon;
+              <section className="mt-8 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
+                <ol className="relative grid grid-cols-1 gap-8 md:grid-cols-4">
+                  {statusFlow.map((status, index) => {
+                    const config = stepConfig[status];
+                    const done = index < currentIndex || selectedOrder.status === "Entregue";
+                    const current = index === currentIndex && selectedOrder.status !== "Entregue";
+                    const Icon = config.icon;
 
-                  return (
-                    <li key={status} className="relative flex items-start gap-4">
-                      {index < statusFlow.length - 1 && (
-                        <span
-                          className={`absolute left-6 top-12 h-full w-0.5 md:left-12 md:right-0 md:top-6 md:h-0.5 md:w-auto ${
-                            index < currentIndex ? "bg-leaf-600" : "bg-surface-muted"
-                          }`}
-                        />
-                      )}
-                      <span
-                        className={`relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-all ${
-                          done
-                            ? "bg-leaf-600 text-white"
-                            : current
-                              ? "scale-105 bg-brand-900 text-white ring-4 ring-leaf-100"
-                              : "bg-surface-muted text-muted-foreground"
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-brand-900">
-                          {config.label}
-                          {current && (
-                            <span className="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
-                              em curso
-                            </span>
-                          )}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {done || current ? config.doneCaption : config.pendingCaption}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-
-              <div className="mt-8 border-t border-border pt-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Linha do tempo
-                </p>
-                <ul className="mt-3 space-y-2.5">
-                  {timeline.map((event) => (
-                    <li key={event.label} className="flex items-center gap-3 text-sm">
-                      <span
-                        className={`grid h-6 w-6 place-items-center rounded-full ${
-                          event.done
-                            ? "bg-leaf-100 text-brand-700"
-                            : "bg-surface-muted text-muted-foreground"
-                        }`}
-                      >
-                        {event.done ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                    return (
+                      <li key={status} className="relative flex items-start gap-4">
+                        {index < statusFlow.length - 1 && (
+                          <span
+                            className={`absolute left-6 top-12 h-full w-0.5 md:left-12 md:right-0 md:top-6 md:h-0.5 md:w-auto ${
+                              index < currentIndex ? "bg-leaf-600" : "bg-surface-muted"
+                            }`}
+                          />
                         )}
-                      </span>
-                      <span className="w-28 text-xs font-mono text-muted-foreground">
-                        {event.time}
-                      </span>
-                      <span className={event.done ? "text-brand-900" : "text-muted-foreground"}>
-                        {event.label}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
+                        <span
+                          className={`relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-all ${
+                            done
+                              ? "bg-leaf-600 text-white"
+                              : current
+                                ? "scale-105 bg-brand-900 text-white ring-4 ring-leaf-100"
+                                : "bg-surface-muted text-muted-foreground"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-brand-900">
+                            {config.label}
+                            {current && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
+                                em curso
+                              </span>
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {done || current ? config.doneCaption : config.pendingCaption}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+
+                <div className="mt-8 border-t border-border pt-6">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Linha do tempo
+                  </p>
+                  <ul className="mt-3 space-y-2.5">
+                    {timeline.map((event) => (
+                      <li key={event.label} className="flex items-center gap-3 text-sm">
+                        <span
+                          className={`grid h-6 w-6 place-items-center rounded-full ${
+                            event.done
+                              ? "bg-leaf-100 text-brand-700"
+                              : "bg-surface-muted text-muted-foreground"
+                          }`}
+                        >
+                          {event.done ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                          )}
+                        </span>
+                        <span className="w-28 text-xs font-mono text-muted-foreground">
+                          {event.time}
+                        </span>
+                        <span className={event.done ? "text-brand-900" : "text-muted-foreground"}>
+                          {event.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
             )}
 
             <section className="mt-6 grid gap-4 md:grid-cols-2">
