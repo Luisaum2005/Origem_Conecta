@@ -15,6 +15,7 @@ const links = [
   { to: "/producer/orders", label: "Pedidos recebidos", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
   { to: "/demands", label: "Demandas", profiles: ["comprador", "produtor", "admin"] },
+  { to: "/chats", label: "Mensagens", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
 ] as const;
 

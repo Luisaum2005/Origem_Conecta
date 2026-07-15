@@ -20,6 +20,7 @@ import {
   Sprout,
   Truck,
   Star,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -59,10 +60,11 @@ function ProducerOrders() {
 
   useEffect(() => {
     if (!profile?.id || profile.tipo !== "produtor") return;
+    const profileId = profile.id;
     let active = true;
     async function fetchRatedOrders() {
       try {
-        const prodId = await getProducerId(profile.id);
+        const prodId = await getProducerId(profileId);
         if (!prodId) return;
 
         if (supabase && isSupabaseConfigured) {
@@ -336,8 +338,18 @@ function ProducerOrderCard({
           <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
             Pedido #{order.id}
           </p>
-          <h3 className="mt-1 text-lg font-bold text-brand-900">
-            {order.buyerName} - R$ {total.toFixed(2)}
+          <h3 className="mt-1 text-lg font-bold text-brand-900 flex flex-wrap items-center gap-2">
+            <span>
+              {order.buyerName} - R$ {total.toFixed(2)}
+            </span>
+            <Link
+              to="/chat"
+              search={{ orderId: order.id, producerId: order.items[0]?.producerId }}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-white px-2.5 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
+            >
+              <MessageSquare className="h-3 w-3 text-leaf-700" />
+              Conversar
+            </Link>
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {formatOrderDate(order.createdAt)} - entrega {order.deliveryEta}

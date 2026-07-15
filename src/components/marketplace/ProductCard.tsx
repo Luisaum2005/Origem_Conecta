@@ -1,6 +1,11 @@
 import { ChevronLeft, ChevronRight, Info, MapPin, PlayCircle, MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
 import { preferredProducer, type Product } from "@/lib/catalog";
+import { useAuth } from "@/lib/auth";
+import { useNavigate } from "@tanstack/react-router";
+import { getOrCreateConversation } from "@/lib/chats";
+import { getBuyerId } from "@/lib/orders";
+import { toast } from "sonner";
 
 function formatQuantity(value: number) {
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -43,6 +48,10 @@ export function ProductCard({
 }) {
   const [hover, setHover] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [negotiating, setNegotiating] = useState(false);
+
   const recommended = preferredProducer(product);
   const selectedProducer =
     product.producers.find((producer) => producer.id === producerChoice) ?? recommended;
@@ -170,15 +179,51 @@ export function ProductCard({
       <div className="mt-4 space-y-3">
         <button
           type="button"
+          disabled={negotiating}
           onClick={() => {
-            alert(
-              `Negociação iniciada com o produtor ${selectedProducer.name} para o produto ${product.name}. A integração com o WhatsApp / chat de negociação estará disponível em breve!`,
-            );
+            const handleNegotiate = async () => {
+              if (!profile) {
+                toast.error("Você precisa estar logado para negociar.");
+                void navigate({ to: "/login" });
+                return;
+              }
+              if (profile.tipo !== "comprador") {
+                toast.error("Apenas compradores podem negociar produtos do portfólio.");
+                return;
+              }
+
+              setNegotiating(true);
+              try {
+                const buyerId = await getBuyerId(profile.id);
+                if (!buyerId) {
+                  throw new Error("Cadastro de comprador não encontrado.");
+                }
+
+                const conv = await getOrCreateConversation({
+                  portfolioProductId: product.id,
+                  buyerId,
+                  producerId: selectedProducer.id,
+                  systemMessageOnCreate: `Você iniciou uma negociação sobre o anúncio ${product.name}.`,
+                  senderId: profile.id,
+                });
+
+                void navigate({
+                  to: "/chat",
+                  search: { id: conv.id },
+                });
+              } catch (err) {
+                console.error("Erro ao iniciar negociação:", err);
+                toast.error(err instanceof Error ? err.message : "Erro ao iniciar negociação.");
+              } finally {
+                setNegotiating(false);
+              }
+            };
+            void handleNegotiate();
           }}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 hover:bg-leaf-100 transition-colors cursor-pointer"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 hover:bg-leaf-100 transition-colors cursor-pointer disabled:opacity-50"
         >
           <MessageSquare className="h-4 w-4 text-leaf-700" />
-          Negociar
+          {negotiating ? "Iniciando..." : "Negociar"}
         </button>
 
         {product.producers.length > 1 && (

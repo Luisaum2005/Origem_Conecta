@@ -22,6 +22,7 @@ import {
   ShoppingBag,
   Trash2,
   Truck,
+  MessageSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -366,9 +367,20 @@ function BuyerOrderCard({
           >
             <div>
               <p className="font-semibold text-brand-900">{item.productName}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Produtor: {item.producerName} ·{" "}
-                {item.manualProducerChoice ? "produtor escolhido" : "produtor automático"}
+              <p className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+                <span>Produtor: {item.producerName}</span>
+                <span>·</span>
+                <span>
+                  {item.manualProducerChoice ? "produtor escolhido" : "produtor automático"}
+                </span>
+                <span>·</span>
+                <Link
+                  to="/chat"
+                  search={{ orderId: order.id, producerId: item.producerId }}
+                  className="font-bold text-leaf-700 hover:underline hover:text-leaf-800 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <MessageSquare className="h-3 w-3" /> Conversar
+                </Link>
               </p>
               {item.notes && (
                 <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-brand-900">

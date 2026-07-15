@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
-import { ClipboardList, Megaphone, Package, Store, Truck, User } from "lucide-react";
+import { ClipboardList, Megaphone, Package, Store, Truck, User, MessageSquare } from "lucide-react";
 
 const items = [
   { to: "/portfolio", label: "Portfólio", icon: Store, profiles: ["comprador"] },
@@ -11,6 +11,12 @@ const items = [
     to: "/demands",
     label: "Demandas",
     icon: Megaphone,
+    profiles: ["comprador", "produtor", "admin"],
+  },
+  {
+    to: "/chats",
+    label: "Mensagens",
+    icon: MessageSquare,
     profiles: ["comprador", "produtor", "admin"],
   },
   { to: "/admin", label: "Admin", icon: ClipboardList, profiles: ["admin"] },

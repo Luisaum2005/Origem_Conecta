@@ -21,6 +21,7 @@ import {
   ShoppingBag,
   Trash2,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -590,6 +591,18 @@ function ProducerDemandCard({
 
   return (
     <DemandCard demand={demand}>
+      {demand.buyerId && (
+        <div className="mt-2 mb-4 flex justify-end">
+          <Link
+            to="/chat"
+            search={{ demandId: demand.id, buyerId: demand.buyerId }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
+          >
+            <MessageSquare className="h-3.5 w-3.5 text-leaf-700" />
+            Conversar com Comprador
+          </Link>
+        </div>
+      )}
       {alreadyResponded ? (
         <Alert tone="success">Sua resposta já foi enviada para essa demanda.</Alert>
       ) : (
@@ -781,7 +794,19 @@ function ResponseSummary({
             {response.status} · Proposta total R$ {total.toFixed(2)}
           </p>
         </div>
-        {action}
+        <div className="flex flex-wrap items-center gap-2">
+          {response.producerId && (
+            <Link
+              to="/chat"
+              search={{ demandId: response.demandId, producerId: response.producerId }}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
+            >
+              <MessageSquare className="h-4 w-4 text-leaf-700" />
+              Conversar
+            </Link>
+          )}
+          {action}
+        </div>
       </div>
       <ul className="mt-3 space-y-2 text-sm text-brand-900">
         {response.items
