@@ -35,37 +35,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let active = true;
 
-    async function loadProfile() {
-      const { data: userData } = await client.auth.getUser();
-      const user = userData.user;
-      if (!user) {
+    async function loadProfile(userId?: string) {
+      if (!userId) {
         if (active) setProfile(null);
         if (active) setLoading(false);
         return;
       }
 
-      const { data } = await client
+      const { data, error } = await client
         .from("profiles")
         .select("id,user_id,tipo,nome,email,telefone")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (active && data) {
-        setProfile({
+        const restoredProfile: AuthProfile = {
           id: data.id,
           userId: data.user_id,
           tipo: data.tipo,
           nome: data.nome,
           email: data.email,
           telefone: data.telefone ?? undefined,
-        });
+        };
+        setProfile(restoredProfile);
+        window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(restoredProfile));
+      } else if (active && !error) {
+        setProfile(null);
       }
       if (active) setLoading(false);
     }
 
-    loadProfile();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      loadProfile();
+    void client.auth.getSession().then(({ data }) => {
+      void loadProfile(data.session?.user.id);
+    });
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+      // Run outside the auth callback to avoid competing with Supabase's session lock.
+      window.setTimeout(() => void loadProfile(session?.user.id), 0);
     });
 
     return () => {
@@ -126,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: profileData.email,
           telefone: profileData.telefone ?? undefined,
         };
+        window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(nextProfile));
         setProfile(nextProfile);
         return nextProfile;
       },
@@ -216,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: profileData.email,
           telefone: profileData.telefone ?? undefined,
         };
+        window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(nextProfile));
         setProfile(nextProfile);
         return nextProfile;
       },

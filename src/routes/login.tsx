@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
 import { getProfileHome, useAuth } from "@/lib/auth";
 import { useState, type FormEvent } from "react";
@@ -9,9 +9,18 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const navigate = useNavigate();
-  const { signIn, isSupabaseConfigured } = useAuth();
+  const { signIn, isSupabaseConfigured, profile, loading: restoringSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  if (restoringSession) {
+    return (
+      <AuthLayout title="Restaurando sua sessão" subtitle="Aguarde um instante...">
+        <p className="text-sm text-muted-foreground">Validando o acesso salvo neste dispositivo.</p>
+      </AuthLayout>
+    );
+  }
+  if (profile) return <Navigate to={getProfileHome(profile.tipo)} replace />;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

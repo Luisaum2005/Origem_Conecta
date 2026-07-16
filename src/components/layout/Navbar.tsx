@@ -4,10 +4,9 @@ import { AccessibilityControls } from "@/components/layout/AccessibilityControls
 import { BottomNav } from "@/components/layout/BottomNav";
 import { SupportButton } from "@/components/layout/SupportButton";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
-import { useDemandRequests } from "@/lib/demands";
-import { useOrders } from "@/lib/orders";
-import { Bell, ClipboardList, Megaphone, PackageCheck, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useNotifications } from "@/lib/notifications";
+import { Bell, User } from "lucide-react";
+import { useState } from "react";
 
 const links = [
   { to: "/portfolio", label: "Portfólio", profiles: ["comprador"] },
@@ -18,74 +17,22 @@ const links = [
   { to: "/chats", label: "Mensagens", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
 ] as const;
-
-function visibleForProfile(profiles: readonly ProfileType[], profileType?: ProfileType) {
-  return profileType ? profiles.includes(profileType) : false;
+function visible(profiles: readonly ProfileType[], type?: ProfileType) {
+  return type ? profiles.includes(type) : false;
 }
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
-  const { orders } = useOrders();
-  const { demands } = useDemandRequests();
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const readStorageKey = profile?.id ? `origem-conecta-read-notifications-${profile.id}` : "";
-  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(window.localStorage.getItem("origem-conecta-read-notifications") || "[]");
-    } catch {
-      return [];
-    }
-  });
-  const [visibleNotifications, setVisibleNotifications] = useState<NotificationItem[]>([]);
+  const [open, setOpen] = useState(false);
+  const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications(
+    profile?.userId,
+  );
   const profilePath =
     profile?.tipo === "comprador"
       ? "/profile/buyer"
       : profile
         ? getProfileHome(profile.tipo)
         : "/login";
-  const visibleLinks = links.filter((link) => visibleForProfile(link.profiles, profile?.tipo));
-  const notifications = useMemo(
-    () => buildNotifications(profile?.tipo, orders, demands),
-    [demands, orders, profile?.tipo],
-  );
-
-  useEffect(() => {
-    if (!readStorageKey || typeof window === "undefined") return;
-    try {
-      setReadNotificationIds(JSON.parse(window.localStorage.getItem(readStorageKey) || "[]"));
-    } catch {
-      setReadNotificationIds([]);
-    }
-    setVisibleNotifications([]);
-    setNotificationsOpen(false);
-  }, [readStorageKey]);
-
-  const unreadNotifications = notifications.filter(
-    (notification) => !readNotificationIds.includes(notification.id),
-  );
-
-  const toggleNotifications = () => {
-    if (notificationsOpen) {
-      setNotificationsOpen(false);
-      setVisibleNotifications([]);
-      return;
-    }
-
-    setVisibleNotifications(unreadNotifications);
-    const nextReadIds = Array.from(
-      new Set([...readNotificationIds, ...unreadNotifications.map((item) => item.id)]),
-    );
-    setReadNotificationIds(nextReadIds);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        readStorageKey || "origem-conecta-read-notifications",
-        JSON.stringify(nextReadIds),
-      );
-    }
-    setNotificationsOpen(true);
-  };
-
   return (
     <>
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
@@ -93,82 +40,93 @@ export function Navbar() {
           <div className="flex items-center gap-6 sm:gap-10">
             <Logo compactOnMobile />
             <nav className="hidden items-center gap-1 md:flex">
-              {visibleLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-brand-900"
-                  activeProps={{ className: "bg-secondary text-brand-900" }}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {links
+                .filter((link) => visible(link.profiles, profile?.tipo))
+                .map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900"
+                    activeProps={{ className: "bg-secondary text-brand-900" }}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
             </nav>
           </div>
-
           <div className="relative flex items-center gap-2">
             <SupportButton compact />
             <AccessibilityControls />
             <div className="relative">
               <button
                 type="button"
-                onClick={toggleNotifications}
+                onClick={() => setOpen(!open)}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
                 aria-label="Notificações"
-                aria-expanded={notificationsOpen}
+                aria-expanded={open}
               >
                 <Bell className="h-5 w-5" />
-                {unreadNotifications.length > 0 && (
-                  <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-orange-600 px-1 text-[10px] font-bold leading-none text-white">
-                    {unreadNotifications.length}
+                {unreadCount > 0 && (
+                  <span className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </button>
-
-              {notificationsOpen && (
-                <div className="absolute right-0 top-12 z-50 w-[min(calc(100vw-2rem),360px)] overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
-                  <div className="border-b border-border px-4 py-3">
-                    <p className="text-sm font-semibold text-brand-900">Notificações</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Alertas gerados pela operação atual.
-                    </p>
-                  </div>
-                  {visibleNotifications.length === 0 ? (
-                    <div className="px-4 py-5 text-sm text-muted-foreground">
-                      Nenhuma notificação importante no momento.
+              {open && (
+                <div className="fixed inset-x-3 top-[70px] z-50 overflow-hidden rounded-2xl border border-border bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[380px]">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-brand-900">Notificações</p>
+                      <p className="text-xs text-muted-foreground">Atualizações da sua conta.</p>
                     </div>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void markAllRead()}
+                        className="text-xs font-semibold text-leaf-700"
+                      >
+                        Marcar todas como lidas
+                      </button>
+                    )}
+                  </div>
+                  {loading ? (
+                    <p className="px-4 py-5 text-sm text-muted-foreground">Carregando...</p>
+                  ) : notifications.length === 0 ? (
+                    <p className="px-4 py-5 text-sm text-muted-foreground">
+                      Nenhuma notificação ainda.
+                    </p>
                   ) : (
-                    <ul className="max-h-[360px] divide-y divide-border overflow-y-auto">
-                      {visibleNotifications.map((notification) => {
-                        const Icon = notification.icon;
-                        return (
-                          <li key={notification.id}>
-                            <Link
-                              to={notification.to}
-                              onClick={() => setNotificationsOpen(false)}
-                              className="flex gap-3 px-4 py-3 hover:bg-secondary"
-                            >
-                              <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-leaf-100 text-brand-700">
-                                <Icon className="h-4 w-4" />
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold text-brand-900">
-                                  {notification.title}
-                                </span>
-                                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                                  {notification.text}
-                                </span>
-                              </span>
-                            </Link>
-                          </li>
-                        );
-                      })}
+                    <ul className="max-h-[min(60vh,420px)] divide-y divide-border overflow-y-auto">
+                      {notifications.map((item) => (
+                        <li key={item.id} className={item.readAt ? "bg-white" : "bg-leaf-50"}>
+                          <a
+                            href={item.url}
+                            onClick={() => {
+                              void markRead(item.id);
+                              setOpen(false);
+                            }}
+                            className="block px-4 py-3 hover:bg-secondary"
+                          >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-brand-900">
+                              {!item.readAt && (
+                                <span className="h-2 w-2 rounded-full bg-orange-600" />
+                              )}
+                              {item.title}
+                            </span>
+                            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                              {item.body}
+                            </span>
+                            <time className="mt-1 block text-[10px] text-muted-foreground">
+                              {new Date(item.createdAt).toLocaleString("pt-BR")}
+                            </time>
+                          </a>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </div>
               )}
             </div>
-
             <Link
               to={profilePath}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900"
@@ -180,7 +138,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="hidden h-10 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-brand-900 md:inline-flex md:items-center"
+                className="hidden h-10 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-secondary md:inline-flex md:items-center"
               >
                 Sair
               </button>
@@ -191,93 +149,4 @@ export function Navbar() {
       <BottomNav />
     </>
   );
-}
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  text: string;
-  to: "/orders" | "/producer/orders" | "/demands" | "/admin";
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-function buildNotifications(
-  profileType: ProfileType | undefined,
-  orders: ReturnType<typeof useOrders>["orders"],
-  demands: ReturnType<typeof useDemandRequests>["demands"],
-): NotificationItem[] {
-  if (!profileType) return [];
-
-  if (profileType === "comprador") {
-    return [
-      ...orders
-        .filter((order) => order.status !== "Entregue")
-        .slice(0, 3)
-        .map((order) => ({
-          id: `buyer-order-${order.id}`,
-          title: `Pedido #${order.id}: ${order.status}`,
-          text: `${order.items.length} item${order.items.length > 1 ? "s" : ""} com entrega ${order.deliveryEta}.`,
-          to: "/orders" as const,
-          icon: PackageCheck,
-        })),
-      ...demands
-        .filter((demand) => demand.responses.some((response) => response.status === "Enviada"))
-        .slice(0, 3)
-        .map((demand) => ({
-          id: `buyer-demand-${demand.id}`,
-          title: "Demanda com resposta",
-          text: `${demand.items.length} item(ns) com proposta de produtor.`,
-          to: "/demands" as const,
-          icon: Megaphone,
-        })),
-    ].slice(0, 5);
-  }
-
-  if (profileType === "produtor") {
-    return [
-      ...orders
-        .filter((order) => order.status !== "Entregue")
-        .slice(0, 3)
-        .map((order) => ({
-          id: `producer-order-${order.id}`,
-          title: `Pedido recebido #${order.id}`,
-          text: `${order.items.length} item${order.items.length > 1 ? "s" : ""} aguardando acompanhamento.`,
-          to: "/producer/orders" as const,
-          icon: ClipboardList,
-        })),
-      ...demands
-        .filter((demand) => demand.status === "Aberta" || demand.status === "Respondida")
-        .slice(0, 3)
-        .map((demand) => ({
-          id: `producer-demand-${demand.id}`,
-          title: demand.urgency === "urgente" ? "Demanda urgente" : "Nova demanda aberta",
-          text: `${demand.items.length} produto(s) para ${demand.buyerName}.`,
-          to: "/demands" as const,
-          icon: Megaphone,
-        })),
-    ].slice(0, 5);
-  }
-
-  return [
-    ...orders
-      .filter((order) => order.status !== "Entregue")
-      .slice(0, 3)
-      .map((order) => ({
-        id: `admin-order-${order.id}`,
-        title: `Pedido em aberto #${order.id}`,
-        text: `${order.buyerName} · ${order.status} · R$ ${order.total.toFixed(2)}.`,
-        to: "/admin" as const,
-        icon: ClipboardList,
-      })),
-    ...demands
-      .filter((demand) => demand.status !== "Aprovada")
-      .slice(0, 3)
-      .map((demand) => ({
-        id: `admin-demand-${demand.id}`,
-        title: `Demanda ${demand.status.toLowerCase()}`,
-        text: `${demand.items.length} item(ns) para ${demand.buyerName}.`,
-        to: "/demands" as const,
-        icon: Megaphone,
-      })),
-  ].slice(0, 6);
 }

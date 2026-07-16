@@ -1,13 +1,18 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { InstallButton } from "@/components/pwa/InstallButton";
 import { ArrowRight, LogIn, ShieldCheck, Sprout, Store, Truck } from "lucide-react";
+import { getProfileHome, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   component: Splash,
 });
 
 function Splash() {
+  const { profile, loading } = useAuth();
+  if (loading) return <AuthRestoring />;
+  if (profile) return <Navigate to={getProfileHome(profile.tipo)} replace />;
+
   return (
     <div className="min-h-screen bg-canvas">
       <header className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-5 sm:px-8 sm:py-6">
@@ -115,6 +120,16 @@ function Splash() {
           </section>
         </div>
       </main>
+    </div>
+  );
+}
+
+function AuthRestoring() {
+  return (
+    <div className="grid min-h-screen place-items-center bg-canvas px-4">
+      <div className="rounded-2xl border border-border bg-white px-5 py-4 text-sm font-semibold text-brand-900 shadow-xs">
+        Restaurando sua sessão...
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { PushSettings } from "@/components/notifications/PushSettings";
 import { type BuyerProfileDetails, useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import {
@@ -243,6 +244,7 @@ function BuyerProfile() {
             </Panel>
           </div>
         </section>
+        <PushSettings />
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { PushSettings } from "@/components/notifications/PushSettings";
 import { useAuth } from "@/lib/auth";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import { type ProducerProfileDetails, useProducerProfileDetails } from "@/lib/producer-profile";
@@ -248,6 +249,7 @@ function ProducerProfile() {
             )}
           </Panel>
         </section>
+        <PushSettings />
       </main>
     </div>
   );
