@@ -74,10 +74,7 @@ export function ProductCard({
   const [inputValue, setInputValue] = useState(qty > 0 ? qty.toString().replace(".", ",") : "");
 
   useEffect(() => {
-    const parsed = Number(inputValue.replace(",", "."));
-    if (parsed !== qty) {
-      setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
-    }
+    setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
   }, [qty]);
 
   const handleInputChange = (valueStr: string) => {

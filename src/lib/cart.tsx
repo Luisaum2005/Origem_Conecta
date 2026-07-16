@@ -1,25 +1,10 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-
-type CartState = Record<string, number>;
-type ProducerChoiceState = Record<string, string>;
-type UnitState = Record<string, string>;
-type Ctx = {
-  cart: CartState;
-  producerChoices: ProducerChoiceState;
-  selectedUnits: UnitState;
-  setQty: (id: string, qty: number) => void;
-  replaceCart: (
-    cart: CartState,
-    producerChoices?: ProducerChoiceState,
-    selectedUnits?: UnitState,
-  ) => void;
-  setProducerChoice: (productId: string, producerId: string) => void;
-  setUnit: (productId: string, unit: string) => void;
-  totalItems: number;
-  clear: () => void;
-};
-
-const CartCtx = createContext<Ctx | null>(null);
+import {
+  CartContext,
+  type CartState,
+  type ProducerChoiceState,
+  type UnitState,
+} from "@/lib/cart-context";
+import { useState, type ReactNode } from "react";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartState>({});
@@ -55,7 +40,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
   const totalItems = Object.keys(cart).length;
   return (
-    <CartCtx.Provider
+    <CartContext.Provider
       value={{
         cart,
         producerChoices,
@@ -73,12 +58,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </CartCtx.Provider>
+    </CartContext.Provider>
   );
 }
-
-export const useCart = () => {
-  const c = useContext(CartCtx);
-  if (!c) throw new Error("CartProvider missing");
-  return c;
-};

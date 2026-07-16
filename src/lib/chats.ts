@@ -96,70 +96,32 @@ export async function getOrCreateConversation(params: {
   senderId?: string;
 }): Promise<SavedConversation> {
   if (supabase) {
-    let query = supabase.from("conversations").select("*");
-    if (params.orderId) {
-      query = query.eq("order_id", params.orderId);
-    } else if (params.demandId) {
-      query = query.eq("demand_id", params.demandId);
-    } else if (params.portfolioProductId) {
-      query = query.eq("portfolio_product_id", params.portfolioProductId);
-    }
+    const { data, error } = await supabase.rpc("get_or_create_conversation", {
+      p_buyer_id: params.buyerId,
+      p_producer_id: params.producerId,
+      p_order_id: params.orderId ?? null,
+      p_demand_id: params.demandId ?? null,
+      p_portfolio_product_id: params.portfolioProductId ?? null,
+      p_initial_message:
+        params.systemMessageOnCreate && params.senderId ? params.systemMessageOnCreate : null,
+    });
 
-    const { data: existing, error: fetchError } = await query
-      .eq("buyer_id", params.buyerId)
-      .eq("producer_id", params.producerId)
-      .maybeSingle();
+    if (error) throw error;
 
-    if (fetchError) throw fetchError;
-    if (existing) {
-      return {
-        id: existing.id,
-        orderId: existing.order_id || undefined,
-        demandId: existing.demand_id || undefined,
-        portfolioProductId: existing.portfolio_product_id || undefined,
-        conversationContext: (existing.conversation_context || "portfolio") as
-          | "portfolio"
-          | "demand"
-          | "order",
-        buyerId: existing.buyer_id,
-        producerId: existing.producer_id,
-        createdAt: existing.created_at,
-        updatedAt: existing.updated_at,
-        lastMessageAt: existing.last_message_at,
-      };
-    }
+    const created = (Array.isArray(data) ? data[0] : data) as {
+      id: string;
+      order_id: string | null;
+      demand_id: string | null;
+      portfolio_product_id: string | null;
+      conversation_context: string | null;
+      buyer_id: string;
+      producer_id: string;
+      created_at: string;
+      updated_at: string;
+      last_message_at: string;
+    } | null;
 
-    // Create a new conversation
-    const contextValue = params.orderId ? "order" : params.demandId ? "demand" : "portfolio";
-
-    const { data: created, error: createError } = await supabase
-      .from("conversations")
-      .insert({
-        order_id: params.orderId || null,
-        demand_id: params.demandId || null,
-        portfolio_product_id: params.portfolioProductId || null,
-        conversation_context: contextValue,
-        buyer_id: params.buyerId,
-        producer_id: params.producerId,
-      })
-      .select()
-      .single();
-
-    if (createError) throw createError;
-
-    // Send first message if provided
-    if (params.systemMessageOnCreate && params.senderId) {
-      const { error: msgError } = await supabase.from("messages").insert({
-        conversation_id: created.id,
-        sender_id: params.senderId,
-        message: params.systemMessageOnCreate,
-      });
-      if (msgError) {
-        console.warn("Erro ao inserir mensagem automática:", msgError);
-      } else {
-        created.last_message_at = new Date().toISOString();
-      }
-    }
+    if (!created) throw new Error("Não foi possível criar ou localizar a conversa.");
 
     return {
       id: created.id,
@@ -357,88 +319,7 @@ export async function getUserConversations(
   profileType: "comprador" | "produtor" | "admin",
 ): Promise<SavedConversation[]> {
   if (supabase) {
-    const selectString = `
-      id,
-      order_id,
-      demand_id,
-      portfolio_product_id,
-      conversation_context,
-      buyer_id,
-      producer_id,
-      created_at,
-      updated_at,
-      last_message_at,
-      orders (
-        id,
-        status,
-        total,
-        buyer_name
-      ),
-      demand_requests (
-        id,
-        buyer_name,
-        delivery_date,
-        urgency
-      ),
-      buyers (
-        id,
-        nome_empresa,
-        profile_id,
-        profiles (
-          nome
-        )
-      ),
-      producers (
-        id,
-        nome_propriedade,
-        responsavel,
-        profile_id,
-        profiles (
-          nome
-        )
-      )
-    `;
-
-    let query = supabase.from("conversations").select(selectString);
-
-    if (profileType === "comprador") {
-      const bId = await getBuyerId(profileId);
-      if (!bId) return [];
-      query = query.eq("buyer_id", bId);
-    } else if (profileType === "produtor") {
-      const pId = await getProducerId(profileId);
-      if (!pId) return [];
-      query = query.eq("producer_id", pId);
-    }
-
-    const { data: convs, error: convsError } = await query.order("last_message_at", {
-      ascending: false,
-    });
-
-    if (convsError) throw convsError;
-    if (!convs || convs.length === 0) return [];
-
-    // Fetch latest messages and unread counts
-    const convIds = convs.map((c) => c.id);
-    const { data: msgsData, error: msgsError } = await supabase
-      .from("messages")
-      .select("conversation_id, message, created_at, sender_id, read_at")
-      .in("conversation_id", convIds)
-      .order("created_at", { ascending: false });
-
-    if (msgsError) throw msgsError;
-
-    interface DbMessageInfoRow {
-      conversation_id: string;
-      message: string;
-      created_at: string;
-      sender_id: string;
-      read_at: string | null;
-    }
-
-    const msgs = (msgsData ?? []) as unknown as DbMessageInfoRow[];
-
-    interface ConversationRow {
+    interface ConversationSummaryRow {
       id: string;
       order_id: string | null;
       demand_id: string | null;
@@ -449,55 +330,22 @@ export async function getUserConversations(
       created_at: string;
       updated_at: string;
       last_message_at: string;
-      orders: {
-        id: string;
-        status: string;
-        total: number;
-        buyer_name: string;
-      } | null;
-      demand_requests: {
-        id: string;
-        buyer_name: string;
-        delivery_date: string;
-        urgency: string;
-      } | null;
-      buyers: {
-        id: string;
-        nome_empresa: string | null;
-        profile_id: string;
-        profiles: {
-          nome: string;
-        } | null;
-      } | null;
-      producers: {
-        id: string;
-        nome_propriedade: string | null;
-        responsavel: string | null;
-        profile_id: string;
-        profiles: {
-          nome: string;
-        } | null;
-      } | null;
+      other_party_name: string;
+      last_message_text: string | null;
+      unread_count: number | string;
+      order_status: string | null;
+      demand_urgency: string | null;
+      order_total: number | string | null;
     }
 
-    const typedConvs = (convs ?? []) as unknown as ConversationRow[];
+    const { data, error } = await supabase.rpc("list_user_conversations", {
+      p_profile_id: profileId,
+    });
+    if (error) throw error;
 
-    return typedConvs.map((row) => {
-      // Find latest message text
-      const latest = msgs?.find((m) => m.conversation_id === row.id);
-      const localUnreads =
-        msgs?.filter(
-          (m) => m.conversation_id === row.id && m.sender_id !== profileId && m.read_at === null,
-        ) || [];
+    const rows = (data ?? []) as unknown as ConversationSummaryRow[];
 
-      // Determine other party name
-      let otherParty = "Participante";
-      if (profileType === "comprador") {
-        otherParty = row.producers?.nome_propriedade || row.producers?.responsavel || "Produtor";
-      } else {
-        otherParty = row.buyers?.nome_empresa || row.buyers?.profiles?.nome || "Comprador";
-      }
-
+    return rows.map((row) => {
       return {
         id: row.id,
         orderId: row.order_id || undefined,
@@ -512,12 +360,12 @@ export async function getUserConversations(
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         lastMessageAt: row.last_message_at,
-        otherPartyName: otherParty,
-        lastMessageText: latest?.message || undefined,
-        unreadCount: localUnreads.length,
-        orderStatus: row.orders?.status || undefined,
-        demandUrgency: row.demand_requests?.urgency || undefined,
-        orderTotal: row.orders?.total ? Number(row.orders.total) : undefined,
+        otherPartyName: row.other_party_name,
+        lastMessageText: row.last_message_text || undefined,
+        unreadCount: Number(row.unread_count || 0),
+        orderStatus: row.order_status || undefined,
+        demandUrgency: row.demand_urgency || undefined,
+        orderTotal: row.order_total == null ? undefined : Number(row.order_total),
       };
     });
   } else {
@@ -565,12 +413,9 @@ export async function getUserConversations(
 
 export async function markAsRead(conversationId: string, profileId: string): Promise<void> {
   if (supabase) {
-    const { error } = await supabase
-      .from("messages")
-      .update({ read_at: new Date().toISOString() })
-      .eq("conversation_id", conversationId)
-      .neq("sender_id", profileId)
-      .is("read_at", null);
+    const { error } = await supabase.rpc("mark_conversation_read", {
+      p_conversation_id: conversationId,
+    });
 
     if (error) throw error;
   } else {

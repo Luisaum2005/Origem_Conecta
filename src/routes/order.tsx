@@ -619,10 +619,7 @@ function OrderItemControls({
   );
 
   useEffect(() => {
-    const parsed = Number(inputValue.replace(",", "."));
-    if (parsed !== quantity) {
-      setInputValue(quantity > 0 ? quantity.toString().replace(".", ",") : "");
-    }
+    setInputValue(quantity > 0 ? quantity.toString().replace(".", ",") : "");
   }, [quantity]);
 
   const handleInputChange = (valueStr: string) => {

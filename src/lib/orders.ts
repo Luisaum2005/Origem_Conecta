@@ -166,7 +166,9 @@ export function canCancelOrder(order: SavedOrder) {
   if (order.status === "Entregue" || order.status === "Cancelado") {
     return false;
   }
-  return true;
+  const deadline =
+    order.cancellationDeadline ?? addHours(order.createdAt, CANCELLATION_LIMIT_HOURS);
+  return Date.now() <= new Date(deadline).getTime();
 }
 
 export function formatCancellationDeadline(order: SavedOrder) {
@@ -347,65 +349,50 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
 
 async function updateRemoteStatus(id: string, status: OrderStatus) {
   if (!supabase) return;
-  const payload: Record<string, string> = { status: appToDbStatus[status] };
-  if (status === "Em entrega") payload.saiu_entrega_em = new Date().toISOString();
-  const { error } = await supabase.from("orders").update(payload).eq("id", id);
+  if (status !== "Em entrega") {
+    throw new Error("Transição de status não permitida por esta operação.");
+  }
+  const { error } = await supabase.rpc("secure_ship_order", { p_order_id: id });
   if (error) throw error;
 }
 
 async function confirmRemoteDelivery(id: string, deliveryAt: string) {
   if (!supabase) return;
   const deliveryEta = formatDeliveryDateTime(deliveryAt);
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "em_separacao",
-      entrega_prevista: new Date(deliveryAt).toISOString(),
-      entrega_label: deliveryEta,
-      confirmado_em: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { error } = await supabase.rpc("secure_confirm_order", {
+    p_order_id: id,
+    p_delivery_at: new Date(deliveryAt).toISOString(),
+  });
   if (error) throw error;
   return deliveryEta;
 }
 
-async function cancelRemoteOrder(id: string, actor: SavedOrder["canceledBy"], reason: string) {
+async function cancelRemoteOrder(id: string, reason: string) {
   if (!supabase) return;
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "cancelado",
-      cancelado_em: new Date().toISOString(),
-      cancelado_por: actor,
-      motivo_cancelamento: reason,
-    })
-    .eq("id", id);
+  const { error } = await supabase.rpc("secure_cancel_order", {
+    p_order_id: id,
+    p_reason: reason,
+  });
   if (error) throw error;
 }
 
-async function completeRemoteDelivery(id: string, receiptCode: string) {
-  if (!supabase) return;
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "entregue",
-      entregue_em: new Date().toISOString(),
-      codigo_recibo: receiptCode,
-    })
-    .eq("id", id);
+async function completeRemoteDelivery(id: string, deliveryCode: string) {
+  if (!supabase) return undefined;
+  const { data, error } = await supabase.rpc("secure_complete_order", {
+    p_order_id: id,
+    p_delivery_code: deliveryCode,
+  });
   if (error) throw error;
+  const result = data as { receiptCode?: string } | null;
+  return result?.receiptCode;
 }
 
 async function complainRemoteOrder(id: string, complaint: string) {
   if (!supabase) return;
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      reclamacao_texto: complaint,
-      reclamacao_status: "aberta",
-      reclamacao_criada_em: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { error } = await supabase.rpc("secure_open_order_complaint", {
+    p_order_id: id,
+    p_complaint: complaint,
+  });
   if (error) throw error;
 }
 
@@ -499,7 +486,7 @@ export function useOrders() {
     }
     const cancellationReason = reason.trim() || "Cancelado pelo usuário.";
     if (supabase && isSupabaseConfigured) {
-      await cancelRemoteOrder(id, actor, cancellationReason);
+      await cancelRemoteOrder(id, cancellationReason);
     }
     setOrders((current) =>
       current.map((item) =>
@@ -522,9 +509,9 @@ export function useOrders() {
     if (order.deliveryCode && code.trim() !== order.deliveryCode) {
       throw new Error("Código de entrega incorreto.");
     }
-    const receiptCode = order.receiptCode ?? generateReceiptCode();
+    let receiptCode = order.receiptCode ?? generateReceiptCode();
     if (supabase && isSupabaseConfigured) {
-      await completeRemoteDelivery(id, receiptCode);
+      receiptCode = (await completeRemoteDelivery(id, code)) ?? receiptCode;
     }
     setOrders((current) =>
       current.map((item) =>

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { ArrowLeft } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export function AuthLayout({
   title,
@@ -86,19 +86,4 @@ export function PrimaryButton({
       {loading ? "Enviando..." : children}
     </button>
   );
-}
-
-export function useFakeSubmit(onSuccess: () => void) {
-  const [loading, setLoading] = useState(false);
-  return {
-    loading,
-    onSubmit: (e: FormEvent) => {
-      e.preventDefault();
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        onSuccess();
-      }, 700);
-    },
-  };
 }

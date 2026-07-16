@@ -224,6 +224,7 @@ async function respondRemoteQuote(
   const subtotal = quantity * price;
   const producerName =
     response.producerName || producer.nome_propriedade || producer.responsavel || "Produtor";
+  const buyerRelation = Array.isArray(data.buyers) ? data.buyers[0] : data.buyers;
   const deliveryLabel = data.entrega_desejada
     ? `Solicitado para ${new Date(`${data.entrega_desejada}T12:00:00`).toLocaleDateString("pt-BR")}`
     : "Aguardando data e hora do produtor";
@@ -232,10 +233,7 @@ async function respondRemoteQuote(
     .from("orders")
     .insert({
       buyer_id: data.buyer_id,
-      buyer_name:
-        (Array.isArray(data.buyers)
-          ? data.buyers[0]?.nome_empresa
-          : (data.buyers as any)?.nome_empresa) || "Comprador",
+      buyer_name: buyerRelation?.nome_empresa || "Comprador",
       status: "recebido",
       subtotal,
       delivery: 0,

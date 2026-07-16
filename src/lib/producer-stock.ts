@@ -281,9 +281,10 @@ export function useProducerStock() {
         setItemsState(remoteItems.length ? remoteItems : profile?.tipo ? [] : readStoredStock());
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         console.warn("Nao foi possivel carregar o estoque do Supabase.", error);
-        toast.error(`Erro ao carregar estoque do Supabase: ${error?.message || error}`);
+        toast.error(`Erro ao carregar estoque do Supabase: ${message}`);
         remoteLoadedRef.current = false;
       }
     }
@@ -301,9 +302,10 @@ export function useProducerStock() {
     if (serialized === lastSyncedRef.current) return;
 
     lastSyncedRef.current = serialized;
-    syncProducerInventory(producerId, items).catch((error: any) => {
+    syncProducerInventory(producerId, items).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       console.warn("Nao foi possivel sincronizar o estoque com o Supabase.", error);
-      toast.error(`Erro ao salvar estoque no Supabase: ${error?.message || error}`);
+      toast.error(`Erro ao salvar estoque no Supabase: ${message}`);
     });
   }, [isSupabaseConfigured, items, producerId]);
 

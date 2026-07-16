@@ -104,7 +104,54 @@ function generateDeliveryCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-function mapDemand(row: any): DemandRequest {
+type DemandItemRow = {
+  id: string;
+  product_name: string;
+  quantity: number | string | null;
+  unit: string;
+  product_state: string;
+  notes: string | null;
+};
+
+type DemandResponseItemRow = {
+  id: string;
+  demand_item_id: string | null;
+  product_name: string;
+  quantity: number | string | null;
+  unit: string;
+  price: number | string | null;
+  can_supply: boolean | null;
+  notes: string | null;
+};
+
+type DemandResponseRow = {
+  id: string;
+  demand_id: string;
+  producer_id: string | null;
+  producer_name: string;
+  status: string | null;
+  notes: string | null;
+  order_id: string | null;
+  created_at: string;
+  demand_response_items?: DemandResponseItemRow[] | null;
+};
+
+type DemandRow = {
+  id: string;
+  created_at: string;
+  buyer_id: string | null;
+  buyer_name: string | null;
+  delivery_date: string;
+  urgency: string | null;
+  status: string | null;
+  payment_method: PaymentMethod | null;
+  payment_notes: string | null;
+  notes: string | null;
+  demand_items?: DemandItemRow[] | null;
+  demand_responses?: DemandResponseRow[] | null;
+};
+
+function mapDemand(row: DemandRow): DemandRequest {
   return {
     id: row.id,
     createdAt: row.created_at,
@@ -116,7 +163,7 @@ function mapDemand(row: any): DemandRequest {
     paymentMethod: row.payment_method ?? undefined,
     paymentNotes: row.payment_notes ?? undefined,
     notes: row.notes ?? undefined,
-    items: (row.demand_items ?? []).map((item: any) => ({
+    items: (row.demand_items ?? []).map((item) => ({
       id: item.id,
       productName: item.product_name,
       quantity: Number(item.quantity || 0),
@@ -124,7 +171,7 @@ function mapDemand(row: any): DemandRequest {
       productState: item.product_state,
       notes: item.notes ?? undefined,
     })),
-    responses: (row.demand_responses ?? []).map((response: any) => ({
+    responses: (row.demand_responses ?? []).map((response) => ({
       id: response.id,
       demandId: response.demand_id,
       producerId: response.producer_id ?? undefined,
@@ -133,7 +180,7 @@ function mapDemand(row: any): DemandRequest {
       notes: response.notes ?? undefined,
       orderId: response.order_id ?? undefined,
       createdAt: response.created_at,
-      items: (response.demand_response_items ?? []).map((item: any) => ({
+      items: (response.demand_response_items ?? []).map((item) => ({
         id: item.id,
         demandItemId: item.demand_item_id ?? undefined,
         productName: item.product_name,

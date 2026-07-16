@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AuthLayout, Field, PrimaryButton, useFakeSubmit } from "@/components/auth/AuthShell";
+import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
+import { useFakeSubmit } from "@/hooks/use-fake-submit";
 import { useState } from "react";
 
 export const Route = createFileRoute("/reset")({

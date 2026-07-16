@@ -1,54 +1,13 @@
 import { supabase, throwSupabaseError } from "@/lib/supabase";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-
-export type ProfileType = "comprador" | "produtor" | "admin";
-
-export type AuthProfile = {
-  id: string;
-  userId: string;
-  tipo: ProfileType;
-  nome: string;
-  email: string;
-  telefone?: string;
-};
-
-type SignInInput = {
-  email: string;
-  password: string;
-};
-
-type SignUpInput = {
-  tipo: ProfileType;
-  email: string;
-  password: string;
-  nome: string;
-  telefone?: string;
-  adminInviteCode?: string;
-  cidade?: string;
-  estado?: string;
-  buyer?: {
-    nomeEmpresa: string;
-    tipoEmpresa: string;
-    cnpj: string;
-  };
-  producer?: {
-    nomePropriedade: string;
-    responsavel: string;
-    cnpj: string;
-    produtos: string[];
-  };
-};
-
-type AuthContextValue = {
-  profile: AuthProfile | null;
-  loading: boolean;
-  isSupabaseConfigured: boolean;
-  signIn: (input: SignInInput) => Promise<AuthProfile>;
-  signUp: (input: SignUpInput) => Promise<AuthProfile>;
-  signOut: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthProfile,
+  type ProfileType,
+  type SignInInput,
+  type SignUpInput,
+} from "@/lib/auth-context";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 const LOCAL_PROFILE_KEY = "origem-conecta-auth-profile";
 const adminInviteCode = import.meta.env.VITE_ADMIN_INVITE_CODE as string | undefined;
 
@@ -61,16 +20,6 @@ function readLocalProfile() {
   } catch {
     return null;
   }
-}
-
-function redirectPath(tipo: ProfileType) {
-  if (tipo === "produtor") return "/profile/producer";
-  if (tipo === "admin") return "/admin";
-  return "/portfolio";
-}
-
-export function getProfileHome(tipo: ProfileType) {
-  return redirectPath(tipo);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -280,10 +229,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error("AuthProvider missing");
-  return value;
 }

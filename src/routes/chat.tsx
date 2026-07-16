@@ -192,7 +192,9 @@ function ChatRoom() {
             let otherParty = "Participante";
             if (profile!.tipo === "comprador") {
               otherParty =
-                chatData.producers?.nome_propriedade || chatData.producers?.responsavel || "Produtor";
+                chatData.producers?.nome_propriedade ||
+                chatData.producers?.responsavel ||
+                "Produtor";
             } else {
               otherParty = chatData.buyers?.nome_empresa || "Comprador";
             }
