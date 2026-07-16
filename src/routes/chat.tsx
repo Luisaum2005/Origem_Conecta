@@ -547,7 +547,7 @@ function ChatRoom() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4 pb-28 md:pb-4"
         >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -612,7 +612,7 @@ function ChatRoom() {
         </div>
 
         {/* Input box section */}
-        <footer className="shrink-0 border-t border-border bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 md:pb-4">
+        <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 md:static md:border-x-0">
           <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
             <textarea
               value={inputText}
