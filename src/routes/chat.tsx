@@ -401,11 +401,11 @@ function ChatRoom() {
   const isBuyer = profile?.tipo === "comprador";
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col h-screen">
+    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-canvas">
       <Navbar />
 
       {/* Main chat window layout */}
-      <div className="flex-1 flex flex-col max-w-[800px] w-full mx-auto bg-white border-x border-border overflow-hidden h-[calc(100vh-64px)] md:h-[calc(100vh-72px)]">
+      <div className="mx-auto flex min-h-0 w-full max-w-[800px] flex-1 flex-col overflow-hidden border-x border-border bg-white pb-[calc(68px+env(safe-area-inset-bottom))] md:pb-0">
         {/* Chat Header */}
         <header className="border-b border-border p-4 bg-white shrink-0 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -547,7 +547,7 @@ function ChatRoom() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-4 space-y-4 bg-canvas/40"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4"
         >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -612,7 +612,7 @@ function ChatRoom() {
         </div>
 
         {/* Input box section */}
-        <footer className="border-t border-border p-4 bg-white shrink-0">
+        <footer className="shrink-0 border-t border-border bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 md:pb-4">
           <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
             <textarea
               value={inputText}
@@ -620,7 +620,7 @@ function ChatRoom() {
               onKeyDown={handleKeyDown}
               placeholder="Digite sua mensagem de negociação..."
               rows={1}
-              className="flex-1 max-h-24 resize-none bg-transparent py-1.5 px-2 text-sm text-brand-900 focus:outline-none focus:ring-0 leading-relaxed font-sans placeholder-muted-foreground"
+              className="min-w-0 flex-1 max-h-24 resize-none bg-transparent py-1.5 px-2 text-base text-brand-900 focus:outline-none focus:ring-0 leading-relaxed font-sans placeholder-muted-foreground sm:text-sm"
               style={{ height: "auto" }}
             />
             <div className="flex flex-col justify-end shrink-0 gap-1.5">
