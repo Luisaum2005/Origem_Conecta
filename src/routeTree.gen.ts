@@ -14,6 +14,7 @@ import { Route as ResetRouteImport } from './routes/reset'
 import { Route as RatingRouteImport } from './routes/rating'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
+import { Route as OrganizationsRouteImport } from './routes/organizations'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderRouteImport } from './routes/order'
 import { Route as LoginRouteImport } from './routes/login'
@@ -23,6 +24,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignupProducerRouteImport } from './routes/signup.producer'
+import { Route as SignupOrganizationRouteImport } from './routes/signup.organization'
 import { Route as SignupBuyerRouteImport } from './routes/signup.buyer'
 import { Route as SignupAdminRouteImport } from './routes/signup.admin'
 import { Route as ProfileProducerRouteImport } from './routes/profile.producer'
@@ -52,6 +54,11 @@ const ProductionRoute = ProductionRouteImport.update({
 const PortfolioRoute = PortfolioRouteImport.update({
   id: '/portfolio',
   path: '/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizationsRoute = OrganizationsRouteImport.update({
+  id: '/organizations',
+  path: '/organizations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -99,6 +106,11 @@ const SignupProducerRoute = SignupProducerRouteImport.update({
   path: '/signup/producer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignupOrganizationRoute = SignupOrganizationRouteImport.update({
+  id: '/signup/organization',
+  path: '/signup/organization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupBuyerRoute = SignupBuyerRouteImport.update({
   id: '/signup/buyer',
   path: '/signup/buyer',
@@ -134,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
+  '/organizations': typeof OrganizationsRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -144,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
+  '/signup/organization': typeof SignupOrganizationRoute
   '/signup/producer': typeof SignupProducerRoute
 }
 export interface FileRoutesByTo {
@@ -155,6 +169,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
+  '/organizations': typeof OrganizationsRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -165,6 +180,7 @@ export interface FileRoutesByTo {
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
+  '/signup/organization': typeof SignupOrganizationRoute
   '/signup/producer': typeof SignupProducerRoute
 }
 export interface FileRoutesById {
@@ -177,6 +193,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
+  '/organizations': typeof OrganizationsRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -187,6 +204,7 @@ export interface FileRoutesById {
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
+  '/signup/organization': typeof SignupOrganizationRoute
   '/signup/producer': typeof SignupProducerRoute
 }
 export interface FileRouteTypes {
@@ -200,6 +218,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/orders'
+    | '/organizations'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -210,6 +229,7 @@ export interface FileRouteTypes {
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
+    | '/signup/organization'
     | '/signup/producer'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -221,6 +241,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/orders'
+    | '/organizations'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -231,6 +252,7 @@ export interface FileRouteTypes {
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
+    | '/signup/organization'
     | '/signup/producer'
   id:
     | '__root__'
@@ -242,6 +264,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/orders'
+    | '/organizations'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -252,6 +275,7 @@ export interface FileRouteTypes {
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
+    | '/signup/organization'
     | '/signup/producer'
   fileRoutesById: FileRoutesById
 }
@@ -264,6 +288,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrderRoute: typeof OrderRoute
   OrdersRoute: typeof OrdersRoute
+  OrganizationsRoute: typeof OrganizationsRoute
   PortfolioRoute: typeof PortfolioRoute
   ProductionRoute: typeof ProductionRoute
   RatingRoute: typeof RatingRoute
@@ -274,6 +299,7 @@ export interface RootRouteChildren {
   ProfileProducerRoute: typeof ProfileProducerRoute
   SignupAdminRoute: typeof SignupAdminRoute
   SignupBuyerRoute: typeof SignupBuyerRoute
+  SignupOrganizationRoute: typeof SignupOrganizationRoute
   SignupProducerRoute: typeof SignupProducerRoute
 }
 
@@ -312,6 +338,13 @@ declare module '@tanstack/react-router' {
       path: '/portfolio'
       fullPath: '/portfolio'
       preLoaderRoute: typeof PortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizations': {
+      id: '/organizations'
+      path: '/organizations'
+      fullPath: '/organizations'
+      preLoaderRoute: typeof OrganizationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -377,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupProducerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signup/organization': {
+      id: '/signup/organization'
+      path: '/signup/organization'
+      fullPath: '/signup/organization'
+      preLoaderRoute: typeof SignupOrganizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup/buyer': {
       id: '/signup/buyer'
       path: '/signup/buyer'
@@ -424,6 +464,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrderRoute: OrderRoute,
   OrdersRoute: OrdersRoute,
+  OrganizationsRoute: OrganizationsRoute,
   PortfolioRoute: PortfolioRoute,
   ProductionRoute: ProductionRoute,
   RatingRoute: RatingRoute,
@@ -434,6 +475,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileProducerRoute: ProfileProducerRoute,
   SignupAdminRoute: SignupAdminRoute,
   SignupBuyerRoute: SignupBuyerRoute,
+  SignupOrganizationRoute: SignupOrganizationRoute,
   SignupProducerRoute: SignupProducerRoute,
 }
 export const routeTree = rootRouteImport
