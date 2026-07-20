@@ -218,9 +218,10 @@ async function getProducer(profileId: string) {
 
 async function loadRemoteDemands(
   profileId: string,
-  profileType: "comprador" | "produtor" | "admin",
+  profileType: "comprador" | "produtor" | "organizacao" | "admin",
 ) {
   if (!supabase) return null;
+  if (profileType === "organizacao") return [];
   const select =
     "id,buyer_id,buyer_name,delivery_date,urgency,status,payment_method,payment_notes,notes,created_at,demand_items(id,product_name,quantity,unit,product_state,notes),demand_responses(id,demand_id,producer_id,producer_name,status,notes,order_id,created_at,demand_response_items(id,demand_item_id,product_name,quantity,unit,price,can_supply,notes))";
 

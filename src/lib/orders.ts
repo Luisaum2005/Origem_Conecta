@@ -252,9 +252,10 @@ export async function getProducerId(profileId: string) {
 
 async function loadRemoteOrders(
   profileId: string,
-  profileType: "comprador" | "produtor" | "admin",
+  profileType: "comprador" | "produtor" | "organizacao" | "admin",
 ) {
   if (!supabase) return null;
+  if (profileType === "organizacao") return [];
   let select =
     "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
 

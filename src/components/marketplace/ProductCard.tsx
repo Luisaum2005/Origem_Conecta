@@ -1,4 +1,12 @@
-import { ChevronLeft, ChevronRight, Info, MapPin, PlayCircle, MessageSquare } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  PlayCircle,
+  MessageSquare,
+  ShoppingCart,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { preferredProducer, type Product } from "@/lib/catalog";
 import { useAuth } from "@/lib/auth";
@@ -51,6 +59,7 @@ export function ProductCard({
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [negotiating, setNegotiating] = useState(false);
+  const [added, setAdded] = useState(false);
 
   const recommended = preferredProducer(product);
   const selectedProducer =
@@ -63,8 +72,6 @@ export function ProductCard({
   ].filter(Boolean) as Array<{ type: "image" | "video"; url: string }>;
   const currentMedia = media[mediaIndex] ?? null;
 
-  const updateQuantity = (value: number) => onChange(clampQuantity(value, availableStock));
-
   const changeMedia = (direction: number) => {
     if (media.length <= 1) return;
     setMediaIndex((current) => (current + direction + media.length) % media.length);
@@ -72,17 +79,39 @@ export function ProductCard({
 
   // Smooth decimal input state
   const [inputValue, setInputValue] = useState(qty > 0 ? qty.toString().replace(".", ",") : "");
+  const [draftUnit, setDraftUnit] = useState(selectedUnit);
 
   useEffect(() => {
     setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
   }, [qty]);
 
+  useEffect(() => {
+    setDraftUnit(selectedUnit);
+  }, [selectedUnit]);
+
   const handleInputChange = (valueStr: string) => {
     setInputValue(valueStr);
-    const parsed = Number(valueStr.replace(",", "."));
-    if (Number.isFinite(parsed)) {
-      updateQuantity(parsed);
+    setAdded(false);
+  };
+
+  const handleAdd = () => {
+    const requestedQuantity = parseQuantity(inputValue);
+    if (requestedQuantity <= 0) {
+      toast.error("Informe uma quantidade maior que zero.");
+      return;
     }
+    if (requestedQuantity > availableStock) {
+      toast.error(
+        `A quantidade máxima disponível é ${formatQuantity(availableStock)} ${product.unit}.`,
+      );
+      return;
+    }
+    const confirmedQuantity = clampQuantity(requestedQuantity, availableStock);
+    onUnitChange(draftUnit);
+    onChange(confirmedQuantity);
+    setInputValue(String(confirmedQuantity).replace(".", ","));
+    setAdded(true);
+    toast.success(`${product.name} adicionado ao pedido.`);
   };
 
   return (
@@ -244,7 +273,7 @@ export function ProductCard({
         <div className="min-w-0">
           <p className="text-2xl font-bold tracking-tight text-brand-900">
             R$ {selectedProducer.price.toFixed(2)}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">/{selectedUnit}</span>
+            <span className="ml-1 text-sm font-medium text-muted-foreground">/{draftUnit}</span>
           </p>
         </div>
 
@@ -267,8 +296,11 @@ export function ProductCard({
                 />
               </div>
               <select
-                value={selectedUnit}
-                onChange={(event) => onUnitChange(event.target.value)}
+                value={draftUnit}
+                onChange={(event) => {
+                  setDraftUnit(event.target.value);
+                  setAdded(false);
+                }}
                 className="h-11 w-28 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
               >
                 <option value="kg">kg</option>
@@ -281,11 +313,20 @@ export function ProductCard({
               </select>
             </div>
 
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 focus:outline-none focus:ring-2 focus:ring-leaf-300 focus:ring-offset-2"
+            >
+              {added ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+              {added ? "Adicionado" : qty > 0 ? "Atualizar" : "Adicionar"}
+            </button>
+
             {qty > 0 && (
               <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
                   <span className="inline-block h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  {inputValue || "0"} {selectedUnit} = 1 item no pedido
+                  {formatQuantity(qty)} {selectedUnit} confirmado no pedido
                 </div>
               </div>
             )}

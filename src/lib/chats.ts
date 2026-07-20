@@ -316,8 +316,9 @@ export async function getConversationMessages(
 
 export async function getUserConversations(
   profileId: string,
-  profileType: "comprador" | "produtor" | "admin",
+  profileType: "comprador" | "produtor" | "organizacao" | "admin",
 ): Promise<SavedConversation[]> {
+  if (profileType === "organizacao") return [];
   if (supabase) {
     interface ConversationSummaryRow {
       id: string;

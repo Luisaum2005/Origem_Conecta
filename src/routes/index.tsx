@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { InstallButton } from "@/components/pwa/InstallButton";
-import { ArrowRight, LogIn, ShieldCheck, Sprout, Store, Truck } from "lucide-react";
+import { ArrowRight, Building2, LogIn, ShieldCheck, Sprout, Store, Truck } from "lucide-react";
 import { getProfileHome, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -60,6 +60,16 @@ function Splash() {
                     <span className="inline-flex items-center gap-2">
                       <Store className="h-5 w-5" />
                       Comprador
+                    </span>
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                  <Link
+                    to="/signup/organization"
+                    className="group inline-flex h-[52px] items-center justify-between gap-3 rounded-xl border border-border bg-white pl-5 pr-3 text-base font-semibold text-brand-900 shadow-xs transition-all hover:border-leaf-500 hover:shadow-sm sm:col-span-2"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-leaf-600" />
+                      Cooperativa ou associação
                     </span>
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </Link>

@@ -1,6 +1,15 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
-import { ClipboardList, Megaphone, Package, Store, Truck, User, MessageSquare } from "lucide-react";
+import {
+  Building2,
+  ClipboardList,
+  Megaphone,
+  Package,
+  Store,
+  Truck,
+  User,
+  MessageSquare,
+} from "lucide-react";
 
 const items = [
   { to: "/portfolio", label: "Portfólio", icon: Store, profiles: ["comprador"] },
@@ -38,6 +47,9 @@ export function BottomNav() {
   const visibleItems = profile
     ? [
         ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),
+        ...(profile.roles?.includes("gestor_organizacao")
+          ? [{ to: "/organizations" as const, label: "Organização", icon: Building2 }]
+          : []),
         { to: profilePath, label: "Perfil", icon: User },
       ]
     : [{ to: "/login", label: "Entrar", icon: User }];

@@ -315,12 +315,13 @@ function ProducerDetailsPanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(details);
+  const [productsText, setProductsText] = useState(() => details.products.join(", "));
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const productsText = draft.products.join(", ");
 
   useEffect(() => {
     setDraft(details);
+    setProductsText(details.products.join(", "));
   }, [details]);
 
   const save = async () => {
@@ -328,10 +329,7 @@ function ProducerDetailsPanel({
     try {
       await onSave({
         ...draft,
-        products: productsText
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        products: parseProducts(productsText),
       });
       setEditing(false);
       setNotice("Dados do produtor atualizados.");
@@ -378,6 +376,7 @@ function ProducerDetailsPanel({
             onClick={() => {
               setNotice("");
               setError("");
+              setProductsText(details.products.join(", "));
               setEditing(true);
             }}
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -426,20 +425,13 @@ function ProducerDetailsPanel({
             <span className="block text-sm font-medium text-brand-900">Produtos atendidos</span>
             <textarea
               value={productsText}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  products: event.target.value
-                    .split(",")
-                    .map((item) => item.trim())
-                    .filter(Boolean),
-                })
-              }
+              onChange={(event) => setProductsText(event.target.value)}
               placeholder="Pitaya Roxa, Figo, Cafe especial..."
               className="mt-2 min-h-[92px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
             />
             <span className="mt-1.5 block text-xs text-muted-foreground">
-              Separe os produtos por vírgula.
+              Separe os produtos por vírgula ou coloque um produto por linha. Espaços dentro do nome
+              são mantidos.
             </span>
           </label>
           <div className="flex flex-wrap gap-2">
@@ -461,6 +453,7 @@ function ProducerDetailsPanel({
               type="button"
               onClick={() => {
                 setDraft(details);
+                setProductsText(details.products.join(", "));
                 setError("");
                 setEditing(false);
               }}
@@ -474,6 +467,15 @@ function ProducerDetailsPanel({
       )}
     </Panel>
   );
+}
+
+function parseProducts(value: string) {
+  const unique = new Map<string, string>();
+  for (const item of value.split(/[,;\n]+/)) {
+    const product = item.trim().replace(/\s+/g, " ");
+    if (product) unique.set(product.toLocaleLowerCase("pt-BR"), product);
+  }
+  return Array.from(unique.values());
 }
 
 function TextField({

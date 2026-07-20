@@ -128,9 +128,10 @@ async function getProducerDetails(profileId: string) {
 
 async function loadRemoteQuotes(
   profileId: string,
-  profileType: "comprador" | "produtor" | "admin",
+  profileType: "comprador" | "produtor" | "organizacao" | "admin",
 ) {
   if (!supabase) return null;
+  if (profileType === "organizacao") return [];
   let query = supabase
     .from("quote_requests")
     .select(

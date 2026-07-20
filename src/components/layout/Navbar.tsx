@@ -16,6 +16,7 @@ const links = [
   { to: "/demands", label: "Demandas", profiles: ["comprador", "produtor", "admin"] },
   { to: "/chats", label: "Mensagens", profiles: ["comprador", "produtor", "admin"] },
   { to: "/admin", label: "Admin", profiles: ["admin"] },
+  { to: "/organizations", label: "Organização", profiles: ["organizacao", "produtor"] },
 ] as const;
 function visible(profiles: readonly ProfileType[], type?: ProfileType) {
   return type ? profiles.includes(type) : false;
@@ -42,6 +43,10 @@ export function Navbar() {
             <nav className="hidden items-center gap-1 md:flex">
               {links
                 .filter((link) => visible(link.profiles, profile?.tipo))
+                .filter(
+                  (link) =>
+                    link.to !== "/organizations" || profile?.roles?.includes("gestor_organizacao"),
+                )
                 .map((link) => (
                   <Link
                     key={link.to}

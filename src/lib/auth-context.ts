@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
-export type ProfileType = "comprador" | "produtor" | "admin";
+export type ProfileType = "comprador" | "produtor" | "organizacao" | "admin";
+export type ProfileRole = "comprador" | "produtor" | "gestor_organizacao" | "admin";
 
 export type AuthProfile = {
   id: string;
@@ -9,6 +10,7 @@ export type AuthProfile = {
   nome: string;
   email: string;
   telefone?: string;
+  roles: ProfileRole[];
 };
 
 export type SignInInput = {
@@ -36,6 +38,21 @@ export type SignUpInput = {
     cnpj: string;
     produtos: string[];
   };
+  organization?: {
+    type: "cooperativa" | "associacao";
+    legalName: string;
+    tradeName: string;
+    cnpj: string;
+    stateRegistration?: string;
+    phone: string;
+    addressLine: string;
+    addressNumber?: string;
+    addressComplement?: string;
+    neighborhood?: string;
+    postalCode: string;
+    responsibleName: string;
+    responsibleRole: string;
+  };
 };
 
 export type AuthContextValue = {
@@ -50,6 +67,7 @@ export type AuthContextValue = {
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function getProfileHome(tipo: ProfileType) {
+  if (tipo === "organizacao") return "/organizations";
   if (tipo === "produtor") return "/profile/producer";
   if (tipo === "admin") return "/admin";
   return "/portfolio";
