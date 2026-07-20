@@ -5,6 +5,7 @@ import { InstallButton } from "@/components/pwa/InstallButton";
 import { ALL_SUPPLIER_PRODUCTS } from "@/lib/hortifruti";
 import { EMPTY_STOCK_ITEM, type ProducerStockItem, useProducerStock } from "@/lib/producer-stock";
 import {
+  Building2,
   CalendarDays,
   Check,
   CircleDollarSign,
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/production")({
 const UNITS = ["kg", "unidade", "caixa", "pacote", "pote", "litro", "maço"];
 
 function Production() {
-  const [items, setItems, { uploadImage, uploadVideo }] = useProducerStock();
+  const [items, setItems, { uploadImage, uploadVideo, salesOrganizations }] = useProducerStock();
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -197,6 +198,36 @@ function Production() {
                 value={draft.product}
                 onChange={(value) => setDraft({ ...draft, product: value })}
               />
+              <label className="block">
+                <span className="block text-sm font-medium text-brand-900">
+                  Responsável pela comercialização
+                </span>
+                <select
+                  value={draft.sellerOrganizationId ?? ""}
+                  onChange={(event) => {
+                    const organization = salesOrganizations.find(
+                      (item) => item.id === event.target.value,
+                    );
+                    setDraft({
+                      ...draft,
+                      sellerOrganizationId: organization?.id,
+                      sellerOrganizationName: organization?.name,
+                      sellerOrganizationCnpj: organization?.cnpj,
+                    });
+                  }}
+                  className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-3 text-base text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
+                >
+                  <option value="">Negociação própria — meus dados</option>
+                  {salesOrganizations.map((organization) => (
+                    <option key={organization.id} value={organization.id}>
+                      {organization.name} — CNPJ {organization.cnpj}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Somente organizações que autorizaram suas vendas aparecem aqui.
+                </span>
+              </label>
               <PhotoField
                 imageUrl={draft.imageUrl}
                 uploading={uploadingImage}
@@ -581,6 +612,12 @@ function StockRow({
             Colheita {fmt(item.harvestDate)} · Validade {fmt(item.expiryDate)}
           </p>
           {item.notes && <p className="mt-2 text-sm text-brand-900">{item.notes}</p>}
+          {item.sellerOrganizationName && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
+              <Building2 className="h-3.5 w-3.5" />
+              Comercialização por {item.sellerOrganizationName}
+            </p>
+          )}
           {item.videoUrl && (
             <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
               <PlayCircle className="h-3.5 w-3.5" />

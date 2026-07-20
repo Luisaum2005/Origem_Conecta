@@ -41,6 +41,7 @@ function SignupOrganization() {
               responsavel: responsible,
               cnpj: "",
               produtos: [],
+              commercializationMode: "organization",
             }
           : undefined,
         organization: {

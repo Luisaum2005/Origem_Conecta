@@ -11,6 +11,11 @@ export type ProducerStockItem = {
   producerName?: string;
   producerLocation?: string;
   producerResponsible?: string;
+  commercializationMode?: "own" | "organization" | "undecided";
+  commercialVerificationStatus?: "self_declared" | "pending" | "verified" | "rejected";
+  sellerOrganizationId?: string;
+  sellerOrganizationName?: string;
+  sellerOrganizationCnpj?: string;
   imageUrl?: string;
   videoUrl?: string;
   product: string;
@@ -21,6 +26,13 @@ export type ProducerStockItem = {
   expiryDate: string;
   notes: string;
   status: StockStatus;
+};
+
+export type SalesOrganization = {
+  id: string;
+  name: string;
+  cnpj: string;
+  type: "cooperativa" | "associacao";
 };
 
 export type StockDecrementItem = {
@@ -41,6 +53,9 @@ type InventoryRow = {
   imagem_url: string | null;
   video_url?: string | null;
   ativo: boolean | null;
+  seller_organization_id?: string | null;
+  seller_organization_name?: string | null;
+  seller_organization_cnpj?: string | null;
   products?: {
     nome?: string | null;
     unidade?: string | null;
@@ -49,6 +64,8 @@ type InventoryRow = {
     nome_propriedade?: string | null;
     localizacao?: string | null;
     responsavel?: string | null;
+    commercialization_mode?: "own" | "organization" | "undecided" | null;
+    commercial_verification_status?: "self_declared" | "pending" | "verified" | "rejected" | null;
   } | null;
 };
 
@@ -112,6 +129,11 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
     producerName: row.producers?.nome_propriedade ?? undefined,
     producerLocation: row.producers?.localizacao ?? undefined,
     producerResponsible: row.producers?.responsavel ?? undefined,
+    commercializationMode: row.producers?.commercialization_mode ?? "undecided",
+    commercialVerificationStatus: row.producers?.commercial_verification_status ?? "self_declared",
+    sellerOrganizationId: row.seller_organization_id ?? undefined,
+    sellerOrganizationName: row.seller_organization_name ?? undefined,
+    sellerOrganizationCnpj: row.seller_organization_cnpj ?? undefined,
     imageUrl: row.imagem_url ?? undefined,
     videoUrl: row.video_url ?? undefined,
     product: row.nome_produto || row.products?.nome || "Produto sem nome",
@@ -141,7 +163,7 @@ async function loadInventory(producerId?: string | null) {
   let query = supabase
     .from("producer_inventory")
     .select(
-      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel)",
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,seller_organization_id,seller_organization_name,seller_organization_cnpj,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel,commercialization_mode,commercial_verification_status)",
     )
     .order("atualizado_em", { ascending: false });
 
@@ -171,6 +193,20 @@ async function loadInventory(producerId?: string | null) {
     return (fallbackData ?? []).map((row) => mapInventoryRow(row as InventoryRow));
   }
   return (data ?? []).map((row) => mapInventoryRow(row as InventoryRow));
+}
+
+async function loadSalesOrganizations() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_my_sales_organizations");
+  if (error) throw error;
+  return (data ?? []).map((organization: Record<string, unknown>) => ({
+    id: String(organization.id),
+    name: String(organization.name ?? "Organização"),
+    cnpj: String(organization.cnpj ?? ""),
+    type: (organization.type === "cooperativa" ? "cooperativa" : "associacao") as
+      | "cooperativa"
+      | "associacao",
+  }));
 }
 
 async function syncProducerInventory(producerId: string, items: ProducerStockItem[]) {
@@ -209,6 +245,7 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     observacoes: item.notes || null,
     imagem_url: item.imageUrl || null,
     video_url: item.videoUrl || null,
+    seller_organization_id: item.sellerOrganizationId || null,
     ativo: item.status === "ativo",
     atualizado_em: new Date().toISOString(),
   }));
@@ -217,6 +254,24 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     .from("producer_inventory")
     .upsert(payload, { onConflict: "id" });
   if (upsertError) throw upsertError;
+
+  const { data: producer, error: producerError } = await supabase
+    .from("producers")
+    .select("categorias_atendidas")
+    .eq("id", producerId)
+    .maybeSingle();
+  if (producerError) throw producerError;
+  const suppliedProducts = Array.from(
+    new Set([
+      ...((producer?.categorias_atendidas as string[] | null) ?? []),
+      ...items.map((item) => item.product.trim()).filter(Boolean),
+    ]),
+  );
+  const { error: categoriesError } = await supabase
+    .from("producers")
+    .update({ categorias_atendidas: suppliedProducts })
+    .eq("id", producerId);
+  if (categoriesError) throw categoriesError;
 }
 
 async function decrementRemoteInventory(items: StockDecrementItem[]) {
@@ -254,6 +309,7 @@ export function useProducerStock() {
   const { profile, isSupabaseConfigured } = useAuth();
   const [items, setItemsState] = useState<ProducerStockItem[]>(readStoredStock);
   const [producerId, setProducerId] = useState<string | null>(null);
+  const [salesOrganizations, setSalesOrganizations] = useState<SalesOrganization[]>([]);
   const remoteLoadedRef = useRef(false);
   const lastSyncedRef = useRef("");
 
@@ -275,9 +331,13 @@ export function useProducerStock() {
             "Erro: Seu perfil de produtor não foi encontrado nas tabelas do Supabase. Verifique o cadastro.",
           );
         }
-        const remoteItems = await loadInventory(nextProducerId);
+        const [remoteItems, nextSalesOrganizations] = await Promise.all([
+          loadInventory(nextProducerId),
+          nextProducerId ? loadSalesOrganizations() : Promise.resolve([]),
+        ]);
         if (!active || !remoteItems) return;
         setProducerId(nextProducerId);
+        setSalesOrganizations(nextSalesOrganizations);
         setItemsState(remoteItems.length ? remoteItems : profile?.tipo ? [] : readStoredStock());
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
@@ -409,6 +469,7 @@ export function useProducerStock() {
       uploadVideo: (file: File, itemId: string) => uploadMedia(file, itemId, "video"),
       canUploadRemoteImage: Boolean(producerId),
       decrementStock,
+      salesOrganizations,
     },
   ] as const;
 }

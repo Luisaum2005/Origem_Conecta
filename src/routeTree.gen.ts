@@ -30,6 +30,7 @@ import { Route as SignupAdminRouteImport } from './routes/signup.admin'
 import { Route as ProfileProducerRouteImport } from './routes/profile.producer'
 import { Route as ProfileBuyerRouteImport } from './routes/profile.buyer'
 import { Route as ProducerOrdersRouteImport } from './routes/producer.orders'
+import { Route as DirectoryOrganizationsRouteImport } from './routes/directory.organizations'
 
 const TrackingRoute = TrackingRouteImport.update({
   id: '/tracking',
@@ -136,6 +137,11 @@ const ProducerOrdersRoute = ProducerOrdersRouteImport.update({
   path: '/producer/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DirectoryOrganizationsRoute = DirectoryOrganizationsRouteImport.update({
+  id: '/directory/organizations',
+  path: '/directory/organizations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/producer': typeof ProfileProducerRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/producer': typeof ProfileProducerRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/producer': typeof ProfileProducerRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/producer'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/producer'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/producer'
@@ -294,6 +306,7 @@ export interface RootRouteChildren {
   RatingRoute: typeof RatingRoute
   ResetRoute: typeof ResetRoute
   TrackingRoute: typeof TrackingRoute
+  DirectoryOrganizationsRoute: typeof DirectoryOrganizationsRoute
   ProducerOrdersRoute: typeof ProducerOrdersRoute
   ProfileBuyerRoute: typeof ProfileBuyerRoute
   ProfileProducerRoute: typeof ProfileProducerRoute
@@ -452,6 +465,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProducerOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/directory/organizations': {
+      id: '/directory/organizations'
+      path: '/directory/organizations'
+      fullPath: '/directory/organizations'
+      preLoaderRoute: typeof DirectoryOrganizationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   RatingRoute: RatingRoute,
   ResetRoute: ResetRoute,
   TrackingRoute: TrackingRoute,
+  DirectoryOrganizationsRoute: DirectoryOrganizationsRoute,
   ProducerOrdersRoute: ProducerOrdersRoute,
   ProfileBuyerRoute: ProfileBuyerRoute,
   ProfileProducerRoute: ProfileProducerRoute,

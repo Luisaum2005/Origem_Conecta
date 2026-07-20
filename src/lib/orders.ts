@@ -16,6 +16,9 @@ export type SavedOrderItem = {
   unitPrice: number;
   producerId: string;
   producerName: string;
+  sellerOrganizationId?: string;
+  sellerOrganizationName?: string;
+  sellerOrganizationCnpj?: string;
   manualProducerChoice: boolean;
   lineTotal: number;
   notes?: string;
@@ -62,6 +65,9 @@ type RemoteOrderItem = {
   escolha_manual_produtor: boolean;
   line_total: number | string;
   observacoes?: string | null;
+  seller_organization_id?: string | null;
+  seller_organization_name?: string | null;
+  seller_organization_cnpj?: string | null;
 };
 
 type RemoteOrder = {
@@ -221,6 +227,9 @@ function mapRemoteOrder(order: RemoteOrder): SavedOrder {
       unitPrice: Number(item.preco_unitario || 0),
       producerId: item.producer_id || item.producer_ref || item.producer_name || "produtor",
       producerName: item.producer_name || "Produtor",
+      sellerOrganizationId: item.seller_organization_id ?? undefined,
+      sellerOrganizationName: item.seller_organization_name ?? undefined,
+      sellerOrganizationCnpj: item.seller_organization_cnpj ?? undefined,
       manualProducerChoice: item.escolha_manual_produtor,
       lineTotal: Number(item.line_total || 0),
       notes: item.observacoes || undefined,
@@ -257,13 +266,13 @@ async function loadRemoteOrders(
   if (!supabase) return null;
   if (profileType === "organizacao") return [];
   let select =
-    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
+    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj)";
 
   if (profileType === "produtor") {
     const producerId = await getProducerId(profileId);
     if (!producerId) return [];
     select =
-      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes)";
+      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj)";
     const { data, error } = await supabase
       .from("orders")
       .select(select)
@@ -332,6 +341,9 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
     producer_id: item.producerId,
     producer_ref: item.producerId,
     producer_name: item.producerName,
+    seller_organization_id: item.sellerOrganizationId ?? null,
+    seller_organization_name: item.sellerOrganizationName ?? null,
+    seller_organization_cnpj: item.sellerOrganizationCnpj ?? null,
     escolha_manual_produtor: item.manualProducerChoice,
     line_total: item.lineTotal,
     observacoes: item.notes || null,

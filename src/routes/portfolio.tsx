@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { ProductCard } from "@/components/marketplace/ProductCard";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
-import { Search, ShoppingBag } from "lucide-react";
+import { Building2, Search, ShoppingBag } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/portfolio")({
@@ -46,6 +46,13 @@ function Portfolio() {
               <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
                 Portfólio
               </h1>
+              <Link
+                to="/directory/organizations"
+                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-leaf-700 hover:underline"
+              >
+                <Building2 className="h-4 w-4" />
+                Conhecer cooperativas e associações
+              </Link>
             </div>
           </div>
           <div className="relative w-full max-w-xs">

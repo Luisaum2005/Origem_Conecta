@@ -7,8 +7,7 @@ import { useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { useCart } from "@/lib/cart";
 import { preferredProducer } from "@/lib/catalog";
 import { getOperationWindow } from "@/lib/operation";
-import { PAYMENT_METHODS, type PaymentMethod, useOrders } from "@/lib/orders";
-import { useProducerStock } from "@/lib/producer-stock";
+import { useOrders } from "@/lib/orders";
 import { useRecurringOrders } from "@/lib/recurring-orders";
 import {
   AlertCircle,
@@ -67,7 +66,6 @@ function Order() {
     useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
-  const [, , { decrementStock }] = useProducerStock();
   const { addRecurringOrder } = useRecurringOrders();
   const navigate = useNavigate();
   const [repeatNotice, setRepeatNotice] = useState("");
@@ -76,8 +74,6 @@ function Order() {
   const [confirmError, setConfirmError] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [maturityPreference, setMaturityPreference] = useState(maturityOptions[0]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Pix");
-  const [paymentNotes, setPaymentNotes] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const items = products.filter((product) => cart[product.id]);
 
@@ -87,7 +83,7 @@ function Order() {
       preferredProducer(product);
     return sum + producer.price * cart[product.id];
   }, 0);
-  const delivery = items.length ? 35 : 0;
+  const delivery = 0;
   const total = subtotal + delivery;
 
   const orderItems = items.map((product) => {
@@ -103,6 +99,9 @@ function Order() {
       unitPrice: selectedProducer.price,
       producerId: selectedProducer.id,
       producerName: selectedProducer.name,
+      sellerOrganizationId: selectedProducer.sellerOrganizationId,
+      sellerOrganizationName: selectedProducer.sellerOrganizationName,
+      sellerOrganizationCnpj: selectedProducer.sellerOrganizationCnpj,
       manualProducerChoice: Boolean(producerChoices[product.id]),
       lineTotal: selectedProducer.price * quantity,
       notes: `Maturação: ${maturityPreference}`,
@@ -112,38 +111,31 @@ function Order() {
   const summaryText = useMemo(() => {
     if (!orderItems.length) return "";
     const lines = [
-      "Resumo do pedido - Origem Conecta",
+      "Solicitação de negociação - Origem Conecta",
       `Comprador: ${buyerDetails.companyName || buyerDetails.responsibleName || "Comprador"}`,
-      `Pedido até: ${operation.cutoffLabel}`,
-      `Entrega prevista: ${operation.deliveryLabel}`,
-      `Pagamento: ${paymentMethod}`,
-      paymentNotes.trim() ? `Observacao do pagamento: ${paymentNotes.trim()}` : "",
+      `Solicitação enviada até: ${operation.cutoffLabel}`,
+      `Preferência de entrega: ${operation.deliveryLabel}`,
       `Maturação: ${maturityPreference}`,
       "",
       ...orderItems.flatMap((item) => [
         `- ${item.productName}`,
         `  Quantidade: ${formatQuantity(item.quantity)} ${item.unit}`,
         `  Produtor: ${item.producerName}`,
-        `  Total: R$ ${item.lineTotal.toFixed(2)}`,
+        `  Valor anunciado: R$ ${item.lineTotal.toFixed(2)}`,
       ]),
       "",
-      `Subtotal: R$ ${subtotal.toFixed(2)}`,
-      `Logística: R$ ${delivery.toFixed(2)}`,
-      `Total: R$ ${total.toFixed(2)}`,
+      `Valor estimado: R$ ${subtotal.toFixed(2)}`,
+      "Preço, logística, pagamento e documentação serão definidos na negociação.",
     ];
     return lines.join("\n");
   }, [
     buyerDetails.companyName,
     buyerDetails.responsibleName,
-    delivery,
     maturityPreference,
     operation.cutoffLabel,
     operation.deliveryLabel,
     orderItems,
-    paymentMethod,
-    paymentNotes,
     subtotal,
-    total,
   ]);
 
   const stockIssues = items
@@ -210,27 +202,20 @@ function Order() {
         delivery,
         total,
         deliveryEta: operation.deliveryLabel,
-        paymentMethod,
-        paymentNotes: paymentNotes.trim() || undefined,
+        paymentMethod: "A combinar",
         items: orderItems,
       });
-      await decrementStock(
-        orderItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
-      );
       clear();
       window.sessionStorage.setItem(
         "origem-conecta-order-success",
-        `Compra enviada com sucesso. Pedido #${savedOrder.id} com ${operation.deliveryText.toLowerCase()}`,
+        `Solicitação #${savedOrder.id} enviada. Aguarde o contato do produtor para negociar as condições.`,
       );
       navigate({ to: "/orders" });
     } catch (error) {
       setConfirmError(
         error instanceof Error
           ? error.message
-          : "Não foi possível confirmar o pedido. Tente novamente.",
+          : "Não foi possível enviar a solicitação. Tente novamente.",
       );
     } finally {
       setIsConfirming(false);
@@ -259,7 +244,7 @@ function Order() {
         </div>
 
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-          Revisão do pedido
+          Lista de interesse
         </h1>
         <p className="mt-2 text-sm text-muted-foreground sm:text-base">
           Altere quantidades, acrescente itens, confira produtores e copie o resumo antes de
@@ -294,7 +279,7 @@ function Order() {
         {items.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-border bg-white p-8 text-center sm:p-12">
             <ShoppingBag className="mx-auto h-10 w-10 text-leaf-700" />
-            <h3 className="mt-4 text-lg font-semibold text-brand-900">Seu pedido está vazio</h3>
+            <h3 className="mt-4 text-lg font-semibold text-brand-900">Sua lista está vazia</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Adicione produtos do portfólio da semana para continuar.
             </p>
@@ -309,7 +294,7 @@ function Order() {
           <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">
             <section className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-brand-900">Itens do pedido</h2>
+                <h2 className="text-lg font-semibold text-brand-900">Itens de interesse</h2>
                 <Link
                   to="/portfolio"
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -446,12 +431,10 @@ function Order() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Logística</dt>
-                    <dd className="font-medium tabular-nums text-brand-900">
-                      R$ {delivery.toFixed(2)}
-                    </dd>
+                    <dd className="font-medium text-brand-900">A negociar</dd>
                   </div>
                   <div className="flex justify-between border-t border-border pt-3 text-base">
-                    <dt className="font-semibold text-brand-900">Total</dt>
+                    <dt className="font-semibold text-brand-900">Valor anunciado estimado</dt>
                     <dd className="text-xl font-bold tabular-nums text-brand-900">
                       R$ {total.toFixed(2)}
                     </dd>
@@ -480,34 +463,9 @@ function Order() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-xl border border-border bg-canvas p-4">
-                  <p className="text-sm font-semibold text-brand-900">Forma de pagamento</p>
-                  <label className="mt-3 block">
-                    <span className="sr-only">Forma de pagamento</span>
-                    <select
-                      value={paymentMethod}
-                      onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                      className="h-11 w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-                    >
-                      {PAYMENT_METHODS.map((method) => (
-                        <option key={method} value={method}>
-                          {method}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="mt-3 block">
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      Observação sobre pagamento
-                    </span>
-                    <textarea
-                      value={paymentNotes}
-                      onChange={(event) => setPaymentNotes(event.target.value)}
-                      rows={3}
-                      placeholder="Ex: chave Pix, faturar para 30 dias, pagar na entrega..."
-                      className="mt-2 w-full rounded-lg border border-border bg-white px-3 py-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-                    />
-                  </label>
+                <div className="mt-5 rounded-xl border border-leaf-200 bg-leaf-100 p-4 text-sm text-brand-900">
+                  Esta solicitação não confirma uma compra. Preço final, logística, pagamento e
+                  documentação serão combinados diretamente com o produtor ou organização.
                 </div>
 
                 <div className="mt-5 rounded-xl border border-border bg-white p-4">
@@ -545,7 +503,7 @@ function Order() {
                   onClick={handleConfirmOrder}
                   className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isConfirming ? "Confirmando..." : "Confirmar pedido"}
+                  {isConfirming ? "Enviando..." : "Enviar solicitação de negociação"}
                 </button>
                 <button
                   type="button"

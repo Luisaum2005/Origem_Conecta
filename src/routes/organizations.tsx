@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { OrganizationMembers } from "@/components/organizations/OrganizationMembers";
 import { useOrganizations } from "@/lib/organizations";
 import { Building2, Clock3, ShieldCheck, Users } from "lucide-react";
 
@@ -73,6 +74,7 @@ function Organizations() {
                     Motivo: {organization.rejectionReason}
                   </p>
                 )}
+                <OrganizationMembers organizationId={organization.id} />
               </article>
             ))}
           </section>

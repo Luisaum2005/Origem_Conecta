@@ -10,8 +10,13 @@ import { useState } from "react";
 
 const links = [
   { to: "/portfolio", label: "Portfólio", profiles: ["comprador"] },
-  { to: "/orders", label: "Pedidos", profiles: ["comprador"] },
-  { to: "/producer/orders", label: "Pedidos recebidos", profiles: ["produtor"] },
+  {
+    to: "/directory/organizations",
+    label: "Cooperativas",
+    profiles: ["comprador", "produtor", "admin"],
+  },
+  { to: "/orders", label: "Solicitações", profiles: ["comprador"] },
+  { to: "/producer/orders", label: "Negociações recebidas", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
   { to: "/demands", label: "Demandas", profiles: ["comprador", "produtor", "admin"] },
   { to: "/chats", label: "Mensagens", profiles: ["comprador", "produtor", "admin"] },

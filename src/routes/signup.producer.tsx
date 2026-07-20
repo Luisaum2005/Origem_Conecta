@@ -2,10 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
 import { AddressFields } from "@/components/forms/AddressFields";
 import { FormProgress, FormSection } from "@/components/forms/FormSection";
+import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { getProfileHome, useAuth } from "@/lib/auth";
-import { SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
-import { useMemo, useState, type FormEvent } from "react";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useState, type FormEvent } from "react";
 
 export const Route = createFileRoute("/signup/producer")({
   component: SignupProducer,
@@ -15,11 +14,18 @@ function SignupProducer() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
   const [picked, setPicked] = useState<string[]>([]);
+  const [commercializationMode, setCommercializationMode] = useState<
+    "own" | "organization" | "undecided"
+  >("undecided");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (picked.length === 0) {
+      setError("Selecione pelo menos um produto que você produz ou fornece.");
+      return;
+    }
     setLoading(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -38,6 +44,9 @@ function SignupProducer() {
           responsavel: String(form.get("responsavel") ?? ""),
           cnpj: String(form.get("cnpj") ?? ""),
           produtos: picked,
+          commercializationMode,
+          caepf: String(form.get("caepf") ?? ""),
+          stateRegistration: String(form.get("stateRegistration") ?? ""),
         },
       });
       navigate({ to: getProfileHome(profile.tipo) });
@@ -76,7 +85,68 @@ function SignupProducer() {
             placeholder="Digite o nome completo"
             required
           />
-          <Field name="cnpj" label="CNPJ" placeholder="Digite o CNPJ" required />
+        </FormSection>
+
+        <FormSection
+          title="Como você pretende comercializar?"
+          caption="Isso informa ao comprador como a negociação será conduzida"
+        >
+          <div className="grid gap-2">
+            {(
+              [
+                ["own", "Em nome próprio", "Tenho ou informarei minha documentação própria."],
+                [
+                  "organization",
+                  "Por cooperativa ou associação",
+                  "Solicitarei vínculo com uma organização após o cadastro.",
+                ],
+                [
+                  "undecided",
+                  "Ainda estou definindo",
+                  "Poderei divulgar minha produção e completar isso posteriormente.",
+                ],
+              ] as const
+            ).map(([value, title, description]) => (
+              <label
+                key={value}
+                className={`cursor-pointer rounded-xl border p-4 ${
+                  commercializationMode === value
+                    ? "border-leaf-600 bg-leaf-100"
+                    : "border-border bg-white"
+                }`}
+              >
+                <span className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="commercializationMode"
+                    value={value}
+                    checked={commercializationMode === value}
+                    onChange={() => setCommercializationMode(value)}
+                    className="mt-1 h-4 w-4 accent-[var(--color-brand-900)]"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-brand-900">{title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{description}</span>
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {commercializationMode === "own" && (
+            <div className="mt-4 grid gap-4">
+              <Field name="cnpj" label="CNPJ próprio, se possuir" placeholder="Digite o CNPJ" />
+              <Field name="caepf" label="CAEPF, se aplicável" placeholder="Digite o CAEPF" />
+              <Field
+                name="stateRegistration"
+                label="Inscrição estadual, se aplicável"
+                placeholder="Digite a inscrição estadual"
+              />
+            </div>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Não informe o CNPJ de uma cooperativa neste cadastro. O vínculo será confirmado pela
+            própria organização.
+          </p>
         </FormSection>
 
         <FormSection title="Contato">
@@ -93,7 +163,7 @@ function SignupProducer() {
         <AddressFields />
 
         <FormSection title="O que você produz" caption="Selecione tudo que fornece">
-          <ProductPicker picked={picked} setPicked={setPicked} />
+          <SupplierProductPicker value={picked} onChange={setPicked} required />
         </FormSection>
 
         <FormSection title="Segurança">
@@ -114,113 +184,5 @@ function SignupProducer() {
         <PrimaryButton loading={loading}>Criar conta de produtor</PrimaryButton>
       </form>
     </AuthLayout>
-  );
-}
-
-function ProductPicker({
-  picked,
-  setPicked,
-}: {
-  picked: string[];
-  setPicked: (s: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return SUPPLIER_PRODUCT_GROUPS;
-    return SUPPLIER_PRODUCT_GROUPS.map((g) => ({
-      ...g,
-      items: g.items.filter((i) => i.toLowerCase().includes(q)),
-    })).filter((g) => g.items.length);
-  }, [query]);
-
-  const toggle = (p: string) =>
-    setPicked(picked.includes(p) ? picked.filter((x) => x !== p) : [...picked, p]);
-
-  return (
-    <div>
-      <span className="block text-sm font-medium text-brand-900">
-        O que você produz ou fornece? <span className="ml-1 text-orange-600">*</span>
-      </span>
-
-      <button
-        type="button"
-        onClick={() => setOpen((s) => !s)}
-        className="mt-2 flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left text-sm text-brand-900 hover:border-leaf-500"
-      >
-        <span className="truncate text-muted-foreground">
-          {picked.length === 0
-            ? "Selecione os produtos que você fornece"
-            : `${picked.length} produto${picked.length > 1 ? "s" : ""} selecionado${picked.length > 1 ? "s" : ""}`}
-        </span>
-        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {picked.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {picked.map((p) => (
-            <span
-              key={p}
-              className="inline-flex items-center gap-1.5 rounded-full bg-leaf-100 px-3 py-1 text-xs font-medium text-brand-900"
-            >
-              {p}
-              <button type="button" onClick={() => toggle(p)} className="hover:text-orange-600">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {open && (
-        <div className="mt-3 rounded-2xl border border-border bg-white shadow-sm">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar produto"
-              className="h-9 w-full bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-            />
-          </div>
-          <div className="max-h-72 overflow-y-auto py-2">
-            {filtered.length === 0 && (
-              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhum produto encontrado.
-              </p>
-            )}
-            {filtered.map((g) => (
-              <div key={g.group} className="px-2 py-1">
-                <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {g.group}
-                </p>
-                <ul>
-                  {g.items.map((p) => {
-                    const active = picked.includes(p);
-                    return (
-                      <li key={p}>
-                        <button
-                          type="button"
-                          onClick={() => toggle(p)}
-                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
-                            active ? "bg-leaf-100 text-brand-900" : "text-brand-900 hover:bg-canvas"
-                          }`}
-                        >
-                          <span>{p}</span>
-                          {active && <Check className="h-4 w-4 text-leaf-700" />}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
   );
 }

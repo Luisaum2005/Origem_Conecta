@@ -37,6 +37,9 @@ export type SignUpInput = {
     responsavel: string;
     cnpj: string;
     produtos: string[];
+    commercializationMode: "own" | "organization" | "undecided";
+    caepf?: string;
+    stateRegistration?: string;
   };
   organization?: {
     type: "cooperativa" | "associacao";

@@ -128,10 +128,10 @@ function Orders() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Meus pedidos
+              Minhas solicitações
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Acompanhe pedidos em andamento, produtores envolvidos e histórico de compra.
+              Acompanhe interesses enviados, produtores envolvidos e negociações em andamento.
             </p>
           </div>
           <Link
@@ -139,12 +139,12 @@ function Orders() {
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
           >
             <ShoppingBag className="h-4 w-4" />
-            Novo pedido
+            Nova solicitação
           </Link>
         </div>
 
         <section className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Metric icon={ClipboardList} label="Pedidos totais" value={`${orders.length}`} />
+          <Metric icon={ClipboardList} label="Solicitações totais" value={`${orders.length}`} />
           <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
           <Metric icon={PackageCheck} label="Entregues" value={`${deliveredOrders.length}`} />
         </section>
@@ -232,9 +232,9 @@ function Orders() {
 
         {orders.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-border bg-white p-12 text-center">
-            <h3 className="text-lg font-semibold text-brand-900">Nenhum pedido criado ainda</h3>
+            <h3 className="text-lg font-semibold text-brand-900">Nenhuma solicitação enviada</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Monte um pedido no portfólio para acompanhar por aqui.
+              Adicione produtos à lista de interesse e envie uma solicitação de negociação.
             </p>
             <Link
               to="/portfolio"
@@ -313,7 +313,7 @@ function BuyerOrderCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Pedido #{order.id}
+            Solicitação #{order.id}
           </p>
           <h2 className="mt-1 text-xl font-bold text-brand-900">
             {order.items.length} item{order.items.length > 1 ? "s" : ""} · R${" "}
@@ -328,7 +328,7 @@ function BuyerOrderCard({
             </p>
           )}
           <p className="mt-1 text-sm font-semibold text-brand-900">
-            Pagamento: {order.paymentMethod ?? "A combinar"}
+            Condições comerciais: a combinar diretamente entre as partes
           </p>
           {order.paymentNotes && (
             <p className="mt-1 text-xs text-muted-foreground">{order.paymentNotes}</p>
@@ -369,6 +369,9 @@ function BuyerOrderCard({
               <p className="font-semibold text-brand-900">{item.productName}</p>
               <p className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
                 <span>Produtor: {item.producerName}</span>
+                {item.sellerOrganizationName && (
+                  <span>Comercialização: {item.sellerOrganizationName}</span>
+                )}
                 <span>·</span>
                 <span>
                   {item.manualProducerChoice ? "produtor escolhido" : "produtor automático"}
@@ -412,7 +415,9 @@ function BuyerOrderCard({
             {order.items.map((item) => (
               <li key={`${order.id}-summary-${item.productId}`}>
                 {item.productName}: {item.quantity.toLocaleString("pt-BR")} {item.unit} ·{" "}
-                {item.producerName} · R$ {item.lineTotal.toFixed(2)}
+                {item.producerName}
+                {item.sellerOrganizationName ? ` · ${item.sellerOrganizationName}` : ""} · R${" "}
+                {item.lineTotal.toFixed(2)}
               </li>
             ))}
           </ul>
@@ -449,7 +454,7 @@ function BuyerOrderCard({
               onClick={() => setIsCancelModalOpen(true)}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
             >
-              Cancelar Pedido
+              Cancelar solicitação
             </button>
           </div>
 
@@ -457,10 +462,10 @@ function BuyerOrderCard({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle className="text-brand-900 font-bold">
-                  Cancelar Pedido #{order.id}
+                  Cancelar solicitação #{order.id}
                 </DialogTitle>
                 <DialogDescription>
-                  Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.
+                  Tem certeza que deseja cancelar esta solicitação? Esta ação não pode ser desfeita.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">

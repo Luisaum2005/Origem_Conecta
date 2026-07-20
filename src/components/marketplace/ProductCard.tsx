@@ -111,7 +111,7 @@ export function ProductCard({
     onChange(confirmedQuantity);
     setInputValue(String(confirmedQuantity).replace(".", ","));
     setAdded(true);
-    toast.success(`${product.name} adicionado ao pedido.`);
+    toast.success(`${product.name} adicionado à lista de interesse.`);
   };
 
   return (
@@ -188,6 +188,20 @@ export function ProductCard({
       </div>
 
       <div className="mt-2.5 space-y-1 text-sm text-muted-foreground">
+        {selectedProducer.sellerOrganizationName && (
+          <p className="rounded-lg bg-leaf-100 px-3 py-2 text-xs font-semibold text-brand-900">
+            Comercialização por {selectedProducer.sellerOrganizationName}
+          </p>
+        )}
+        {!selectedProducer.sellerOrganizationName && (
+          <p className="rounded-lg bg-canvas px-3 py-2 text-xs font-semibold text-brand-900">
+            {selectedProducer.commercializationMode === "own"
+              ? "Negociação em nome próprio"
+              : selectedProducer.commercializationMode === "organization"
+                ? "Vínculo comercial com organização ainda não confirmado"
+                : "Forma de comercialização ainda não informada"}
+          </p>
+        )}
         <p className="flex items-center gap-1.5">
           <span className="font-semibold text-brand-900">Produtor:</span> {selectedProducer.name}
         </p>
@@ -319,14 +333,14 @@ export function ProductCard({
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 focus:outline-none focus:ring-2 focus:ring-leaf-300 focus:ring-offset-2"
             >
               {added ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-              {added ? "Adicionado" : qty > 0 ? "Atualizar" : "Adicionar"}
+              {added ? "Adicionado" : qty > 0 ? "Atualizar interesse" : "Adicionar à lista"}
             </button>
 
             {qty > 0 && (
               <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
                   <span className="inline-block h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  {formatQuantity(qty)} {selectedUnit} confirmado no pedido
+                  {formatQuantity(qty)} {selectedUnit} na lista de interesse
                 </div>
               </div>
             )}

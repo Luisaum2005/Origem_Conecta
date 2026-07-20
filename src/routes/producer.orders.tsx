@@ -109,11 +109,11 @@ function ProducerOrders() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Pedidos recebidos
+              Negociações recebidas
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Acompanhe os pedidos de {producerName}, confirme data e hora de entrega e avance o
-              status operacional.
+              Acompanhe as solicitações de {producerName}, negocie as condições e avance o status
+              operacional.
             </p>
           </div>
           <Link
@@ -128,7 +128,7 @@ function ProducerOrders() {
         <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             icon={ClipboardList}
-            label="Pedidos recebidos"
+            label="Solicitações recebidas"
             value={`${producerOrders.length}`}
           />
           <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
@@ -172,7 +172,7 @@ function ProducerOrders() {
             <Panel title="Produtos mais vendidos" icon={PackageCheck}>
               {topProducts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Os produtos aparecem aqui quando houver pedidos para o produtor.
+                  Os produtos aparecem aqui quando houver solicitações para o produtor.
                 </p>
               ) : (
                 <ul className="space-y-3">
@@ -336,7 +336,7 @@ function ProducerOrderCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Pedido #{order.id}
+            Solicitação #{order.id}
           </p>
           <h3 className="mt-1 text-lg font-bold text-brand-900 flex flex-wrap items-center gap-2">
             <span>
@@ -381,7 +381,7 @@ function ProducerOrderCard({
             </div>
           )}
           <p className="mt-1 text-sm font-semibold text-brand-900">
-            Pagamento: {order.paymentMethod ?? "A combinar"}
+            Pagamento e condições: definidos diretamente entre as partes
           </p>
           {order.paymentNotes && (
             <p className="mt-1 text-xs text-muted-foreground">{order.paymentNotes}</p>
@@ -489,7 +489,7 @@ function ProducerOrderCard({
                 disabled={saving}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer disabled:opacity-60"
               >
-                Cancelar Pedido
+                Cancelar solicitação
               </button>
             </div>
 
@@ -497,10 +497,11 @@ function ProducerOrderCard({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle className="text-brand-900 font-bold">
-                    Cancelar Pedido #{order.id}
+                    Cancelar solicitação #{order.id}
                   </DialogTitle>
                   <DialogDescription>
-                    Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.
+                    Tem certeza que deseja cancelar esta solicitação? Esta ação não pode ser
+                    desfeita.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
@@ -684,9 +685,9 @@ function getProducerOrders(
 function EmptyState() {
   return (
     <div className="rounded-2xl border border-border bg-canvas p-8 text-center">
-      <h3 className="text-base font-semibold text-brand-900">Nenhum pedido recebido ainda</h3>
+      <h3 className="text-base font-semibold text-brand-900">Nenhuma solicitação recebida</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Quando um comprador escolher produtos deste produtor, o pedido aparece aqui.
+        Quando um comprador enviar interesse nos produtos, a solicitação aparece aqui.
       </p>
     </div>
   );

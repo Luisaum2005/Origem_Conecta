@@ -84,6 +84,11 @@ export function useAvailableProducts() {
               origin: location,
               price: Number(item.price || 0),
               stock: Number(item.quantity || 0),
+              sellerOrganizationId: item.sellerOrganizationId,
+              sellerOrganizationName: item.sellerOrganizationName,
+              sellerOrganizationCnpj: item.sellerOrganizationCnpj,
+              commercializationMode: item.commercializationMode,
+              commercialVerificationStatus: item.commercialVerificationStatus,
             },
           ],
         };

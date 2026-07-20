@@ -13,8 +13,8 @@ import {
 
 const items = [
   { to: "/portfolio", label: "Portfólio", icon: Store, profiles: ["comprador"] },
-  { to: "/orders", label: "Pedidos", icon: Truck, profiles: ["comprador"] },
-  { to: "/producer/orders", label: "Pedidos", icon: ClipboardList, profiles: ["produtor"] },
+  { to: "/orders", label: "Solicitações", icon: Truck, profiles: ["comprador"] },
+  { to: "/producer/orders", label: "Negociações", icon: ClipboardList, profiles: ["produtor"] },
   { to: "/production", label: "Estoque", icon: Package, profiles: ["produtor"] },
   {
     to: "/demands",

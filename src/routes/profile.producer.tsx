@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { PushSettings } from "@/components/notifications/PushSettings";
+import { ProducerMemberships } from "@/components/organizations/ProducerMemberships";
 import { useAuth } from "@/lib/auth";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import { type ProducerProfileDetails, useProducerProfileDetails } from "@/lib/producer-profile";
@@ -88,7 +90,7 @@ function ProducerProfile() {
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
             >
               <Store className="h-3.5 w-3.5 text-leaf-600" />
-              Ver pedidos recebidos
+              Ver negociações recebidas
             </Link>
             <Link
               to="/production"
@@ -102,15 +104,15 @@ function ProducerProfile() {
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
-          <Metric icon={Truck} label="Pedidos em andamento" value={`${openOrders.length}`} />
+          <Metric icon={Truck} label="Negociações em andamento" value={`${openOrders.length}`} />
           <Metric
             icon={CircleDollarSign}
-            label="Receita em pedidos"
+            label="Valor anunciado nas solicitações"
             value={`R$ ${orderRevenue.toFixed(2)}`}
           />
           <Metric
             icon={ShieldCheck}
-            label="Pedidos entregues"
+            label="Negociações concluídas"
             value={producerOrders.length ? `${deliveryRate}%` : "Sem dados"}
           />
         </section>
@@ -118,6 +120,8 @@ function ProducerProfile() {
         <section className="mt-6">
           <ProducerDetailsPanel details={details} onSave={saveDetails} saving={saving} />
         </section>
+
+        <ProducerMemberships />
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Panel title="Estoque publicado" icon={Package}>
@@ -315,22 +319,17 @@ function ProducerDetailsPanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(details);
-  const [productsText, setProductsText] = useState(() => details.products.join(", "));
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     setDraft(details);
-    setProductsText(details.products.join(", "));
   }, [details]);
 
   const save = async () => {
     setError("");
     try {
-      await onSave({
-        ...draft,
-        products: parseProducts(productsText),
-      });
+      await onSave(draft);
       setEditing(false);
       setNotice("Dados do produtor atualizados.");
     } catch (err) {
@@ -346,6 +345,10 @@ function ProducerDetailsPanel({
             <Mini label="Propriedade" value={details.propertyName || "Não informado"} />
             <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
             <Mini label="CNPJ" value={details.cnpj || "Não informado"} />
+            <Mini
+              label="Comercialização"
+              value={commercializationLabel(details.commercializationMode)}
+            />
             <Mini label="Telefone" value={details.phone || "Não informado"} />
             <Mini label="Localização" value={details.location || "Não informado"} />
           </dl>
@@ -376,7 +379,6 @@ function ProducerDetailsPanel({
             onClick={() => {
               setNotice("");
               setError("");
-              setProductsText(details.products.join(", "));
               setEditing(true);
             }}
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
@@ -400,13 +402,48 @@ function ProducerDetailsPanel({
               value={draft.responsibleName}
               onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
             />
-            <TextField
-              icon={Store}
-              label="CNPJ"
-              value={draft.cnpj}
-              onChange={(cnpj) => setDraft({ ...draft, cnpj })}
-              placeholder="Digite o CNPJ"
-            />
+            <label className="block">
+              <span className="block text-sm font-medium text-brand-900">
+                Como pretende comercializar
+              </span>
+              <select
+                value={draft.commercializationMode}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    commercializationMode: event.target.value as typeof draft.commercializationMode,
+                  })
+                }
+                className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4 text-sm text-brand-900"
+              >
+                <option value="own">Em nome próprio</option>
+                <option value="organization">Por cooperativa ou associação</option>
+                <option value="undecided">Ainda estou definindo</option>
+              </select>
+            </label>
+            {draft.commercializationMode === "own" && (
+              <>
+                <TextField
+                  icon={Store}
+                  label="CNPJ próprio, se possuir"
+                  value={draft.cnpj}
+                  onChange={(cnpj) => setDraft({ ...draft, cnpj })}
+                  placeholder="Digite o CNPJ"
+                />
+                <TextField
+                  icon={Store}
+                  label="CAEPF, se aplicável"
+                  value={draft.caepf}
+                  onChange={(caepf) => setDraft({ ...draft, caepf })}
+                />
+                <TextField
+                  icon={Store}
+                  label="Inscrição estadual, se aplicável"
+                  value={draft.stateRegistration}
+                  onChange={(stateRegistration) => setDraft({ ...draft, stateRegistration })}
+                />
+              </>
+            )}
             <TextField
               icon={Phone}
               label="Telefone/WhatsApp"
@@ -421,19 +458,16 @@ function ProducerDetailsPanel({
               placeholder="Digite a cidade e UF"
             />
           </div>
-          <label className="block">
-            <span className="block text-sm font-medium text-brand-900">Produtos atendidos</span>
-            <textarea
-              value={productsText}
-              onChange={(event) => setProductsText(event.target.value)}
-              placeholder="Pitaya Roxa, Figo, Cafe especial..."
-              className="mt-2 min-h-[92px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
+          <div>
+            <SupplierProductPicker
+              value={draft.products}
+              onChange={(products) => setDraft({ ...draft, products })}
             />
             <span className="mt-1.5 block text-xs text-muted-foreground">
-              Separe os produtos por vírgula ou coloque um produto por linha. Espaços dentro do nome
-              são mantidos.
+              Esta lista representa tudo que você fornece. O estoque publicado pode conter apenas os
+              produtos disponíveis no momento.
             </span>
-          </label>
+          </div>
           <div className="flex flex-wrap gap-2">
             {error && (
               <p className="w-full rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
@@ -453,7 +487,6 @@ function ProducerDetailsPanel({
               type="button"
               onClick={() => {
                 setDraft(details);
-                setProductsText(details.products.join(", "));
                 setError("");
                 setEditing(false);
               }}
@@ -469,13 +502,10 @@ function ProducerDetailsPanel({
   );
 }
 
-function parseProducts(value: string) {
-  const unique = new Map<string, string>();
-  for (const item of value.split(/[,;\n]+/)) {
-    const product = item.trim().replace(/\s+/g, " ");
-    if (product) unique.set(product.toLocaleLowerCase("pt-BR"), product);
-  }
-  return Array.from(unique.values());
+function commercializationLabel(mode: "own" | "organization" | "undecided") {
+  if (mode === "own") return "Em nome próprio";
+  if (mode === "organization") return "Por organização";
+  return "Ainda não definida";
 }
 
 function TextField({

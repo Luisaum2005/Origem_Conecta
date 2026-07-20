@@ -175,6 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               JSON.stringify({
                 nome_propriedade: input.producer.nomePropriedade,
                 responsavel: input.producer.responsavel,
+                cnpj: input.producer.cnpj,
+                commercialization_mode: input.producer.commercializationMode,
+                caepf: input.producer.caepf,
+                state_registration: input.producer.stateRegistration,
                 localizacao: location || "Localização não informada",
               }),
             );
@@ -224,15 +228,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (input.tipo === "produtor" && input.producer) {
           const location = [input.cidade, input.estado].filter(Boolean).join(", ");
-          const { error: producerError } = await supabase.from("producers").insert({
-            profile_id: profileData.id,
-            nome_propriedade: input.producer.nomePropriedade,
-            responsavel: input.producer.responsavel,
-            cnpj: input.producer.cnpj,
-            localizacao: location || null,
-            categorias_atendidas: input.producer.produtos,
-          });
+          const { data: producerData, error: producerError } = await supabase
+            .from("producers")
+            .insert({
+              profile_id: profileData.id,
+              nome_propriedade: input.producer.nomePropriedade,
+              responsavel: input.producer.responsavel,
+              cnpj: null,
+              commercialization_mode: input.producer.commercializationMode,
+              localizacao: location || null,
+              categorias_atendidas: input.producer.produtos,
+            })
+            .select("id")
+            .single();
           throwSupabaseError(producerError);
+          if (producerData) {
+            const { error: documentsError } = await supabase
+              .from("producer_commercial_documents")
+              .insert({
+                producer_id: producerData.id,
+                cnpj: input.producer.cnpj || null,
+                caepf: input.producer.caepf || null,
+                state_registration: input.producer.stateRegistration || null,
+              });
+            throwSupabaseError(documentsError);
+          }
         }
 
         if (input.organization) {

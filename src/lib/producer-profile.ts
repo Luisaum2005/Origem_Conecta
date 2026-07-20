@@ -9,6 +9,10 @@ export type ProducerProfileDetails = {
   phone: string;
   location: string;
   products: string[];
+  commercializationMode: "own" | "organization" | "undecided";
+  commercialVerificationStatus: "self_declared" | "pending" | "verified" | "rejected";
+  caepf: string;
+  stateRegistration: string;
 };
 
 const PRODUCER_PROFILE_STORAGE_KEY = "origem-conecta-producer-profile";
@@ -20,6 +24,10 @@ const DEFAULT_PRODUCER_PROFILE: ProducerProfileDetails = {
   phone: "",
   location: "",
   products: [],
+  commercializationMode: "undecided",
+  commercialVerificationStatus: "self_declared",
+  caepf: "",
+  stateRegistration: "",
 };
 
 type RemoteProducerProfile = {
@@ -32,6 +40,18 @@ type RemoteProducerProfile = {
         cnpj?: string | null;
         localizacao?: string | null;
         categorias_atendidas?: string[] | null;
+        commercialization_mode?: "own" | "organization" | "undecided" | null;
+        commercial_verification_status?:
+          | "self_declared"
+          | "pending"
+          | "verified"
+          | "rejected"
+          | null;
+        producer_commercial_documents?: {
+          cnpj?: string | null;
+          caepf?: string | null;
+          state_registration?: string | null;
+        } | null;
       }
     | Array<{
         nome_propriedade?: string | null;
@@ -39,6 +59,18 @@ type RemoteProducerProfile = {
         cnpj?: string | null;
         localizacao?: string | null;
         categorias_atendidas?: string[] | null;
+        commercialization_mode?: "own" | "organization" | "undecided" | null;
+        commercial_verification_status?:
+          | "self_declared"
+          | "pending"
+          | "verified"
+          | "rejected"
+          | null;
+        producer_commercial_documents?: {
+          cnpj?: string | null;
+          caepf?: string | null;
+          state_registration?: string | null;
+        } | null;
       }>
     | null;
 };
@@ -56,13 +88,18 @@ function readStoredProfile() {
 
 function mapRemoteProfile(row: RemoteProducerProfile): ProducerProfileDetails {
   const producer = Array.isArray(row.producers) ? row.producers[0] : row.producers;
+  const documents = producer?.producer_commercial_documents;
   return {
     propertyName: producer?.nome_propriedade || row.nome || DEFAULT_PRODUCER_PROFILE.propertyName,
     responsibleName: producer?.responsavel || row.nome || DEFAULT_PRODUCER_PROFILE.responsibleName,
-    cnpj: producer?.cnpj || "",
+    cnpj: documents?.cnpj || "",
     phone: row.telefone || "",
     location: producer?.localizacao || DEFAULT_PRODUCER_PROFILE.location,
     products: producer?.categorias_atendidas ?? [],
+    commercializationMode: producer?.commercialization_mode ?? "undecided",
+    commercialVerificationStatus: producer?.commercial_verification_status ?? "self_declared",
+    caepf: documents?.caepf ?? "",
+    stateRegistration: documents?.state_registration ?? "",
   };
 }
 
@@ -71,7 +108,7 @@ async function loadRemoteProducerProfile(profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "nome,telefone,producers(nome_propriedade,responsavel,cnpj,localizacao,categorias_atendidas)",
+      "nome,telefone,producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,commercialization_mode,commercial_verification_status,producer_commercial_documents(cnpj,caepf,state_registration))",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -96,12 +133,28 @@ async function updateRemoteProducerProfile(profileId: string, details: ProducerP
     .update({
       nome_propriedade: details.propertyName,
       responsavel: details.responsibleName,
-      cnpj: details.cnpj || null,
       localizacao: details.location || null,
       categorias_atendidas: details.products,
+      commercialization_mode: details.commercializationMode,
     })
     .eq("profile_id", profileId);
   if (producerError) throw producerError;
+  const { data: producerRow, error: producerIdError } = await supabase
+    .from("producers")
+    .select("id")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (producerIdError) throw producerIdError;
+  if (producerRow) {
+    const { error: documentsError } = await supabase.from("producer_commercial_documents").upsert({
+      producer_id: producerRow.id,
+      cnpj: details.cnpj || null,
+      caepf: details.caepf || null,
+      state_registration: details.stateRegistration || null,
+      updated_at: new Date().toISOString(),
+    });
+    if (documentsError) throw documentsError;
+  }
 }
 
 export function useProducerProfileDetails() {
@@ -131,6 +184,10 @@ export function useProducerProfileDetails() {
             phone: profile.telefone || "",
             location: localDetails.localizacao || "",
             products: localDetails.produtos || [],
+            commercializationMode: localDetails.commercialization_mode || "undecided",
+            commercialVerificationStatus: "self_declared",
+            caepf: localDetails.caepf || "",
+            stateRegistration: localDetails.state_registration || "",
           });
         }
       } catch (e) {
@@ -167,6 +224,9 @@ export function useProducerProfileDetails() {
             cnpj: nextDetails.cnpj,
             localizacao: nextDetails.location,
             produtos: nextDetails.products,
+            commercialization_mode: nextDetails.commercializationMode,
+            caepf: nextDetails.caepf,
+            state_registration: nextDetails.stateRegistration,
           }),
         );
       }

@@ -10,6 +10,11 @@ export type ProducerOption = {
   onTimeRate: number;
   reliabilityScore: number;
   eta: string;
+  sellerOrganizationId?: string;
+  sellerOrganizationName?: string;
+  sellerOrganizationCnpj?: string;
+  commercializationMode?: "own" | "organization" | "undecided";
+  commercialVerificationStatus?: "self_declared" | "pending" | "verified" | "rejected";
 };
 
 export type Product = {
