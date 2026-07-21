@@ -1,5 +1,5 @@
 import { useAuth } from "@/lib/auth";
-import { CANCELLATION_LIMIT_HOURS, type PaymentMethod } from "@/lib/orders";
+import type { PaymentMethod } from "@/lib/orders";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
@@ -94,14 +94,6 @@ function toResponseStatus(status: DemandResponseStatus) {
 
 function normalizeUrgency(value?: string | null): DemandUrgency {
   return value === "urgente" ? "urgente" : "normal";
-}
-
-function addHours(value: string, hours: number) {
-  return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString();
-}
-
-function generateDeliveryCode() {
-  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 type DemandItemRow = {
@@ -332,61 +324,12 @@ async function approveRemoteResponse(
   const buyer = await getBuyer(profileId);
   if (!buyer) throw new Error("Cadastro de comprador não encontrado.");
   if (!response.producerId) throw new Error("Produtor da resposta não encontrado.");
-
-  const acceptedItems = response.items.filter((item) => item.canSupply);
-  const total = acceptedItems.reduce((sum, item) => sum + item.price, 0);
-  const deliveryLabel = demand.deliveryDate
-    ? new Date(`${demand.deliveryDate}T12:00:00`).toLocaleDateString("pt-BR")
-    : "A combinar";
-
-  const { data: order, error } = await supabase
-    .from("orders")
-    .insert({
-      buyer_id: buyer.id,
-      buyer_name: demand.buyerName,
-      status: "recebido",
-      subtotal: total,
-      delivery: 0,
-      total,
-      entrega_label: `Entrega solicitada para ${deliveryLabel}`,
-      cancelamento_limite_em: addHours(new Date().toISOString(), CANCELLATION_LIMIT_HOURS),
-      codigo_entrega: generateDeliveryCode(),
-      origem_demanda_id: demand.id,
-      payment_method: demand.paymentMethod ?? "A combinar",
-      payment_notes: demand.paymentNotes ?? null,
-    })
-    .select("id,criado_em")
-    .single();
+  const { data, error } = await supabase.rpc("secure_accept_demand_response", {
+    p_response_id: response.id,
+  });
   if (error) throw error;
-
-  const orderItems = acceptedItems.map((item) => ({
-    order_id: order.id,
-    product_ref: item.demandItemId ?? item.productName,
-    product_name: item.productName,
-    quantidade: item.quantity,
-    unidade: item.unit,
-    preco_unitario: item.quantity > 0 ? item.price / item.quantity : item.price,
-    producer_id: response.producerId,
-    producer_ref: response.producerId,
-    producer_name: response.producerName,
-    escolha_manual_produtor: true,
-    line_total: item.price,
-    observacoes: item.notes ?? null,
-  }));
-
-  if (orderItems.length) {
-    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-    if (itemsError) throw itemsError;
-  }
-
-  await supabase.from("demand_responses").update({ status: "recusada" }).eq("demand_id", demand.id);
-  await supabase
-    .from("demand_responses")
-    .update({ status: "aprovada", order_id: order.id })
-    .eq("id", response.id);
-  await supabase.from("demand_requests").update({ status: "aprovada" }).eq("id", demand.id);
-
-  return order.id as string;
+  if (!data) throw new Error("Não foi possível aceitar a resposta.");
+  return data as string;
 }
 
 export function useDemandRequests() {

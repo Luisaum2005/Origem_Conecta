@@ -200,77 +200,14 @@ async function respondRemoteQuote(
     throw new Error("Informe um preço válido para aceitar a solicitação.");
   }
 
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .update({
-      producer_id: producer.id,
-      preco_resposta: price,
-      observacoes_resposta: response.responseNotes || null,
-      status: "respondida",
-      respondido_em: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("status", "aberta")
-    .is("producer_id", null)
-    .select(
-      "id,buyer_id,nome_produto,quantidade,unidade,entrega_desejada,observacoes,buyers(nome_empresa)",
-    )
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    throw new Error("Esta cotacao ja foi respondida por outro produtor.");
-  }
-
-  const quantity = Number(data.quantidade || 0);
-  const subtotal = quantity * price;
-  const producerName =
-    response.producerName || producer.nome_propriedade || producer.responsavel || "Produtor";
-  const buyerRelation = Array.isArray(data.buyers) ? data.buyers[0] : data.buyers;
-  const deliveryLabel = data.entrega_desejada
-    ? `Solicitado para ${new Date(`${data.entrega_desejada}T12:00:00`).toLocaleDateString("pt-BR")}`
-    : "Aguardando data e hora do produtor";
-
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .insert({
-      buyer_id: data.buyer_id,
-      buyer_name: buyerRelation?.nome_empresa || "Comprador",
-      status: "recebido",
-      subtotal,
-      delivery: 0,
-      total: subtotal,
-      entrega_label: deliveryLabel,
-      origem_solicitacao_id: data.id,
-    })
-    .select("id")
-    .single();
-  if (orderError) throw orderError;
-
-  const { error: itemError } = await supabase.from("order_items").insert({
-    order_id: order.id,
-    product_ref: data.nome_produto,
-    product_name: data.nome_produto,
-    quantidade: quantity,
-    unidade: data.unidade,
-    preco_unitario: price,
-    producer_id: producer.id,
-    producer_ref: producer.id,
-    producer_name: producerName,
-    escolha_manual_produtor: true,
-    line_total: subtotal,
-    observacoes: [
-      data.observacoes ? `Solicitação: ${data.observacoes}` : "",
-      response.responseNotes ? `Resposta do produtor: ${response.responseNotes}` : "",
-    ]
-      .filter(Boolean)
-      .join(" | "),
+  const { data, error } = await supabase.rpc("secure_respond_quote", {
+    p_quote_id: id,
+    p_price: price,
+    p_notes: response.responseNotes || null,
   });
-  if (itemError) {
-    await supabase.from("orders").delete().eq("id", order.id);
-    throw itemError;
-  }
-
-  return order.id as string;
+  if (error) throw error;
+  if (!data) throw new Error("Não foi possível responder à cotação.");
+  return data as string;
 }
 
 async function updateRemoteQuoteStatus(id: string, status: QuoteStatus) {

@@ -65,8 +65,9 @@ function Organizations() {
                 </dl>
                 {organization.verificationStatus === "unverified" && (
                   <p className="mt-5 rounded-xl bg-orange-50 p-3 text-xs text-orange-800">
-                    O cadastro está ativo, mas o CNPJ ainda não foi verificado. O uso comercial do
-                    CNPJ será liberado quando a validação automática estiver concluída.
+                    O cadastro está ativo, mas os dados do CNPJ ainda não foram verificados. A
+                    organização pode gerenciar associados e negociações, porém permanece sem selo de
+                    verificação.
                   </p>
                 )}
                 {organization.rejectionReason && (

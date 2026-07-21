@@ -81,6 +81,7 @@ export function PrimaryButton({
   return (
     <button
       {...rest}
+      disabled={loading || rest.disabled}
       className="inline-flex h-[52px] w-full items-center justify-center rounded-xl bg-brand-900 px-6 text-base font-semibold text-white shadow-xs transition-colors hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
     >
       {loading ? "Enviando..." : children}

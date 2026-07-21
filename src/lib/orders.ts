@@ -309,55 +309,26 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
     );
   }
 
-  const { data, error } = await supabase
-    .from("orders")
-    .insert({
-      buyer_id: buyerId,
-      buyer_name: order.buyerName,
-      status: appToDbStatus[order.status],
-      subtotal: order.subtotal,
+  const { data, error } = await supabase.rpc("secure_create_portfolio_order", {
+    p_order: {
+      buyerName: order.buyerName,
       delivery: order.delivery,
-      total: order.total,
-      entrega_label: order.deliveryEta,
-      entrega_prevista: order.deliveryAt ?? null,
-      cancelamento_limite_em:
-        order.cancellationDeadline ?? addHours(order.createdAt, CANCELLATION_LIMIT_HOURS),
-      codigo_entrega: order.deliveryCode ?? generateDeliveryCode(),
-      origem_solicitacao_id: order.originQuoteId ?? null,
-      payment_method: order.paymentMethod ?? "A combinar",
-      payment_notes: order.paymentNotes ?? null,
-    })
-    .select("id,criado_em")
-    .single();
+      deliveryEta: order.deliveryEta,
+      deliveryAt: order.deliveryAt ?? null,
+      paymentMethod: order.paymentMethod ?? "A combinar",
+      paymentNotes: order.paymentNotes ?? null,
+    },
+    p_items: order.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      manualProducerChoice: item.manualProducerChoice,
+      notes: item.notes ?? null,
+    })),
+  });
   if (error) throw error;
-
-  const payload = order.items.map((item) => ({
-    order_id: data.id,
-    product_ref: item.productId,
-    product_name: item.productName,
-    quantidade: item.quantity,
-    unidade: item.unit,
-    preco_unitario: item.unitPrice,
-    producer_id: item.producerId,
-    producer_ref: item.producerId,
-    producer_name: item.producerName,
-    seller_organization_id: item.sellerOrganizationId ?? null,
-    seller_organization_name: item.sellerOrganizationName ?? null,
-    seller_organization_cnpj: item.sellerOrganizationCnpj ?? null,
-    escolha_manual_produtor: item.manualProducerChoice,
-    line_total: item.lineTotal,
-    observacoes: item.notes || null,
-  }));
-
-  if (payload.length) {
-    const { error: itemsError } = await supabase.from("order_items").insert(payload);
-    if (itemsError) {
-      await supabase.from("orders").delete().eq("id", data.id);
-      throw itemsError;
-    }
-  }
-
-  return { id: data.id as string, createdAt: data.criado_em as string };
+  const result = data as { id: string; createdAt: string } | null;
+  if (!result?.id) throw new Error("O pedido não foi criado.");
+  return result;
 }
 
 async function updateRemoteStatus(id: string, status: OrderStatus) {

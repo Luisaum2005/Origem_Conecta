@@ -1,9 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { InstallButton } from "@/components/pwa/InstallButton";
 import { ALL_SUPPLIER_PRODUCTS } from "@/lib/hortifruti";
-import { EMPTY_STOCK_ITEM, type ProducerStockItem, useProducerStock } from "@/lib/producer-stock";
+import {
+  EMPTY_STOCK_ITEM,
+  type ProducerStockItem,
+  type SalesOrganization,
+  useProducerStock,
+} from "@/lib/producer-stock";
 import {
   Building2,
   CalendarDays,
@@ -32,6 +37,14 @@ export const Route = createFileRoute("/production")({
 
 const UNITS = ["kg", "unidade", "caixa", "pacote", "pote", "litro", "maço"];
 
+function organizationOptionLabel(organization: SalesOrganization) {
+  if (organization.membershipStatus === "invited") return "convite aguardando aceite";
+  if (organization.membershipStatus === "pending") return "vínculo aguardando aprovação";
+  if (organization.organizationStatus !== "active") return "organização indisponível";
+  if (!organization.canSell) return "aguardando autorização comercial";
+  return `CNPJ ${organization.cnpj}`;
+}
+
 function Production() {
   const [items, setItems, { uploadImage, uploadVideo, salesOrganizations }] = useProducerStock();
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
@@ -40,6 +53,12 @@ function Production() {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [imageError, setImageError] = useState("");
   const [videoError, setVideoError] = useState("");
+  const authorizedOrganizations = salesOrganizations.filter(
+    (organization) =>
+      organization.membershipStatus === "active" &&
+      organization.canSell &&
+      organization.organizationStatus === "active",
+  );
 
   const isValid = draft.product && draft.quantity && draft.unit && draft.price;
   const activeItems = items.filter((item) => item.status === "ativo");
@@ -205,7 +224,7 @@ function Production() {
                 <select
                   value={draft.sellerOrganizationId ?? ""}
                   onChange={(event) => {
-                    const organization = salesOrganizations.find(
+                    const organization = authorizedOrganizations.find(
                       (item) => item.id === event.target.value,
                     );
                     setDraft({
@@ -218,15 +237,36 @@ function Production() {
                   className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-3 text-base text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
                 >
                   <option value="">Negociação própria — meus dados</option>
-                  {salesOrganizations.map((organization) => (
-                    <option key={organization.id} value={organization.id}>
-                      {organization.name} — CNPJ {organization.cnpj}
-                    </option>
-                  ))}
+                  {salesOrganizations.map((organization) => {
+                    const eligible =
+                      organization.membershipStatus === "active" &&
+                      organization.canSell &&
+                      organization.organizationStatus === "active";
+                    return (
+                      <option key={organization.id} value={organization.id} disabled={!eligible}>
+                        {organization.name} — {organizationOptionLabel(organization)}
+                      </option>
+                    );
+                  })}
                 </select>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Somente organizações que autorizaram suas vendas aparecem aqui.
-                </span>
+                {salesOrganizations.length === 0 ? (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Nenhuma cooperativa vinculada. Solicite ou aceite um vínculo no seu{" "}
+                    <Link to="/profile/producer" className="font-semibold text-leaf-700 underline">
+                      perfil
+                    </Link>
+                    .
+                  </span>
+                ) : authorizedOrganizations.length === 0 ? (
+                  <span className="mt-1 block text-xs text-orange-700">
+                    Existe um vínculo, mas a cooperativa ainda precisa ativá-lo e autorizar sua
+                    comercialização na área de associados.
+                  </span>
+                ) : (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Selecione uma organização autorizada ou negocie em nome próprio.
+                  </span>
+                )}
               </label>
               <PhotoField
                 imageUrl={draft.imageUrl}

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
-import { useFakeSubmit } from "@/hooks/use-fake-submit";
+import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 
 export const Route = createFileRoute("/reset")({
@@ -10,7 +10,36 @@ export const Route = createFileRoute("/reset")({
 function Reset() {
   const navigate = useNavigate();
   const [sent, setSent] = useState(false);
-  const { loading, onSubmit } = useFakeSubmit(() => setSent(true));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) {
+      setError("O serviço de autenticação não está configurado.");
+      return;
+    }
+
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    setLoading(true);
+    setError("");
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      if (resetError) throw resetError;
+      setSent(true);
+    } catch (resetError) {
+      setError(
+        resetError instanceof Error
+          ? resetError.message
+          : "Não foi possível enviar o link. Tente novamente.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthLayout
@@ -34,7 +63,18 @@ function Reset() {
         </div>
       ) : (
         <form className="space-y-5" onSubmit={onSubmit}>
-          <Field label="E-mail" type="email" placeholder="voce@restaurante.com" required />
+          <Field
+            name="email"
+            label="E-mail"
+            type="email"
+            placeholder="voce@restaurante.com"
+            required
+          />
+          {error ? (
+            <p className="text-sm text-red-700" role="alert">
+              {error}
+            </p>
+          ) : null}
           <PrimaryButton loading={loading}>Enviar link</PrimaryButton>
         </form>
       )}

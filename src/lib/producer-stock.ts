@@ -33,11 +33,10 @@ export type SalesOrganization = {
   name: string;
   cnpj: string;
   type: "cooperativa" | "associacao";
-};
-
-export type StockDecrementItem = {
-  productId: string;
-  quantity: number;
+  membershipStatus: "invited" | "pending" | "active";
+  canSell: boolean;
+  organizationStatus: "active" | "pending" | "rejected" | "suspended";
+  verificationStatus: "unverified" | "verified" | "failed";
 };
 
 type InventoryRow = {
@@ -95,31 +94,6 @@ function readStoredStock() {
   } catch {
     return INITIAL_PRODUCER_STOCK;
   }
-}
-
-function normalizeDecrementItems(items: StockDecrementItem[]) {
-  return items
-    .map((item) => ({
-      productId: item.productId,
-      quantity: Number(item.quantity || 0),
-    }))
-    .filter((item) => item.productId && item.quantity > 0);
-}
-
-function applyStockDecrement(stock: ProducerStockItem[], items: StockDecrementItem[]) {
-  const decrements = normalizeDecrementItems(items);
-  if (!decrements.length) return stock;
-
-  return stock.map((stockItem) => {
-    const decrement = decrements.find((item) => item.productId === stockItem.id);
-    if (!decrement) return stockItem;
-
-    const nextQuantity = Math.max(0, Number(stockItem.quantity || 0) - decrement.quantity);
-    return {
-      ...stockItem,
-      quantity: String(nextQuantity),
-    };
-  });
 }
 
 function mapInventoryRow(row: InventoryRow): ProducerStockItem {
@@ -197,7 +171,7 @@ async function loadInventory(producerId?: string | null) {
 
 async function loadSalesOrganizations() {
   if (!supabase) return [];
-  const { data, error } = await supabase.rpc("get_my_sales_organizations");
+  const { data, error } = await supabase.rpc("get_my_organization_commercial_options");
   if (error) throw error;
   return (data ?? []).map((organization: Record<string, unknown>) => ({
     id: String(organization.id),
@@ -206,6 +180,27 @@ async function loadSalesOrganizations() {
     type: (organization.type === "cooperativa" ? "cooperativa" : "associacao") as
       | "cooperativa"
       | "associacao",
+    membershipStatus:
+      organization.membership_status === "active"
+        ? "active"
+        : organization.membership_status === "pending"
+          ? "pending"
+          : "invited",
+    canSell: organization.can_sell === true,
+    organizationStatus:
+      organization.organization_status === "active"
+        ? "active"
+        : organization.organization_status === "suspended"
+          ? "suspended"
+          : organization.organization_status === "rejected"
+            ? "rejected"
+            : "pending",
+    verificationStatus:
+      organization.verification_status === "verified"
+        ? "verified"
+        : organization.verification_status === "failed"
+          ? "failed"
+          : "unverified",
   }));
 }
 
@@ -272,15 +267,6 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     .update({ categorias_atendidas: suppliedProducts })
     .eq("id", producerId);
   if (categoriesError) throw categoriesError;
-}
-
-async function decrementRemoteInventory(items: StockDecrementItem[]) {
-  if (!supabase) return;
-  const payload = normalizeDecrementItems(items);
-  if (!payload.length) return;
-
-  const { error } = await supabase.rpc("decrement_inventory_for_order", { p_items: payload });
-  if (error) throw error;
 }
 
 function extensionFromFile(file: File) {
@@ -447,20 +433,6 @@ export function useProducerStock() {
     [isSupabaseConfigured, producerId],
   );
 
-  const decrementStock = useCallback(
-    async (orderItems: StockDecrementItem[]) => {
-      const normalized = normalizeDecrementItems(orderItems);
-      if (!normalized.length) return;
-
-      if (supabase && isSupabaseConfigured) {
-        await decrementRemoteInventory(normalized);
-      }
-
-      setItemsState((current) => applyStockDecrement(current, normalized));
-    },
-    [isSupabaseConfigured],
-  );
-
   return [
     items,
     setItems,
@@ -468,7 +440,6 @@ export function useProducerStock() {
       uploadImage: (file: File, itemId: string) => uploadMedia(file, itemId, "image"),
       uploadVideo: (file: File, itemId: string) => uploadMedia(file, itemId, "video"),
       canUploadRemoteImage: Boolean(producerId),
-      decrementStock,
       salesOrganizations,
     },
   ] as const;

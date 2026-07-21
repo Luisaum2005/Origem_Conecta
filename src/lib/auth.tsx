@@ -187,115 +187,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return localProfile;
         }
 
+        const signupPayload = {
+          tipo: input.tipo,
+          nome: input.nome,
+          telefone: input.telefone,
+          cidade: input.cidade,
+          estado: input.estado,
+          buyer: input.buyer,
+          producer: input.producer,
+          organization: input.organization,
+        };
         const { data, error } = await supabase.auth.signUp({
           email: input.email,
           password: input.password,
+          options: { data: { signup_payload: signupPayload } },
         });
         if (error) throw error;
         if (!data.user) throw new Error("Usuário não foi criado.");
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .insert({
-            user_id: data.user.id,
-            tipo: input.tipo,
-            nome: input.nome,
-            telefone: input.telefone,
-            email: input.email,
-            cidade: input.cidade,
-            estado: input.estado,
-          })
           .select("id,user_id,tipo,nome,email,telefone")
+          .eq("user_id", data.user.id)
           .single();
         throwSupabaseError(profileError);
-        if (!profileData) throw new Error("Falha ao criar o perfil.");
-
-        const { error: initialRoleError } = await supabase.from("profile_roles").insert({
-          profile_id: profileData.id,
-          role: defaultRole(input.tipo),
-        });
-        throwSupabaseError(initialRoleError);
-
-        if (input.tipo === "comprador" && input.buyer) {
-          const { error: buyerError } = await supabase.from("buyers").insert({
-            profile_id: profileData.id,
-            nome_empresa: input.buyer.nomeEmpresa,
-            tipo_empresa: input.buyer.tipoEmpresa,
-            cnpj: input.buyer.cnpj,
-          });
-          throwSupabaseError(buyerError);
-        }
-
-        if (input.tipo === "produtor" && input.producer) {
-          const location = [input.cidade, input.estado].filter(Boolean).join(", ");
-          const { data: producerData, error: producerError } = await supabase
-            .from("producers")
-            .insert({
-              profile_id: profileData.id,
-              nome_propriedade: input.producer.nomePropriedade,
-              responsavel: input.producer.responsavel,
-              cnpj: null,
-              commercialization_mode: input.producer.commercializationMode,
-              localizacao: location || null,
-              categorias_atendidas: input.producer.produtos,
-            })
-            .select("id")
-            .single();
-          throwSupabaseError(producerError);
-          if (producerData) {
-            const { error: documentsError } = await supabase
-              .from("producer_commercial_documents")
-              .insert({
-                producer_id: producerData.id,
-                cnpj: input.producer.cnpj || null,
-                caepf: input.producer.caepf || null,
-                state_registration: input.producer.stateRegistration || null,
-              });
-            throwSupabaseError(documentsError);
-          }
-        }
-
-        if (input.organization) {
-          const cnpj = input.organization.cnpj.replace(/\D/g, "");
-          const { data: organization, error: organizationError } = await supabase
-            .from("organizations")
-            .insert({
-              type: input.organization.type,
-              legal_name: input.organization.legalName,
-              trade_name: input.organization.tradeName,
-              cnpj,
-              state_registration: input.organization.stateRegistration || null,
-              email: input.email,
-              phone: input.organization.phone,
-              address_line: input.organization.addressLine,
-              address_number: input.organization.addressNumber || null,
-              address_complement: input.organization.addressComplement || null,
-              neighborhood: input.organization.neighborhood || null,
-              city: input.cidade,
-              state: input.estado?.toUpperCase(),
-              postal_code: input.organization.postalCode.replace(/\D/g, ""),
-              responsible_name: input.organization.responsibleName,
-              responsible_role: input.organization.responsibleRole,
-              created_by: profileData.id,
-            })
-            .select("id")
-            .single();
-          throwSupabaseError(organizationError);
-          if (!organization) throw new Error("Não foi possível criar a organização.");
-          const { error: ownerError } = await supabase.from("organization_users").insert({
-            organization_id: organization.id,
-            profile_id: profileData.id,
-            role: "owner",
-            status: "active",
-          });
-          throwSupabaseError(ownerError);
-          if (input.tipo === "produtor") {
-            const { error: roleError } = await supabase
-              .from("profile_roles")
-              .insert({ profile_id: profileData.id, role: "gestor_organizacao" });
-            throwSupabaseError(roleError);
-          }
-        }
+        if (!profileData) throw new Error("Falha ao concluir o cadastro.");
 
         const nextProfile: AuthProfile = {
           id: profileData.id,

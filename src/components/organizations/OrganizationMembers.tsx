@@ -149,7 +149,7 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
                         }
                         className="h-4 w-4 accent-[var(--color-brand-900)]"
                       />
-                      Pode vender pelo CNPJ
+                      Pode comercializar pela organização
                     </label>
                     <button
                       type="button"

@@ -13,10 +13,10 @@ const links = [
   {
     to: "/directory/organizations",
     label: "Cooperativas",
-    profiles: ["comprador", "produtor", "admin"],
+    profiles: ["comprador", "admin"],
   },
   { to: "/orders", label: "Solicitações", profiles: ["comprador"] },
-  { to: "/producer/orders", label: "Negociações recebidas", profiles: ["produtor"] },
+  { to: "/producer/orders", label: "Negociações", profiles: ["produtor"] },
   { to: "/production", label: "Estoque", profiles: ["produtor"] },
   { to: "/demands", label: "Demandas", profiles: ["comprador", "produtor", "admin"] },
   { to: "/chats", label: "Mensagens", profiles: ["comprador", "produtor", "admin"] },
@@ -42,10 +42,10 @@ export function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
-        <div className="mx-auto flex h-full max-w-[1200px] items-center justify-between px-4 sm:px-8">
-          <div className="flex items-center gap-6 sm:gap-10">
+        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 xl:px-8">
+          <div className="flex min-w-0 items-center gap-4 xl:gap-8">
             <Logo compactOnMobile />
-            <nav className="hidden items-center gap-1 md:flex">
+            <nav className="hidden min-w-0 items-center gap-0.5 md:flex xl:gap-1">
               {links
                 .filter((link) => visible(link.profiles, profile?.tipo))
                 .filter(
@@ -56,7 +56,7 @@ export function Navbar() {
                   <Link
                     key={link.to}
                     to={link.to}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900"
+                    className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900 xl:px-3 xl:text-sm"
                     activeProps={{ className: "bg-secondary text-brand-900" }}
                   >
                     {link.label}

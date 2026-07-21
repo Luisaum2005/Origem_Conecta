@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UpdatePasswordRouteImport } from './routes/update-password'
 import { Route as TrackingRouteImport } from './routes/tracking'
 import { Route as ResetRouteImport } from './routes/reset'
 import { Route as RatingRouteImport } from './routes/rating'
@@ -32,6 +33,11 @@ import { Route as ProfileBuyerRouteImport } from './routes/profile.buyer'
 import { Route as ProducerOrdersRouteImport } from './routes/producer.orders'
 import { Route as DirectoryOrganizationsRouteImport } from './routes/directory.organizations'
 
+const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
+  id: '/update-password',
+  path: '/update-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrackingRoute = TrackingRouteImport.update({
   id: '/tracking',
   path: '/tracking',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
   '/tracking': typeof TrackingRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/update-password'
     | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
@@ -257,6 +267,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/update-password'
     | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '/rating'
     | '/reset'
     | '/tracking'
+    | '/update-password'
     | '/directory/organizations'
     | '/producer/orders'
     | '/profile/buyer'
@@ -306,6 +318,7 @@ export interface RootRouteChildren {
   RatingRoute: typeof RatingRoute
   ResetRoute: typeof ResetRoute
   TrackingRoute: typeof TrackingRoute
+  UpdatePasswordRoute: typeof UpdatePasswordRoute
   DirectoryOrganizationsRoute: typeof DirectoryOrganizationsRoute
   ProducerOrdersRoute: typeof ProducerOrdersRoute
   ProfileBuyerRoute: typeof ProfileBuyerRoute
@@ -318,6 +331,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/update-password': {
+      id: '/update-password'
+      path: '/update-password'
+      fullPath: '/update-password'
+      preLoaderRoute: typeof UpdatePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tracking': {
       id: '/tracking'
       path: '/tracking'
@@ -490,6 +510,7 @@ const rootRouteChildren: RootRouteChildren = {
   RatingRoute: RatingRoute,
   ResetRoute: ResetRoute,
   TrackingRoute: TrackingRoute,
+  UpdatePasswordRoute: UpdatePasswordRoute,
   DirectoryOrganizationsRoute: DirectoryOrganizationsRoute,
   ProducerOrdersRoute: ProducerOrdersRoute,
   ProfileBuyerRoute: ProfileBuyerRoute,
