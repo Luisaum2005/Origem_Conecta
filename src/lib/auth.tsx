@@ -10,7 +10,6 @@ import {
 import { buildSignupPayload } from "@/lib/signup-payload";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 const LOCAL_PROFILE_KEY = "origem-conecta-auth-profile";
-const adminInviteCode = import.meta.env.VITE_ADMIN_INVITE_CODE as string | undefined;
 
 function defaultRole(tipo: ProfileType): ProfileRole {
   return tipo === "organizacao" ? "gestor_organizacao" : tipo;
@@ -104,14 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!supabase) {
           const tipo: ProfileType = email.toLowerCase().includes("produtor")
             ? "produtor"
-            : email.toLowerCase().includes("admin")
-              ? "admin"
-              : "comprador";
+            : "comprador";
           const localProfile: AuthProfile = {
             id: `local-${tipo}`,
             userId: `local-user-${tipo}`,
             tipo,
-            nome: tipo === "produtor" ? "Produtor" : tipo === "admin" ? "Admin" : "Comprador",
+            nome: tipo === "produtor" ? "Produtor" : "Comprador",
             email,
             roles: [defaultRole(tipo)],
           };
@@ -155,11 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return nextProfile;
       },
       signUp: async (input) => {
-        if (
-          input.tipo === "admin" &&
-          (!adminInviteCode || input.adminInviteCode !== adminInviteCode)
-        ) {
-          throw new Error("Codigo de convite administrativo invalido.");
+        if (input.tipo === "admin") {
+          throw new Error("O cadastro público de administrador não está disponível.");
         }
 
         if (!supabase) {

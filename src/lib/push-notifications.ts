@@ -15,6 +15,19 @@ function decodeKey(value: string) {
   const raw = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
 }
+
+export function validateVapidPublicKey(value?: string) {
+  if (!value) return "A chave pública VAPID não foi configurada.";
+  try {
+    const decoded = decodeKey(value.trim());
+    if (decoded.length !== 65 || decoded[0] !== 4) {
+      return "A chave pública VAPID possui formato inválido.";
+    }
+    return null;
+  } catch {
+    return "A chave pública VAPID não é uma chave Base64 URL válida.";
+  }
+}
 async function persistSubscription(subscription: PushSubscription) {
   const json = subscription.toJSON();
   if (!json.keys?.p256dh || !json.keys?.auth) {
@@ -41,7 +54,8 @@ export async function enablePush(userId: string) {
   if (!supportsPush()) throw new Error("Este navegador não oferece suporte a notificações push.");
   if (!userId) throw new Error("Usuário não identificado.");
   const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-  if (!publicKey) throw new Error("A chave pública VAPID ainda não foi configurada.");
+  const configurationError = validateVapidPublicKey(publicKey);
+  if (configurationError) throw new Error(configurationError);
   const permission = await Notification.requestPermission();
   if (permission !== "granted")
     throw new Error(
@@ -54,7 +68,7 @@ export async function enablePush(userId: string) {
     (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: decodeKey(publicKey),
+      applicationServerKey: decodeKey(publicKey!),
     }));
   await persistSubscription(subscription);
   return "enabled" as const;

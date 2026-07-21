@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { AccessibilityControls } from "@/components/layout/AccessibilityControls";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function AuthLayout({
   title,
@@ -150,5 +150,24 @@ export function PrimaryButton({
     >
       {loading ? "Enviando..." : children}
     </button>
+  );
+}
+
+export function FormError({ children }: { children?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (children) ref.current?.focus();
+  }, [children]);
+  if (!children) return null;
+  return (
+    <div
+      ref={ref}
+      role="alert"
+      tabIndex={-1}
+      className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)] outline-none focus:ring-2 focus:ring-red-300"
+    >
+      {children}
+      <span className="mt-1 block text-xs">Revise os campos acima e tente novamente.</span>
+    </div>
   );
 }

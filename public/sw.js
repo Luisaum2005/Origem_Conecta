@@ -1,12 +1,33 @@
-// Minimal service worker so the app meets PWA installability requirements.
+const CACHE_NAME = "origem-conecta-v2";
+const APP_SHELL = ["/", "/login", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+        ),
+      self.clients.claim(),
+    ]),
+  );
 });
-self.addEventListener("fetch", () => {
-  // network-first, no caching for now
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin)
+    return;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok)
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+        return response;
+      })
+      .catch(async () => (await caches.match(event.request)) || (await caches.match("/"))),
+  );
 });
 self.addEventListener("push", (event) => {
   let payload = { title: "Origem Conecta", body: "Você tem uma nova atualização.", url: "/" };

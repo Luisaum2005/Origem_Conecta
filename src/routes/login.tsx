@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
+import { AuthLayout, Field, FormError, PrimaryButton } from "@/components/auth/AuthShell";
 import { getProfileHome, useAuth } from "@/lib/auth";
 import { useState, type FormEvent } from "react";
 
@@ -46,18 +46,29 @@ function Login() {
       title="Entrar na Origem Conecta"
       subtitle="Acesse sua conta para acompanhar portfólio, pedidos, solicitações e estoque."
       footer={
-        <>
-          Novo por aqui?{" "}
-          <Link to="/signup/buyer" className="font-semibold text-brand-900 hover:underline">
-            Criar conta de comprador
-          </Link>
-        </>
+        <div className="space-y-3">
+          <p className="font-medium text-brand-900">Ainda não possui uma conta?</p>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+            <Link to="/signup/buyer" className="font-semibold text-brand-900 hover:underline">
+              Sou comprador
+            </Link>
+            <Link to="/signup/producer" className="font-semibold text-brand-900 hover:underline">
+              Sou produtor
+            </Link>
+            <Link
+              to="/signup/organization"
+              className="font-semibold text-brand-900 hover:underline"
+            >
+              Represento uma cooperativa ou associação
+            </Link>
+          </div>
+        </div>
       }
     >
       {!isSupabaseConfigured && (
         <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
           Modo local ativo. Use qualquer e-mail e senha para testar. E-mails com "produtor" entram
-          como produtor; com "admin", como admin.
+          como produtor; os demais entram como comprador.
         </div>
       )}
       <form className="space-y-5" onSubmit={onSubmit}>
@@ -82,11 +93,7 @@ function Login() {
             Esqueci a senha
           </Link>
         </div>
-        {error && (
-          <p className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
-            {error}
-          </p>
-        )}
+        <FormError>{error}</FormError>
         <PrimaryButton loading={loading}>Entrar</PrimaryButton>
       </form>
     </AuthLayout>

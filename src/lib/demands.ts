@@ -220,7 +220,8 @@ async function loadRemoteDemands(
   let query = supabase
     .from("demand_requests")
     .select(select)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(100);
 
   if (profileType === "comprador") {
     const buyer = await getBuyer(profileId);

@@ -24,7 +24,7 @@ function Organizations() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-brand-900">Cooperativas e associações</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Acompanhe o cadastro e a aprovação das organizações que você administra.
+          Gerencie as organizações vinculadas à sua conta e acompanhe a verificação cadastral.
         </p>
         {loading ? (
           <p className="mt-8 rounded-2xl border border-border bg-white p-6">

@@ -139,7 +139,8 @@ async function loadInventory(producerId?: string | null) {
     .select(
       "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,seller_organization_id,seller_organization_name,seller_organization_cnpj,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel,commercialization_mode,commercial_verification_status)",
     )
-    .order("atualizado_em", { ascending: false });
+    .order("atualizado_em", { ascending: false })
+    .limit(100);
 
   if (producerId) {
     query = query.eq("producer_id", producerId);
@@ -154,7 +155,8 @@ async function loadInventory(producerId?: string | null) {
       .select(
         "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo",
       )
-      .order("atualizado_em", { ascending: false });
+      .order("atualizado_em", { ascending: false })
+      .limit(100);
 
     if (producerId) {
       fallbackQuery = fallbackQuery.eq("producer_id", producerId);

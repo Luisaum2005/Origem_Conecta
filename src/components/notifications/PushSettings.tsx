@@ -1,5 +1,11 @@
 import { useAuth } from "@/lib/auth";
-import { disablePush, enablePush, getPushState, type PushState } from "@/lib/push-notifications";
+import {
+  disablePush,
+  enablePush,
+  getPushState,
+  validateVapidPublicKey,
+  type PushState,
+} from "@/lib/push-notifications";
 import { BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -8,6 +14,9 @@ export function PushSettings() {
   const [state, setState] = useState<PushState>("default");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const configurationError = validateVapidPublicKey(
+    import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined,
+  );
   useEffect(() => {
     if (!profile || !isSupabaseConfigured) return;
     let active = true;
@@ -65,7 +74,11 @@ export function PushSettings() {
             type="button"
             onClick={toggle}
             disabled={
-              busy || state === "unsupported" || state === "denied" || !isSupabaseConfigured
+              busy ||
+              state === "unsupported" ||
+              state === "denied" ||
+              !isSupabaseConfigured ||
+              Boolean(configurationError)
             }
             className="mt-4 h-10 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white disabled:bg-gray-300"
           >
@@ -83,6 +96,11 @@ export function PushSettings() {
           {state === "unsupported" && (
             <p className="mt-2 text-xs text-muted-foreground">
               Este navegador não oferece suporte a Web Push.
+            </p>
+          )}
+          {configurationError && (
+            <p className="mt-2 text-xs text-orange-700" role="alert">
+              {configurationError} O servidor também precisa ter as chaves privadas correspondentes.
             </p>
           )}
           {notice && (

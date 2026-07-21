@@ -17,6 +17,12 @@ const items = [
   { to: "/producer/orders", label: "Negociações", icon: ClipboardList, profiles: ["produtor"] },
   { to: "/production", label: "Estoque", icon: Package, profiles: ["produtor"] },
   {
+    to: "/directory/organizations",
+    label: "Cooperativas",
+    icon: Building2,
+    profiles: ["comprador"],
+  },
+  {
     to: "/demands",
     label: "Demandas",
     icon: Megaphone,
@@ -44,7 +50,7 @@ export function BottomNav() {
       : profile
         ? getProfileHome(profile.tipo)
         : "/login";
-  const visibleItems = profile
+  const candidateItems = profile
     ? [
         ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),
         ...(profile.roles?.includes("gestor_organizacao")
@@ -53,10 +59,13 @@ export function BottomNav() {
         { to: profilePath, label: "Perfil", icon: User },
       ]
     : [{ to: "/login", label: "Entrar", icon: User }];
+  const visibleItems = candidateItems.filter(
+    (item, index, all) => all.findIndex((candidate) => candidate.to === item.to) === index,
+  );
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white/95 backdrop-blur md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white/95 backdrop-blur lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegação principal"
     >
@@ -68,6 +77,7 @@ export function BottomNav() {
             <li key={item.to} className="flex-1">
               <Link
                 to={item.to}
+                aria-current={isActive ? "page" : undefined}
                 className="relative flex h-full min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95"
               >
                 <span

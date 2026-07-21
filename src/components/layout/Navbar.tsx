@@ -6,7 +6,7 @@ import { SupportButton } from "@/components/layout/SupportButton";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
 import { Bell, LogOut, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const links = [
   { to: "/portfolio", label: "Portfólio", profiles: ["comprador"] },
@@ -31,6 +31,8 @@ export function Navbar() {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const notificationButtonRef = useRef<HTMLButtonElement>(null);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
     useNotifications(profile?.userId);
   const profilePath =
@@ -39,13 +41,36 @@ export function Navbar() {
       : profile
         ? getProfileHome(profile.tipo)
         : "/login";
+  useEffect(() => {
+    if (!open) return;
+    const panel = notificationPanelRef.current;
+    const firstFocusable = panel?.querySelector<HTMLElement>("button, a[href]");
+    firstFocusable?.focus();
+    const close = () => {
+      setOpen(false);
+      notificationButtonRef.current?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!panel?.contains(target) && !notificationButtonRef.current?.contains(target)) close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
   return (
     <>
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
         <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-4 xl:gap-8">
             <Logo compactOnMobile />
-            <nav className="hidden min-w-0 items-center gap-0.5 md:flex xl:gap-1">
+            <nav className="hidden min-w-0 items-center gap-0.5 lg:flex xl:gap-1">
               {links
                 .filter((link) => visible(link.profiles, profile?.tipo))
                 .filter(
@@ -69,6 +94,7 @@ export function Navbar() {
             <AccessibilityControls />
             <div className="relative">
               <button
+                ref={notificationButtonRef}
                 type="button"
                 onClick={() => setOpen(!open)}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
@@ -83,7 +109,13 @@ export function Navbar() {
                 )}
               </button>
               {open && (
-                <div className="fixed inset-x-3 top-[70px] z-50 overflow-hidden rounded-2xl border border-border bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[380px]">
+                <div
+                  ref={notificationPanelRef}
+                  role="dialog"
+                  aria-modal="false"
+                  aria-label="Notificações"
+                  className="fixed inset-x-3 top-[70px] z-50 overflow-hidden rounded-2xl border border-border bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[380px]"
+                >
                   <div className="flex items-center justify-between border-b border-border px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-brand-900">Notificações</p>
@@ -148,7 +180,7 @@ export function Navbar() {
                 </div>
               )}
             </div>
-            <div className="relative md:hidden">
+            <div className="relative lg:hidden">
               <button
                 type="button"
                 onClick={() => setAccountOpen((current) => !current)}
@@ -184,7 +216,7 @@ export function Navbar() {
             </div>
             <Link
               to={profilePath}
-              className="hidden h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900 md:inline-flex"
+              className="hidden h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900 lg:inline-flex"
             >
               <User className="h-4 w-4" />
               <span>{profile?.nome ?? "Entrar"}</span>
@@ -193,7 +225,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="hidden h-10 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-secondary md:inline-flex md:items-center"
+                className="hidden h-10 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-secondary lg:inline-flex lg:items-center"
               >
                 Sair
               </button>

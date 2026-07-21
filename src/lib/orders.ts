@@ -277,12 +277,17 @@ async function loadRemoteOrders(
       .from("orders")
       .select(select)
       .eq("order_items.producer_id", producerId)
-      .order("criado_em", { ascending: false });
+      .order("criado_em", { ascending: false })
+      .limit(100);
     if (error) throw error;
     return (data ?? []).map((order) => mapRemoteOrder(order as unknown as RemoteOrder));
   }
 
-  let query = supabase.from("orders").select(select).order("criado_em", { ascending: false });
+  let query = supabase
+    .from("orders")
+    .select(select)
+    .order("criado_em", { ascending: false })
+    .limit(100);
 
   if (profileType === "comprador") {
     const buyerId = await getBuyerId(profileId);
