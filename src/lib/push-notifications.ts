@@ -15,15 +15,31 @@ function decodeKey(value: string) {
   const raw = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
 }
-export async function getPushState(): Promise<PushState> {
+async function persistSubscription(subscription: PushSubscription) {
+  const json = subscription.toJSON();
+  if (!json.keys?.p256dh || !json.keys?.auth) {
+    throw new Error("A inscrição de notificações deste navegador está incompleta.");
+  }
+  const { error } = await assertSupabaseConfigured().rpc("register_push_subscription", {
+    p_endpoint: subscription.endpoint,
+    p_p256dh: json.keys.p256dh,
+    p_auth: json.keys.auth,
+    p_user_agent: navigator.userAgent,
+  });
+  throwSupabaseError(error);
+}
+
+export async function getPushState(userId?: string): Promise<PushState> {
   if (!supportsPush()) return "unsupported";
   if (Notification.permission === "denied") return "denied";
   const registration = await navigator.serviceWorker.register("/sw.js");
   const subscription = await registration.pushManager.getSubscription();
+  if (subscription && userId) await persistSubscription(subscription);
   return subscription ? "enabled" : Notification.permission === "default" ? "default" : "disabled";
 }
 export async function enablePush(userId: string) {
   if (!supportsPush()) throw new Error("Este navegador não oferece suporte a notificações push.");
+  if (!userId) throw new Error("Usuário não identificado.");
   const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
   if (!publicKey) throw new Error("A chave pública VAPID ainda não foi configurada.");
   const permission = await Notification.requestPermission();
@@ -40,20 +56,7 @@ export async function enablePush(userId: string) {
       userVisibleOnly: true,
       applicationServerKey: decodeKey(publicKey),
     }));
-  const json = subscription.toJSON();
-  const { error } = await assertSupabaseConfigured().from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint: subscription.endpoint,
-      p256dh: json.keys?.p256dh,
-      auth: json.keys?.auth,
-      user_agent: navigator.userAgent,
-      is_active: true,
-      failure_count: 0,
-    },
-    { onConflict: "endpoint" },
-  );
-  throwSupabaseError(error);
+  await persistSubscription(subscription);
   return "enabled" as const;
 }
 export async function disablePush() {

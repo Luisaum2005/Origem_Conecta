@@ -207,25 +207,6 @@ async function loadSalesOrganizations() {
 async function syncProducerInventory(producerId: string, items: ProducerStockItem[]) {
   if (!supabase) return;
 
-  const { data: currentRows, error: currentError } = await supabase
-    .from("producer_inventory")
-    .select("id")
-    .eq("producer_id", producerId);
-  if (currentError) throw currentError;
-
-  const nextIds = new Set(items.map((item) => item.id).filter(Boolean));
-  const removedIds = (currentRows ?? [])
-    .map((row) => row.id as string)
-    .filter((id) => !nextIds.has(id));
-
-  if (removedIds.length) {
-    const { error: deleteError } = await supabase
-      .from("producer_inventory")
-      .delete()
-      .in("id", removedIds);
-    if (deleteError) throw deleteError;
-  }
-
   if (!items.length) return;
 
   const payload = items.map((item) => ({
@@ -267,6 +248,16 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     .update({ categorias_atendidas: suppliedProducts })
     .eq("id", producerId);
   if (categoriesError) throw categoriesError;
+}
+
+async function deleteRemoteInventory(producerId: string, itemId: string) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from("producer_inventory")
+    .delete()
+    .eq("id", itemId)
+    .eq("producer_id", producerId);
+  if (error) throw error;
 }
 
 function extensionFromFile(file: File) {
@@ -433,6 +424,17 @@ export function useProducerStock() {
     [isSupabaseConfigured, producerId],
   );
 
+  const deleteItem = useCallback(
+    async (itemId: string) => {
+      if (supabase && isSupabaseConfigured) {
+        if (!producerId) throw new Error("Cadastro de produtor não encontrado.");
+        await deleteRemoteInventory(producerId, itemId);
+      }
+      setItemsState((current) => current.filter((item) => item.id !== itemId));
+    },
+    [isSupabaseConfigured, producerId],
+  );
+
   return [
     items,
     setItems,
@@ -440,6 +442,7 @@ export function useProducerStock() {
       uploadImage: (file: File, itemId: string) => uploadMedia(file, itemId, "image"),
       uploadVideo: (file: File, itemId: string) => uploadMedia(file, itemId, "video"),
       canUploadRemoteImage: Boolean(producerId),
+      deleteItem,
       salesOrganizations,
     },
   ] as const;

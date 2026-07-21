@@ -46,7 +46,8 @@ function organizationOptionLabel(organization: SalesOrganization) {
 }
 
 function Production() {
-  const [items, setItems, { uploadImage, uploadVideo, salesOrganizations }] = useProducerStock();
+  const [items, setItems, { uploadImage, uploadVideo, deleteItem, salesOrganizations }] =
+    useProducerStock();
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -94,9 +95,14 @@ function Production() {
     setVideoError("");
   };
 
-  const remove = (id: string) => {
-    setItems((current) => current.filter((item) => item.id !== id));
-    if (editingId === id) cancelEdit();
+  const remove = async (item: ProducerStockItem) => {
+    if (!window.confirm(`Excluir "${item.product}"? Esta ação não poderá ser desfeita.`)) return;
+    try {
+      await deleteItem(item.id);
+      if (editingId === item.id) cancelEdit();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Não foi possível excluir o produto.");
+    }
   };
 
   const handleVideoChange = async (file?: File) => {
@@ -187,7 +193,7 @@ function Production() {
                     key={item.id}
                     item={item}
                     onEdit={() => edit(item)}
-                    onDelete={() => remove(item.id)}
+                    onDelete={() => void remove(item)}
                     onToggleStatus={() => toggleStatus(item.id)}
                     editing={editingId === item.id}
                   />

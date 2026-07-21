@@ -6,8 +6,8 @@ import {
   type ProfileRole,
   type ProfileType,
   type SignInInput,
-  type SignUpInput,
 } from "@/lib/auth-context";
+import { buildSignupPayload } from "@/lib/signup-payload";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 const LOCAL_PROFILE_KEY = "origem-conecta-auth-profile";
 const adminInviteCode = import.meta.env.VITE_ADMIN_INVITE_CODE as string | undefined;
@@ -187,16 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return localProfile;
         }
 
-        const signupPayload = {
-          tipo: input.tipo,
-          nome: input.nome,
-          telefone: input.telefone,
-          cidade: input.cidade,
-          estado: input.estado,
-          buyer: input.buyer,
-          producer: input.producer,
-          organization: input.organization,
-        };
+        const signupPayload = buildSignupPayload(input);
         const { data, error } = await supabase.auth.signUp({
           email: input.email,
           password: input.password,

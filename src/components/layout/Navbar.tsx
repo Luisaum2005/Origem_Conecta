@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { SupportButton } from "@/components/layout/SupportButton";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
-import { Bell, User } from "lucide-react";
+import { Bell, LogOut, User } from "lucide-react";
 import { useState } from "react";
 
 const links = [
@@ -30,9 +30,9 @@ function visible(profiles: readonly ProfileType[], type?: ProfileType) {
 export function Navbar() {
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
-  const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications(
-    profile?.userId,
-  );
+  const [accountOpen, setAccountOpen] = useState(false);
+  const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
+    useNotifications(profile?.userId);
   const profilePath =
     profile?.tipo === "comprador"
       ? "/profile/buyer"
@@ -101,6 +101,17 @@ export function Navbar() {
                   </div>
                   {loading ? (
                     <p className="px-4 py-5 text-sm text-muted-foreground">Carregando...</p>
+                  ) : error ? (
+                    <div className="px-4 py-5 text-sm text-red-700" role="alert">
+                      <p>{error}</p>
+                      <button
+                        type="button"
+                        onClick={() => void refresh()}
+                        className="mt-3 font-semibold underline"
+                      >
+                        Tentar novamente
+                      </button>
+                    </div>
                   ) : notifications.length === 0 ? (
                     <p className="px-4 py-5 text-sm text-muted-foreground">
                       Nenhuma notificação ainda.
@@ -137,12 +148,46 @@ export function Navbar() {
                 </div>
               )}
             </div>
+            <div className="relative md:hidden">
+              <button
+                type="button"
+                onClick={() => setAccountOpen((current) => !current)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-brand-900"
+                aria-label="Abrir opções da conta"
+                aria-expanded={accountOpen}
+              >
+                <User className="h-5 w-5" />
+              </button>
+              {accountOpen && (
+                <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-border bg-white p-2 shadow-lg">
+                  <p className="truncate px-3 py-2 text-sm font-semibold text-brand-900">
+                    {profile?.nome ?? "Minha conta"}
+                  </p>
+                  <Link
+                    to={profilePath}
+                    onClick={() => setAccountOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-brand-900 hover:bg-secondary"
+                  >
+                    <User className="h-5 w-5" /> Meu perfil
+                  </Link>
+                  {profile && (
+                    <button
+                      type="button"
+                      onClick={() => void signOut()}
+                      className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      <LogOut className="h-5 w-5" /> Sair da conta
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <Link
               to={profilePath}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900"
+              className="hidden h-10 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-medium text-brand-900 md:inline-flex"
             >
               <User className="h-4 w-4" />
-              <span className="hidden md:inline">{profile?.nome ?? "Entrar"}</span>
+              <span>{profile?.nome ?? "Entrar"}</span>
             </Link>
             {profile && (
               <button

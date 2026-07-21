@@ -9,8 +9,24 @@ export function PushSettings() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   useEffect(() => {
-    void getPushState().then(setState);
-  }, []);
+    if (!profile || !isSupabaseConfigured) return;
+    let active = true;
+    getPushState(profile.userId)
+      .then((nextState) => {
+        if (active) setState(nextState);
+      })
+      .catch((error) => {
+        if (active)
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível verificar as notificações neste dispositivo.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [isSupabaseConfigured, profile]);
   const toggle = async () => {
     if (!profile || !isSupabaseConfigured) return;
     setBusy(true);
@@ -28,7 +44,7 @@ export function PushSettings() {
       setNotice(
         error instanceof Error ? error.message : "Não foi possível alterar as notificações.",
       );
-      setState(await getPushState());
+      setState(await getPushState(profile.userId));
     } finally {
       setBusy(false);
     }

@@ -32,7 +32,7 @@ function SignupBuyer() {
         estado: String(form.get("uf") ?? ""),
         buyer: {
           nomeEmpresa: String(form.get("nomeEmpresa") ?? ""),
-          tipoEmpresa: "Restaurante",
+          tipoEmpresa: String(form.get("tipoEmpresa") ?? ""),
           cnpj: String(form.get("cnpj") ?? ""),
         },
       });

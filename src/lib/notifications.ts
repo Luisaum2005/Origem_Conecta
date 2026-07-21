@@ -27,20 +27,30 @@ function mapNotification(row: Record<string, unknown>): AppNotification {
 export function useNotifications(userId?: string) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(Boolean(supabase && userId));
+  const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     if (!supabase || !userId) {
       setNotifications([]);
       setLoading(false);
+      setError("");
       return;
     }
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("id,type,title,body,data,read_at,created_at")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    throwSupabaseError(error);
-    setNotifications((data ?? []).map(mapNotification));
-    setLoading(false);
+    setLoading(true);
+    setError("");
+    try {
+      const { data, error: loadError } = await supabase
+        .from("notifications")
+        .select("id,type,title,body,data,read_at,created_at")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      throwSupabaseError(loadError);
+      setNotifications((data ?? []).map(mapNotification));
+    } catch (loadError) {
+      console.error("Não foi possível carregar as notificações.", loadError);
+      setError("Não foi possível carregar as notificações. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
   useEffect(() => {
     void refresh();
@@ -58,24 +68,43 @@ export function useNotifications(userId?: string) {
     };
   }, [refresh, userId]);
   const markRead = async (id: string) => {
-    const client = assertSupabaseConfigured();
-    const { error } = await client.rpc("mark_notification_read", { p_notification_id: id });
-    throwSupabaseError(error);
-    setNotifications((items) =>
-      items.map((item) => (item.id === id ? { ...item, readAt: new Date().toISOString() } : item)),
-    );
+    try {
+      const client = assertSupabaseConfigured();
+      const { error: updateError } = await client.rpc("mark_notification_read", {
+        p_notification_id: id,
+      });
+      throwSupabaseError(updateError);
+      setNotifications((items) =>
+        items.map((item) =>
+          item.id === id ? { ...item, readAt: new Date().toISOString() } : item,
+        ),
+      );
+      return true;
+    } catch (updateError) {
+      console.error("Não foi possível marcar a notificação como lida.", updateError);
+      setError("Não foi possível atualizar a notificação.");
+      return false;
+    }
   };
   const markAllRead = async () => {
-    const client = assertSupabaseConfigured();
-    const { error } = await client.rpc("mark_all_notifications_read");
-    throwSupabaseError(error);
-    const now = new Date().toISOString();
-    setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? now })));
+    try {
+      const client = assertSupabaseConfigured();
+      const { error: updateError } = await client.rpc("mark_all_notifications_read");
+      throwSupabaseError(updateError);
+      const now = new Date().toISOString();
+      setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? now })));
+      return true;
+    } catch (updateError) {
+      console.error("Não foi possível marcar todas as notificações como lidas.", updateError);
+      setError("Não foi possível atualizar as notificações.");
+      return false;
+    }
   };
   return {
     notifications,
     unreadCount: notifications.filter((item) => !item.readAt).length,
     loading,
+    error,
     refresh,
     markRead,
     markAllRead,

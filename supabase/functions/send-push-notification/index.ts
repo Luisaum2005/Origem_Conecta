@@ -60,23 +60,42 @@ Deno.serve(async (request) => {
     webpush.setVapidDetails(subject, vapidPublic, vapidPrivate);
     let sent = 0;
     let failed = 0;
+    let attempts = 0;
+    const failureMessages: string[] = [];
     await Promise.all(
       (subscriptions ?? []).map(async (subscription) => {
-        try {
-          await webpush.sendNotification(
-            {
-              endpoint: subscription.endpoint,
-              keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-            },
-            JSON.stringify({
-              title: notification.title,
-              body: notification.body,
-              url: notification.data?.url ?? "/",
-              notificationId: notification.id,
-            }),
-            { TTL: 3600 },
-          );
-          sent++;
+        let delivered = false;
+        let lastError: unknown;
+        let lastStatus = 0;
+        for (let attempt = 1; attempt <= 3 && !delivered; attempt++) {
+          attempts++;
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: subscription.endpoint,
+                keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+              },
+              JSON.stringify({
+                title: notification.title,
+                body: notification.body,
+                url: notification.data?.url ?? "/",
+                notificationId: notification.id,
+              }),
+              { TTL: 3600 },
+            );
+            delivered = true;
+          } catch (error) {
+            lastError = error;
+            lastStatus =
+              typeof error === "object" && error && "statusCode" in error
+                ? Number(error.statusCode)
+                : 0;
+            if (lastStatus === 404 || lastStatus === 410) break;
+            if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+          }
+        }
+        if (delivered) {
+          sent += 1;
           await supabase
             .from("push_subscriptions")
             .update({
@@ -85,16 +104,17 @@ Deno.serve(async (request) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", subscription.id);
-        } catch (error) {
-          failed++;
-          const status =
-            typeof error === "object" && error && "statusCode" in error
-              ? Number(error.statusCode)
-              : 0;
+        } else {
+          failed += 1;
+          const detail =
+            lastError instanceof Error
+              ? lastError.message
+              : `Falha HTTP ${lastStatus || "desconhecida"}`;
+          failureMessages.push(detail.slice(0, 300));
           await supabase
             .from("push_subscriptions")
             .update({
-              is_active: status === 404 || status === 410 ? false : true,
+              is_active: lastStatus === 404 || lastStatus === 410 ? false : true,
               failure_count: subscription.failure_count ? subscription.failure_count + 1 : 1,
               last_failure_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -107,7 +127,12 @@ Deno.serve(async (request) => {
       sent && failed ? "partial" : sent ? "sent" : subscriptions?.length ? "failed" : "skipped";
     await supabase
       .from("notifications")
-      .update({ push_status: status, push_attempted_at: new Date().toISOString() })
+      .update({
+        push_status: status,
+        push_attempted_at: new Date().toISOString(),
+        push_attempt_count: attempts,
+        push_last_error: failureMessages.length ? failureMessages.join(" | ").slice(0, 1000) : null,
+      })
       .eq("id", notification.id);
     return new Response(JSON.stringify({ sent, failed, status }), { headers });
   } catch (error) {
