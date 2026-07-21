@@ -221,11 +221,12 @@ async function updateRemoteQuoteStatus(id: string, status: QuoteStatus) {
 
 export function useQuoteRequests() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const [quotes, setQuotes] = useState<QuoteRequest[]>(readQuoteRequests);
+  const [quotes, setQuotes] = useState<QuoteRequest[]>(() => (supabase ? [] : readQuoteRequests()));
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(QUOTE_REQUESTS_STORAGE_KEY, JSON.stringify(quotes));
-  }, [quotes]);
+  }, [isSupabaseConfigured, quotes]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || !profile) return;

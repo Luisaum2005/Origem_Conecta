@@ -12,7 +12,7 @@ export function FormProgress({
   const pct = (step / total) * 100;
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+      <div className="flex flex-col items-start gap-1 text-sm font-medium text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
           Etapa {step} de {total}
         </span>

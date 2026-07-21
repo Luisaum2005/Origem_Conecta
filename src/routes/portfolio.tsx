@@ -116,7 +116,7 @@ function Portfolio() {
           className="fixed bottom-[92px] left-1/2 z-40 inline-flex h-14 max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-brand-900 px-5 text-base font-semibold text-white shadow-md transition-all hover:bg-brand-800 hover:shadow-lg md:bottom-6 md:px-6"
         >
           <ShoppingBag className="h-5 w-5" />
-          Ver pedido
+          Ver lista de interesse
           <span className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-orange-600 px-2 text-sm font-bold">
             {totalItems.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </span>

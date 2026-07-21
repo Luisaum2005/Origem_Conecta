@@ -1,6 +1,6 @@
 import { SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 type SupplierProductPickerProps = {
   value: string[];
@@ -15,6 +15,8 @@ export function SupplierProductPicker({
 }: SupplierProductPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const labelId = useId();
+  const listboxId = useId();
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return SUPPLIER_PRODUCT_GROUPS;
@@ -31,13 +33,17 @@ export function SupplierProductPicker({
 
   return (
     <div>
-      <span className="block text-sm font-medium text-brand-900">
+      <span id={labelId} className="block text-sm font-medium text-brand-900">
         O que você produz ou fornece?
         {required && <span className="ml-1 text-orange-600">*</span>}
       </span>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
+        aria-labelledby={labelId}
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-haspopup="listbox"
         className="mt-2 flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left text-sm text-brand-900 hover:border-leaf-500"
       >
         <span className="truncate text-muted-foreground">
@@ -60,7 +66,7 @@ export function SupplierProductPicker({
                 type="button"
                 onClick={() => toggle(product)}
                 aria-label={`Remover ${product}`}
-                className="hover:text-orange-600"
+                className="grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white hover:text-orange-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -78,10 +84,19 @@ export function SupplierProductPicker({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar produto"
+              aria-label="Buscar produto na lista"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setOpen(false);
+              }}
               className="h-9 w-full bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
             />
           </div>
-          <div className="max-h-72 overflow-y-auto py-2">
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-multiselectable="true"
+            className="max-h-72 overflow-y-auto py-2"
+          >
             {filtered.length === 0 && (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                 Produto não encontrado. Entre em contato com o suporte para solicitar a inclusão.
@@ -100,6 +115,8 @@ export function SupplierProductPicker({
                         <button
                           type="button"
                           onClick={() => toggle(product)}
+                          role="option"
+                          aria-selected={active}
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
                             active ? "bg-leaf-100 text-brand-900" : "text-brand-900 hover:bg-canvas"
                           }`}

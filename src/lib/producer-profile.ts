@@ -159,12 +159,15 @@ async function updateRemoteProducerProfile(profileId: string, details: ProducerP
 
 export function useProducerProfileDetails() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const [details, setDetails] = useState<ProducerProfileDetails>(readStoredProfile);
+  const [details, setDetails] = useState<ProducerProfileDetails>(() =>
+    supabase ? DEFAULT_PRODUCER_PROFILE : readStoredProfile(),
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(PRODUCER_PROFILE_STORAGE_KEY, JSON.stringify(details));
-  }, [details]);
+  }, [details, isSupabaseConfigured]);
 
   useEffect(() => {
     if (profile?.tipo !== "produtor") return;

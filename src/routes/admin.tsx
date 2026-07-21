@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useDemandRequests } from "@/lib/demands";
 import { formatOrderDate, type OrderStatus, useOrders } from "@/lib/orders";
@@ -40,8 +51,6 @@ function Admin() {
 
   const clearLocalTestData = () => {
     if (typeof window === "undefined") return;
-    const confirmed = window.confirm("Limpar todos os dados locais de teste deste navegador?");
-    if (!confirmed) return;
     Object.keys(window.localStorage)
       .filter((key) => key.startsWith("origem-conecta-"))
       .forEach((key) => window.localStorage.removeItem(key));
@@ -303,14 +312,33 @@ function Admin() {
                 Remove apenas os dados salvos neste navegador. Dados reais no Supabase devem ser
                 apagados pelo painel do Supabase.
               </p>
-              <button
-                type="button"
-                onClick={clearLocalTestData}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
-              >
-                <Trash2 className="h-4 w-4" />
-                Limpar dados locais
-              </button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
+                  >
+                    <Trash2 className="h-4 w-4" /> Limpar dados locais
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Limpar dados locais?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Serão removidos somente os dados de teste deste navegador.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={clearLocalTestData}
+                      className="bg-red-700 text-white hover:bg-red-800"
+                    >
+                      Limpar dados
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </Panel>
           </div>
         </section>

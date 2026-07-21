@@ -479,7 +479,7 @@ function ChatRoom() {
                 to={isBuyer ? "/orders" : "/producer/orders"}
                 className="font-bold text-leaf-700 hover:underline hover:text-leaf-800"
               >
-                Ver pedido
+                Ver solicitação
               </Link>
             ) : (
               <Link
@@ -615,6 +615,7 @@ function ChatRoom() {
         <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 md:static md:border-x-0">
           <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
             <textarea
+              aria-label="Mensagem da negociação"
               value={inputText}
               onChange={(e) => setInputText(e.target.value.slice(0, 2000))}
               onKeyDown={handleKeyDown}
@@ -624,14 +625,17 @@ function ChatRoom() {
               style={{ height: "auto" }}
             />
             <div className="flex flex-col justify-end shrink-0 gap-1.5">
-              <span className="text-[10px] text-muted-foreground text-right px-1 select-none">
+              <span
+                className="px-1 text-right text-sm text-muted-foreground select-none"
+                aria-live="polite"
+              >
                 {inputText.length}/2000
               </span>
               <button
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={sending || !inputText.trim()}
-                className="grid h-9 w-9 place-items-center rounded-xl bg-brand-900 text-white hover:bg-brand-800 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer shrink-0"
+                className="grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-xl bg-brand-900 text-white transition-colors hover:bg-brand-800 disabled:pointer-events-none disabled:opacity-50"
                 aria-label="Enviar mensagem"
               >
                 <Send className="h-4.5 w-4.5" />

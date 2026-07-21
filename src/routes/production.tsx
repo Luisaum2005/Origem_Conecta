@@ -2,6 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { InstallButton } from "@/components/pwa/InstallButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ALL_SUPPLIER_PRODUCTS } from "@/lib/hortifruti";
 import {
   EMPTY_STOCK_ITEM,
@@ -96,7 +107,6 @@ function Production() {
   };
 
   const remove = async (item: ProducerStockItem) => {
-    if (!window.confirm(`Excluir "${item.product}"? Esta ação não poderá ser desfeita.`)) return;
     try {
       await deleteItem(item.id);
       if (editingId === item.id) cancelEdit();
@@ -696,14 +706,33 @@ function StockRow({
           <Pencil className="h-4 w-4" />
           Editar
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
-        >
-          <Trash2 className="h-4 w-4" />
-          Excluir
-        </button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
+            >
+              <Trash2 className="h-4 w-4" /> Excluir
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir {item.product}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                O produto deixará de aparecer no portfólio. Esta ação não poderá ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Manter produto</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={onDelete}
+                className="bg-red-700 text-white hover:bg-red-800"
+              >
+                Excluir produto
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </li>
   );

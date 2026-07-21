@@ -334,11 +334,12 @@ async function approveRemoteResponse(
 
 export function useDemandRequests() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const [demands, setDemands] = useState<DemandRequest[]>(readDemands);
+  const [demands, setDemands] = useState<DemandRequest[]>(() => (supabase ? [] : readDemands()));
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(DEMANDS_STORAGE_KEY, JSON.stringify(demands));
-  }, [demands]);
+  }, [demands, isSupabaseConfigured]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || !profile) return;

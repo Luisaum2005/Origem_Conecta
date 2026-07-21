@@ -269,7 +269,7 @@ function Order() {
 
         {removedItem && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-900">
-            <span>{removedItem.name} foi removido do pedido.</span>
+            <span>{removedItem.name} foi removido da lista de interesse.</span>
             <button type="button" onClick={restoreRemovedItem} className="font-bold underline">
               Desfazer
             </button>
@@ -421,7 +421,7 @@ function Order() {
 
             <aside className="space-y-4 lg:sticky lg:top-[88px] lg:h-fit">
               <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-brand-900">Resumo da compra</h2>
+                <h2 className="text-lg font-semibold text-brand-900">Resumo da solicitação</h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Subtotal</dt>
@@ -489,7 +489,10 @@ function Order() {
                 </div>
 
                 {hasStockIssues && (
-                  <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]">
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]"
+                  >
                     Ajuste as quantidades. Um ou mais itens ultrapassam o estoque publicado.
                   </div>
                 )}
@@ -515,7 +518,7 @@ function Order() {
                       items: orderItems,
                     });
                     setRecurringNotice(
-                      "Pedido recorrente salvo. Você pode carregar esse modelo em Meus pedidos antes de confirmar uma nova compra.",
+                      "Modelo recorrente salvo. Você pode carregá-lo em Solicitações antes de iniciar uma nova negociação.",
                     );
                   }}
                   className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:border-leaf-500"

@@ -22,13 +22,13 @@
   --color-brand-600: #2e7a42;
   --color-brand-500: #3f9154;
   --color-brand-100: #eaf3ec;
-  --color-leaf-700: #6ba539;
-  --color-leaf-600: #7ab548;
+  --color-leaf-700: #245f35;
+  --color-leaf-600: #2e7d42;
   --color-leaf-500: #8cc75a;
   --color-leaf-300: #b7df8e;
   --color-leaf-100: #e8f5d8;
-  --color-orange-700: #d96512;
-  --color-orange-600: #f47b20;
+  --color-orange-700: #a83c00;
+  --color-orange-600: #c94f00;
   --color-orange-500: #ffa24c;
   --color-orange-100: #ffe4cc;
 
@@ -102,7 +102,7 @@
 
   --border: #e7ded1;
   --input: #d8cebf;
-  --ring: #7ab548;
+  --ring: #2e7d42;
 
   --text-tertiary: #748377;
   --text-disabled: #9aa59c;
@@ -124,7 +124,11 @@
   }
 
   html[data-font-scale="large"] {
-    font-size: 112.5%;
+    font-size: 115%;
+  }
+
+  html[data-font-scale="xlarge"] {
+    font-size: 130%;
   }
 
   h1,
@@ -133,6 +137,30 @@
   h4 {
     letter-spacing: -0.01em;
     color: var(--foreground);
+  }
+
+  :where(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid var(--color-brand-600);
+    outline-offset: 3px;
+  }
+}
+
+@layer utilities {
+  .text-xs,
+  .text-\[11px\],
+  .text-\[10px\] {
+    font-size: 0.875rem;
+    line-height: 1.35rem;
+  }
+
+  .h-9,
+  .h-10 {
+    min-height: 44px;
+  }
+
+  .w-9,
+  .w-10 {
+    min-width: 44px;
   }
 }
 

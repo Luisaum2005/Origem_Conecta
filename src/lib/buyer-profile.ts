@@ -111,12 +111,15 @@ async function updateRemoteBuyerProfile(profileId: string, details: BuyerProfile
 
 export function useBuyerProfileDetails() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const [details, setDetails] = useState<BuyerProfileDetails>(readStoredProfile);
+  const [details, setDetails] = useState<BuyerProfileDetails>(() =>
+    supabase ? DEFAULT_BUYER_PROFILE : readStoredProfile(),
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(BUYER_PROFILE_STORAGE_KEY, JSON.stringify(details));
-  }, [details]);
+  }, [details, isSupabaseConfigured]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || profile?.tipo !== "comprador") return;

@@ -34,7 +34,9 @@ function readLocalProfile() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<AuthProfile | null>(readLocalProfile);
+  const [profile, setProfile] = useState<AuthProfile | null>(() =>
+    supabase ? null : readLocalProfile(),
+  );
   const [loading, setLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function loadProfile(userId?: string) {
       if (!userId) {
         if (active) setProfile(null);
+        window.localStorage.removeItem(LOCAL_PROFILE_KEY);
         if (active) setLoading(false);
         return;
       }
@@ -71,8 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         setProfile(restoredProfile);
         window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(restoredProfile));
-      } else if (active && !error) {
+      } else if (active) {
         setProfile(null);
+        window.localStorage.removeItem(LOCAL_PROFILE_KEY);
       }
       if (active) setLoading(false);
     }
@@ -127,7 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        throwSupabaseError(error);
+        if (!data.user) throw new Error("Não foi possível identificar o usuário.");
         const userId = data.user.id;
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -193,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: input.password,
           options: { data: { signup_payload: signupPayload } },
         });
-        if (error) throw error;
+        throwSupabaseError(error);
         if (!data.user) throw new Error("Usuário não foi criado.");
 
         const { data: profileData, error: profileError } = await supabase

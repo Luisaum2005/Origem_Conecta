@@ -23,10 +23,20 @@ type SupabaseLikeError = {
 };
 
 export function toReadableSupabaseError(error: SupabaseLikeError | null | undefined) {
-  if (!error) return "Erro desconhecido do Supabase.";
-  return [error.message, error.details, error.hint, error.code ? `Codigo: ${error.code}` : ""]
-    .filter(Boolean)
-    .join(" ");
+  if (!error) return "Não foi possível concluir a operação. Tente novamente.";
+  const message = (error.message ?? "").toLowerCase();
+  if (message.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (message.includes("email not confirmed")) return "Confirme seu e-mail antes de entrar.";
+  if (message.includes("user already registered")) return "Já existe uma conta com este e-mail.";
+  if (message.includes("duplicate key") || error.code === "23505")
+    return "Este cadastro já existe. Confira os dados informados.";
+  if (message.includes("row-level security") || error.code === "42501")
+    return "Você não tem permissão para realizar esta ação.";
+  if (message.includes("failed to fetch") || message.includes("network"))
+    return "Não foi possível conectar. Verifique sua internet e tente novamente.";
+  if (message.includes("jwt") || message.includes("session"))
+    return "Sua sessão expirou. Entre novamente para continuar.";
+  return "Não foi possível concluir a operação. Revise os dados e tente novamente.";
 }
 
 export function throwSupabaseError(error: SupabaseLikeError | null | undefined) {

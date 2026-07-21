@@ -6,12 +6,23 @@ import {
   useMemberships,
 } from "@/lib/organization-memberships";
 import { Check, MailPlus, UserCheck, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 export function OrganizationMembers({ organizationId }: { organizationId: string }) {
   const { memberships, loading, error, refresh } = useMemberships(organizationId);
   const [busy, setBusy] = useState("");
+  const [confirmMember, setConfirmMember] = useState<{ id: string; name: string } | null>(null);
   const invite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -154,14 +165,7 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
                     <button
                       type="button"
                       disabled={busy === member.id}
-                      onClick={() => {
-                        if (window.confirm("Encerrar o vínculo deste associado?"))
-                          void act(
-                            member.id,
-                            () => deactivateMembership(member.id),
-                            "Vínculo encerrado.",
-                          );
-                      }}
+                      onClick={() => setConfirmMember({ id: member.id, name: member.producerName })}
                       className="text-xs font-semibold text-[var(--color-error-fg)] hover:underline"
                     >
                       Desvincular
@@ -173,6 +177,36 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
           </div>
         </>
       )}
+      <AlertDialog
+        open={Boolean(confirmMember)}
+        onOpenChange={(open) => !open && setConfirmMember(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desvincular {confirmMember?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O produtor deixará de comercializar por esta organização.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!confirmMember) return;
+                void act(
+                  confirmMember.id,
+                  () => deactivateMembership(confirmMember.id),
+                  "Vínculo encerrado.",
+                );
+                setConfirmMember(null);
+              }}
+              className="bg-red-700 text-white hover:bg-red-800"
+            >
+              Desvincular
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

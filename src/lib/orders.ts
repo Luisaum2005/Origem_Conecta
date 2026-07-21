@@ -383,12 +383,15 @@ async function complainRemoteOrder(id: string, complaint: string) {
 export function useOrders() {
   const { profile, isSupabaseConfigured } = useAuth();
   const [orders, setOrders] = useState<SavedOrder[]>(() =>
-    readOrders().map((order) => ({ ...order, status: normalizeStatus(order.status) })),
+    supabase
+      ? []
+      : readOrders().map((order) => ({ ...order, status: normalizeStatus(order.status) })),
   );
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
-  }, [orders]);
+  }, [isSupabaseConfigured, orders]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || !profile) return;

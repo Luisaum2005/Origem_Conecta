@@ -7,6 +7,16 @@ import {
   type OrganizationSearchResult,
 } from "@/lib/organization-memberships";
 import { Building2, Check, Search, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,6 +25,7 @@ export function ProducerMemberships() {
   const [organizations, setOrganizations] = useState<OrganizationSearchResult[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState("");
+  const [confirmExit, setConfirmExit] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
     const timer = window.setTimeout(
       () =>
@@ -123,14 +134,7 @@ export function ProducerMemberships() {
                     {membership.status === "active" && (
                       <button
                         disabled={busy === membership.id}
-                        onClick={() => {
-                          if (!window.confirm(`Deseja sair de ${org.tradeName}?`)) return;
-                          void act(
-                            membership.id,
-                            () => deactivateMembership(membership.id),
-                            "Vínculo encerrado.",
-                          );
-                        }}
+                        onClick={() => setConfirmExit({ id: membership.id, name: org.tradeName })}
                         className="h-9 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-700 disabled:opacity-50"
                       >
                         Sair
@@ -153,6 +157,36 @@ export function ProducerMemberships() {
           })}
         </ul>
       )}
+      <AlertDialog
+        open={Boolean(confirmExit)}
+        onOpenChange={(open) => !open && setConfirmExit(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sair de {confirmExit?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você deixará de comercializar pelo CNPJ desta organização.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar associado</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!confirmExit) return;
+                void act(
+                  confirmExit.id,
+                  () => deactivateMembership(confirmExit.id),
+                  "Vínculo encerrado.",
+                );
+                setConfirmExit(null);
+              }}
+              className="bg-red-700 text-white hover:bg-red-800"
+            >
+              Sair da organização
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

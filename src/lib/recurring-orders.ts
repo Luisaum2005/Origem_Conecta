@@ -109,11 +109,14 @@ async function deleteRemoteRecurringOrder(id: string) {
 
 export function useRecurringOrders() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>(readRecurringOrders);
+  const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>(() =>
+    supabase ? [] : readRecurringOrders(),
+  );
 
   useEffect(() => {
+    if (supabase && isSupabaseConfigured) return;
     window.localStorage.setItem(RECURRING_ORDERS_STORAGE_KEY, JSON.stringify(recurringOrders));
-  }, [recurringOrders]);
+  }, [isSupabaseConfigured, recurringOrders]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || profile?.tipo !== "comprador") return;
