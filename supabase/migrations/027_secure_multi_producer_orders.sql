@@ -111,7 +111,8 @@ begin
     where p.user_id=auth.uid() and b.ativo for update;
   if not found then raise exception 'Cadastro de comprador nao encontrado.'; end if;
   if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'O pedido precisa ter itens.'; end if;
-  v_delivery:=greatest(coalesce((p_order->>'delivery')::numeric,0),0);
+  -- Frete e logistica sao combinados fora da plataforma. Never trust a browser-supplied fee.
+  v_delivery:=0;
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_qty:=coalesce((v_item->>'quantity')::numeric,0);
     if v_qty<=0 then raise exception 'Quantidade invalida.'; end if;

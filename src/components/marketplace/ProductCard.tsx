@@ -41,16 +41,12 @@ export function ProductCard({
   product,
   qty,
   onChange,
-  producerChoice,
-  onProducerChange,
   selectedUnit,
   onUnitChange,
 }: {
   product: Product;
   qty: number;
   onChange: (qty: number) => void;
-  producerChoice?: string;
-  onProducerChange?: (producerId: string) => void;
   selectedUnit: string;
   onUnitChange: (unit: string) => void;
 }) {
@@ -61,9 +57,7 @@ export function ProductCard({
   const [negotiating, setNegotiating] = useState(false);
   const [added, setAdded] = useState(false);
 
-  const recommended = preferredProducer(product);
-  const selectedProducer =
-    product.producers.find((producer) => producer.id === producerChoice) ?? recommended;
+  const selectedProducer = preferredProducer(product);
   const availableStock = Math.max(0, selectedProducer.stock);
 
   const media = [
@@ -265,22 +259,6 @@ export function ProductCard({
           <MessageSquare className="h-4 w-4 text-leaf-700" />
           {negotiating ? "Iniciando..." : "Negociar"}
         </button>
-
-        {product.producers.length > 1 && (
-          <select
-            value={producerChoice ?? ""}
-            onChange={(event) => onProducerChange?.(event.target.value)}
-            className="mt-3 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-          >
-            <option value="">Escolha automática recomendada</option>
-            {product.producers.map((producer) => (
-              <option key={producer.id} value={producer.id}>
-                {producer.name} · R$ {producer.price.toFixed(2)} · {formatQuantity(producer.stock)}{" "}
-                {product.unit}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       <div className="mt-5 flex flex-col gap-3">

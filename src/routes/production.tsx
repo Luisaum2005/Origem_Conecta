@@ -404,7 +404,7 @@ function ProductSelect({ value, onChange }: { value: string; onChange: (value: s
             setQuery(event.target.value);
           }}
           placeholder="Digite ou selecione..."
-          className="h-[48px] w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus:outline-none"
+          className="h-[48px] w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
         />
       </div>
       <datalist id="supplier-products">
@@ -578,7 +578,7 @@ function NumberField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-full w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus:outline-none"
+          className="h-full w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
         />
       </div>
     </label>
@@ -603,7 +603,7 @@ function DateField({
           type="date"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-[48px] w-full bg-transparent text-base text-brand-900 focus:outline-none"
+          className="h-[48px] w-full bg-transparent text-base text-brand-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
         />
       </div>
     </label>

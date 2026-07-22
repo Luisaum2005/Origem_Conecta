@@ -39,7 +39,7 @@ export function AddressFields() {
       setFormValue(form, "bairro", address.neighborhood);
       setFormValue(form, "municipio", address.city);
       setFormValue(form, "uf", address.state);
-      setCepStatus(`Endereço preenchido por ${address.source}. Confira antes de continuar.`);
+      setCepStatus("");
     } catch (error) {
       if (controller.signal.aborted) return;
       setCepStatus(

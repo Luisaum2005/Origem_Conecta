@@ -21,8 +21,7 @@ function Portfolio() {
     () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
     [products],
   );
-  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, totalItems } =
-    useCart();
+  const { cart, selectedUnits, setQty, setUnit, totalItems } = useCart();
   const [cat, setCat] = useState("Todos");
   const [q, setQ] = useState("");
 
@@ -58,6 +57,8 @@ function Portfolio() {
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
+              aria-label="Buscar produto no portfólio"
+              type="search"
               value={q}
               onChange={(event) => setQ(event.target.value)}
               placeholder="Buscar produto"
@@ -73,7 +74,7 @@ function Portfolio() {
               <button
                 key={category}
                 onClick={() => setCat(category)}
-                className={`h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-colors ${
+                className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-medium transition-colors motion-reduce:transition-none ${
                   active
                     ? "bg-brand-900 text-white"
                     : "border border-border bg-white text-muted-foreground hover:text-brand-900"
@@ -92,8 +93,6 @@ function Portfolio() {
               product={product}
               qty={cart[product.id] ?? 0}
               onChange={(qty) => setQty(product.id, qty)}
-              producerChoice={producerChoices[product.id]}
-              onProducerChange={(producerId) => setProducerChoice(product.id, producerId)}
               selectedUnit={selectedUnits[product.id] ?? product.unit}
               onUnitChange={(unit) => setUnit(product.id, unit)}
             />
@@ -113,7 +112,7 @@ function Portfolio() {
       {totalItems > 0 && (
         <Link
           to="/order"
-          className="fixed bottom-[92px] left-1/2 z-40 inline-flex h-14 max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-brand-900 px-5 text-base font-semibold text-white shadow-md transition-all hover:bg-brand-800 hover:shadow-lg md:bottom-6 md:px-6"
+          className="fixed bottom-[92px] left-1/2 z-40 inline-flex h-14 max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-brand-900 px-5 text-base font-semibold text-white shadow-md transition-all hover:bg-brand-800 hover:shadow-lg motion-reduce:transition-none md:bottom-6 md:px-6"
         >
           <ShoppingBag className="h-5 w-5" />
           Ver lista de interesse

@@ -18,12 +18,13 @@ describe("critical order integrity migration", () => {
   });
 
   it("reserves inventory during portfolio checkout and restores it on cancellation", () => {
-    expect(migration).toContain(
-      "set quantidade_disponivel=quantidade_disponivel-v_qty",
-    );
-    expect(migration).toContain(
-      "set quantidade_disponivel=quantidade_disponivel+v_item.qty",
-    );
+    expect(migration).toContain("set quantidade_disponivel=quantidade_disponivel-v_qty");
+    expect(migration).toContain("set quantidade_disponivel=quantidade_disponivel+v_item.qty");
+  });
+
+  it("does not accept a delivery fee supplied by the browser", () => {
+    expect(migration).toContain("v_delivery:=0");
+    expect(migration).not.toContain("p_order->>'delivery'");
   });
 
   it("tracks delivery separately for every producer", () => {

@@ -33,6 +33,8 @@ export function Navbar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
     useNotifications(profile?.userId);
   const profilePath =
@@ -64,6 +66,28 @@ export function Navbar() {
       document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [open]);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const menu = accountMenuRef.current;
+    menu?.querySelector<HTMLElement>("a[href], button")?.focus();
+    const close = (restoreFocus = true) => {
+      setAccountOpen(false);
+      if (restoreFocus) requestAnimationFrame(() => accountButtonRef.current?.focus());
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!menu?.contains(target) && !accountButtonRef.current?.contains(target)) close(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [accountOpen]);
   return (
     <>
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
@@ -182,20 +206,30 @@ export function Navbar() {
             </div>
             <div className="relative lg:hidden">
               <button
+                ref={accountButtonRef}
                 type="button"
                 onClick={() => setAccountOpen((current) => !current)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-brand-900"
                 aria-label="Abrir opções da conta"
                 aria-expanded={accountOpen}
+                aria-haspopup="menu"
+                aria-controls="account-menu"
               >
                 <User className="h-5 w-5" />
               </button>
               {accountOpen && (
-                <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-border bg-white p-2 shadow-lg">
+                <div
+                  ref={accountMenuRef}
+                  id="account-menu"
+                  role="menu"
+                  aria-label="Opções da conta"
+                  className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-border bg-white p-2 shadow-lg"
+                >
                   <p className="truncate px-3 py-2 text-sm font-semibold text-brand-900">
                     {profile?.nome ?? "Minha conta"}
                   </p>
                   <Link
+                    role="menuitem"
                     to={profilePath}
                     onClick={() => setAccountOpen(false)}
                     className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-brand-900 hover:bg-secondary"
@@ -204,6 +238,7 @@ export function Navbar() {
                   </Link>
                   {profile?.tipo === "comprador" && (
                     <Link
+                      role="menuitem"
                       to="/directory/organizations"
                       onClick={() => setAccountOpen(false)}
                       className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-brand-900 hover:bg-secondary"
@@ -213,6 +248,7 @@ export function Navbar() {
                   )}
                   {profile && (
                     <button
+                      role="menuitem"
                       type="button"
                       onClick={() => void signOut()}
                       className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50"

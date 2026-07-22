@@ -1,6 +1,6 @@
 import { SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type SupplierProductPickerProps = {
   value: string[];
@@ -17,6 +17,9 @@ export function SupplierProductPicker({
   const [query, setQuery] = useState("");
   const labelId = useId();
   const listboxId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return SUPPLIER_PRODUCT_GROUPS;
@@ -25,6 +28,34 @@ export function SupplierProductPicker({
       items: group.items.filter((item) => item.toLowerCase().includes(normalizedQuery)),
     })).filter((group) => group.items.length);
   }, [query]);
+  const visibleProducts = useMemo(() => filtered.flatMap((group) => group.items), [filtered]);
+
+  const close = (restoreFocus = true) => {
+    setOpen(false);
+    if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const focusProduct = (index: number) => {
+    if (visibleProducts.length === 0) return;
+    const bounded = Math.max(0, Math.min(index, visibleProducts.length - 1));
+    rootRef.current?.querySelector<HTMLButtonElement>(`[data-product-index="${bounded}"]`)?.focus();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) close(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   const toggle = (product: string) =>
     onChange(
@@ -32,26 +63,29 @@ export function SupplierProductPicker({
     );
 
   return (
-    <div>
+    <div ref={rootRef}>
       <span id={labelId} className="block text-sm font-medium text-brand-900">
         O que você produz ou fornece?
         {required && <span className="ml-1 text-orange-600">*</span>}
       </span>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-labelledby={labelId}
         aria-expanded={open}
         aria-controls={listboxId}
         aria-haspopup="listbox"
-        className="mt-2 flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left text-sm text-brand-900 hover:border-leaf-500"
+        className="mt-2 flex min-h-[52px] w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left text-base text-brand-900 hover:border-leaf-500 focus-visible:border-leaf-600 focus-visible:ring-2 focus-visible:ring-leaf-100"
       >
         <span className="truncate text-muted-foreground">
           {value.length === 0
             ? "Selecione os produtos que você fornece"
             : `${value.length} produto${value.length > 1 ? "s" : ""} selecionado${value.length > 1 ? "s" : ""}`}
         </span>
-        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-4 w-4 transition motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {value.length > 0 && (
@@ -81,14 +115,21 @@ export function SupplierProductPicker({
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               autoFocus
+              ref={searchRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar produto"
               aria-label="Buscar produto na lista"
               onKeyDown={(event) => {
-                if (event.key === "Escape") setOpen(false);
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  focusProduct(0);
+                } else if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  focusProduct(visibleProducts.length - 1);
+                } else if (event.key === "Escape") close();
               }}
-              className="h-9 w-full bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+              className="h-11 w-full bg-transparent text-base placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
             />
           </div>
           <div
@@ -110,6 +151,7 @@ export function SupplierProductPicker({
                 <ul>
                   {group.items.map((product) => {
                     const active = value.includes(product);
+                    const productIndex = visibleProducts.indexOf(product);
                     return (
                       <li key={product}>
                         <button
@@ -117,7 +159,26 @@ export function SupplierProductPicker({
                           onClick={() => toggle(product)}
                           role="option"
                           aria-selected={active}
-                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
+                          data-product-index={productIndex}
+                          onKeyDown={(event) => {
+                            if (event.key === "ArrowDown") {
+                              event.preventDefault();
+                              focusProduct((productIndex + 1) % visibleProducts.length);
+                            } else if (event.key === "ArrowUp") {
+                              event.preventDefault();
+                              focusProduct(
+                                (productIndex - 1 + visibleProducts.length) %
+                                  visibleProducts.length,
+                              );
+                            } else if (event.key === "Home") {
+                              event.preventDefault();
+                              focusProduct(0);
+                            } else if (event.key === "End") {
+                              event.preventDefault();
+                              focusProduct(visibleProducts.length - 1);
+                            }
+                          }}
+                          className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-base focus-visible:ring-2 focus-visible:ring-leaf-600 ${
                             active ? "bg-leaf-100 text-brand-900" : "text-brand-900 hover:bg-canvas"
                           }`}
                         >

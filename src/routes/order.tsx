@@ -35,7 +35,6 @@ export const Route = createFileRoute("/order")({
 type RemovedItem = {
   productId: string;
   quantity: number;
-  producerChoice?: string;
   name: string;
 };
 
@@ -62,8 +61,7 @@ function clampQuantity(value: number, max: number) {
 function Order() {
   const products = useAvailableProducts();
   const operation = getOperationWindow();
-  const { cart, producerChoices, selectedUnits, setQty, setProducerChoice, setUnit, clear } =
-    useCart();
+  const { cart, selectedUnits, setQty, setUnit, clear } = useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const { addRecurringOrder } = useRecurringOrders();
@@ -78,18 +76,14 @@ function Order() {
   const items = products.filter((product) => cart[product.id]);
 
   const subtotal = items.reduce((sum, product) => {
-    const producer =
-      product.producers.find((item) => item.id === producerChoices[product.id]) ??
-      preferredProducer(product);
+    const producer = preferredProducer(product);
     return sum + producer.price * cart[product.id];
   }, 0);
   const delivery = 0;
   const total = subtotal + delivery;
 
   const orderItems = items.map((product) => {
-    const selectedProducer =
-      product.producers.find((item) => item.id === producerChoices[product.id]) ??
-      preferredProducer(product);
+    const selectedProducer = preferredProducer(product);
     const quantity = cart[product.id];
     return {
       productId: product.id,
@@ -102,7 +96,7 @@ function Order() {
       sellerOrganizationId: selectedProducer.sellerOrganizationId,
       sellerOrganizationName: selectedProducer.sellerOrganizationName,
       sellerOrganizationCnpj: selectedProducer.sellerOrganizationCnpj,
-      manualProducerChoice: Boolean(producerChoices[product.id]),
+      manualProducerChoice: false,
       lineTotal: selectedProducer.price * quantity,
       notes: `Maturação: ${maturityPreference}`,
     };
@@ -140,9 +134,7 @@ function Order() {
 
   const stockIssues = items
     .map((product) => {
-      const selectedProducer =
-        product.producers.find((item) => item.id === producerChoices[product.id]) ??
-        preferredProducer(product);
+      const selectedProducer = preferredProducer(product);
       const requested = cart[product.id] ?? 0;
       return requested > selectedProducer.stock
         ? {
@@ -162,7 +154,6 @@ function Order() {
     setRemovedItem({
       productId,
       quantity: cart[productId],
-      producerChoice: producerChoices[productId],
       name: product?.name ?? "Produto",
     });
     setQty(productId, 0);
@@ -171,9 +162,6 @@ function Order() {
   const restoreRemovedItem = () => {
     if (!removedItem) return;
     setQty(removedItem.productId, removedItem.quantity);
-    if (removedItem.producerChoice) {
-      setProducerChoice(removedItem.productId, removedItem.producerChoice);
-    }
     setRemovedItem(null);
   };
 
@@ -304,9 +292,7 @@ function Order() {
               </div>
 
               {items.map((product) => {
-                const selectedProducer =
-                  product.producers.find((item) => item.id === producerChoices[product.id]) ??
-                  preferredProducer(product);
+                const selectedProducer = preferredProducer(product);
                 const lineTotal = selectedProducer.price * cart[product.id];
                 const currentUnit = selectedUnits[product.id] ?? product.unit;
                 return (
@@ -350,33 +336,7 @@ function Order() {
                       </button>
                     </div>
 
-                    <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_auto]">
-                      <label className="block">
-                        <span className="text-xs font-semibold text-brand-900">
-                          Escolha do produtor
-                        </span>
-                        <select
-                          value={producerChoices[product.id] ?? ""}
-                          onChange={(event) => {
-                            const producerId = event.target.value;
-                            const nextProducer =
-                              product.producers.find((producer) => producer.id === producerId) ??
-                              preferredProducer(product);
-                            setProducerChoice(product.id, producerId);
-                            updateQuantity(product.id, cart[product.id], nextProducer.stock);
-                          }}
-                          className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-                        >
-                          <option value="">Automática recomendada pela Origem</option>
-                          {product.producers.map((producer) => (
-                            <option key={producer.id} value={producer.id}>
-                              {producer.name} · R$ {producer.price.toFixed(2)} ·{" "}
-                              {formatQuantity(producer.stock)} {product.unit}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
+                    <div className="mt-4 border-t border-border pt-4">
                       <div className="flex flex-wrap items-end justify-between gap-3 sm:justify-end">
                         {cart[product.id] > selectedProducer.stock && (
                           <p className="text-xs font-semibold text-[var(--color-error-fg)]">
