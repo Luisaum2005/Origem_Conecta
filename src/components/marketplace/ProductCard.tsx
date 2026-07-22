@@ -318,8 +318,7 @@ export function ProductCard({
                 className="h-11 w-28 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
               >
                 <option value="kg">kg</option>
-                <option value="kg">g</option>
-                <option value="kg">cacho</option>
+                <option value="g">g</option>
                 <option value="caixa">caixa</option>
                 <option value="unidade">unid</option>
                 <option value="cacho">cacho</option>

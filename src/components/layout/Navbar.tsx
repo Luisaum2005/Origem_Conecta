@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { SupportButton } from "@/components/layout/SupportButton";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
-import { Bell, LogOut, User } from "lucide-react";
+import { Bell, Building2, LogOut, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const links = [
@@ -67,7 +67,7 @@ export function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
-        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 xl:px-8">
+        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-4 xl:gap-8">
             <Logo compactOnMobile />
             <nav className="hidden min-w-0 items-center gap-0.5 lg:flex xl:gap-1">
@@ -89,7 +89,7 @@ export function Navbar() {
                 ))}
             </nav>
           </div>
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex shrink-0 items-center gap-1 sm:gap-2">
             <SupportButton compact />
             <AccessibilityControls />
             <div className="relative">
@@ -202,6 +202,15 @@ export function Navbar() {
                   >
                     <User className="h-5 w-5" /> Meu perfil
                   </Link>
+                  {profile?.tipo === "comprador" && (
+                    <Link
+                      to="/directory/organizations"
+                      onClick={() => setAccountOpen(false)}
+                      className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-brand-900 hover:bg-secondary"
+                    >
+                      <Building2 className="h-5 w-5" /> Cooperativas e associações
+                    </Link>
+                  )}
                   {profile && (
                     <button
                       type="button"

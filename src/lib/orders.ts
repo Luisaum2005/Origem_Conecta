@@ -22,6 +22,9 @@ export type SavedOrderItem = {
   manualProducerChoice: boolean;
   lineTotal: number;
   notes?: string;
+  producerConfirmedAt?: string;
+  producerShippedAt?: string;
+  producerDeliveredAt?: string;
 };
 
 export type SavedOrder = {
@@ -68,6 +71,9 @@ type RemoteOrderItem = {
   seller_organization_id?: string | null;
   seller_organization_name?: string | null;
   seller_organization_cnpj?: string | null;
+  producer_confirmed_at?: string | null;
+  producer_shipped_at?: string | null;
+  producer_delivered_at?: string | null;
 };
 
 type RemoteOrder = {
@@ -183,14 +189,41 @@ export function formatCancellationDeadline(order: SavedOrder) {
   );
 }
 
-function mapRemoteOrder(order: RemoteOrder): SavedOrder {
+function mapRemoteOrder(order: RemoteOrder, deriveProducerProgress = false): SavedOrder {
   const deliveryAt = order.entrega_prevista ?? undefined;
+  const items = (order.order_items ?? []).map((item) => ({
+    productId: item.product_ref || item.product_name,
+    productName: item.product_name,
+    quantity: Number(item.quantidade || 0),
+    unit: item.unidade,
+    unitPrice: Number(item.preco_unitario || 0),
+    producerId: item.producer_id || item.producer_ref || item.producer_name || "produtor",
+    producerName: item.producer_name || "Produtor",
+    sellerOrganizationId: item.seller_organization_id ?? undefined,
+    sellerOrganizationName: item.seller_organization_name ?? undefined,
+    sellerOrganizationCnpj: item.seller_organization_cnpj ?? undefined,
+    manualProducerChoice: item.escolha_manual_produtor,
+    lineTotal: Number(item.line_total || 0),
+    notes: item.observacoes || undefined,
+    producerConfirmedAt: item.producer_confirmed_at ?? undefined,
+    producerShippedAt: item.producer_shipped_at ?? undefined,
+    producerDeliveredAt: item.producer_delivered_at ?? undefined,
+  }));
+  const producerStatus: OrderStatus | undefined = deriveProducerProgress
+    ? items.length > 0 && items.every((item) => item.producerDeliveredAt)
+      ? "Entregue"
+      : items.length > 0 && items.every((item) => item.producerShippedAt)
+        ? "Em entrega"
+        : items.length > 0 && items.every((item) => item.producerConfirmedAt)
+          ? "Em separação"
+          : undefined
+    : undefined;
   return {
     id: order.id,
     buyerId: order.buyer_id ?? undefined,
     createdAt: order.criado_em,
     buyerName: order.buyer_name || "Comprador",
-    status: dbToAppStatus[order.status],
+    status: producerStatus ?? dbToAppStatus[order.status],
     subtotal: Number(order.subtotal || 0),
     delivery: Number(order.delivery || 0),
     total: Number(order.total || 0),
@@ -219,21 +252,7 @@ function mapRemoteOrder(order: RemoteOrder): SavedOrder {
     originQuoteId: order.origem_solicitacao_id ?? undefined,
     paymentMethod: normalizePaymentMethod(order.payment_method),
     paymentNotes: order.payment_notes ?? undefined,
-    items: (order.order_items ?? []).map((item) => ({
-      productId: item.product_ref || item.product_name,
-      productName: item.product_name,
-      quantity: Number(item.quantidade || 0),
-      unit: item.unidade,
-      unitPrice: Number(item.preco_unitario || 0),
-      producerId: item.producer_id || item.producer_ref || item.producer_name || "produtor",
-      producerName: item.producer_name || "Produtor",
-      sellerOrganizationId: item.seller_organization_id ?? undefined,
-      sellerOrganizationName: item.seller_organization_name ?? undefined,
-      sellerOrganizationCnpj: item.seller_organization_cnpj ?? undefined,
-      manualProducerChoice: item.escolha_manual_produtor,
-      lineTotal: Number(item.line_total || 0),
-      notes: item.observacoes || undefined,
-    })),
+    items,
   };
 }
 
@@ -266,13 +285,13 @@ async function loadRemoteOrders(
   if (!supabase) return null;
   if (profileType === "organizacao") return [];
   let select =
-    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj)";
+    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
 
   if (profileType === "produtor") {
     const producerId = await getProducerId(profileId);
     if (!producerId) return [];
     select =
-      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj)";
+      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
     const { data, error } = await supabase
       .from("orders")
       .select(select)
@@ -280,7 +299,7 @@ async function loadRemoteOrders(
       .order("criado_em", { ascending: false })
       .limit(100);
     if (error) throw error;
-    return (data ?? []).map((order) => mapRemoteOrder(order as unknown as RemoteOrder));
+    return (data ?? []).map((order) => mapRemoteOrder(order as unknown as RemoteOrder, true));
   }
 
   let query = supabase

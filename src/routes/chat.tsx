@@ -405,7 +405,7 @@ function ChatRoom() {
       <Navbar />
 
       {/* Main chat window layout */}
-      <div className="mx-auto flex min-h-0 w-full max-w-[800px] flex-1 flex-col overflow-hidden border-x border-border bg-white pb-[calc(68px+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="mx-auto flex min-h-0 w-full max-w-[800px] flex-1 flex-col overflow-hidden border-x border-border bg-white pb-[calc(68px+env(safe-area-inset-bottom))] lg:pb-0">
         {/* Chat Header */}
         <header className="border-b border-border p-4 bg-white shrink-0 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -547,7 +547,7 @@ function ChatRoom() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4 pb-28 md:pb-4"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4 pb-28 lg:pb-4"
         >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -612,7 +612,7 @@ function ChatRoom() {
         </div>
 
         {/* Input box section */}
-        <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 md:static md:border-x-0">
+        <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 lg:static lg:border-x-0">
           <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
             <textarea
               aria-label="Mensagem da negociação"
