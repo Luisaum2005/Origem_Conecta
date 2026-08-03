@@ -21,6 +21,7 @@ import {
   useProducerStock,
 } from "@/lib/producer-stock";
 import {
+  BellRing,
   Building2,
   CalendarDays,
   Check,
@@ -311,6 +312,15 @@ function Production() {
                 />
               </div>
               <NumberField
+                label="Avisar quando restar"
+                value={draft.minimumStock}
+                onChange={(value) => setDraft({ ...draft, minimumStock: value })}
+                placeholder="Ex: 20"
+                suffix={draft.unit}
+                required={false}
+                helper="Opcional. Você receberá uma notificação quando o estoque chegar a esse valor."
+              />
+              <NumberField
                 label="Preço por unidade"
                 value={draft.price}
                 onChange={(value) => setDraft({ ...draft, price: value })}
@@ -555,17 +565,23 @@ function NumberField({
   onChange,
   placeholder,
   prefix,
+  suffix,
+  required = true,
+  helper,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   prefix?: string;
+  suffix?: string;
+  required?: boolean;
+  helper?: string;
 }) {
   return (
     <label className="block">
       <span className="block text-sm font-medium text-brand-900">
-        {label} <span className="ml-1 text-orange-600">*</span>
+        {label} {required && <span className="ml-1 text-orange-600">*</span>}
       </span>
       <div className="mt-2 flex h-[52px] items-center rounded-xl border border-border bg-white px-4 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-100">
         {prefix && (
@@ -580,7 +596,9 @@ function NumberField({
           placeholder={placeholder}
           className="h-full w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
         />
+        {suffix && <span className="ml-2 text-sm text-muted-foreground">{suffix}</span>}
       </div>
+      {helper && <span className="mt-1 block text-xs text-muted-foreground">{helper}</span>}
     </label>
   );
 }
@@ -664,6 +682,12 @@ function StockRow({
           <p className="mt-1 text-sm text-muted-foreground">
             {item.quantity || "0"} {item.unit} · R$ {Number(item.price || 0).toFixed(2)}/{item.unit}
           </p>
+          {Number(item.minimumStock || 0) > 0 && (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-orange-700">
+              <BellRing className="h-3.5 w-3.5" />
+              Aviso em {item.minimumStock} {item.unit}
+            </p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             Colheita {fmt(item.harvestDate)} · Validade {fmt(item.expiryDate)}
           </p>

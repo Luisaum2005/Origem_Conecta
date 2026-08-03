@@ -20,6 +20,7 @@ export type ProducerStockItem = {
   videoUrl?: string;
   product: string;
   quantity: string;
+  minimumStock: string;
   unit: string;
   price: string;
   harvestDate: string;
@@ -45,6 +46,7 @@ type InventoryRow = {
   nome_produto: string | null;
   unidade: string | null;
   quantidade_disponivel: number | string | null;
+  estoque_minimo?: number | string | null;
   preco: number | string | null;
   data_colheita: string | null;
   validade: string | null;
@@ -74,6 +76,7 @@ export const EMPTY_STOCK_ITEM: ProducerStockItem = {
   id: "",
   product: "",
   quantity: "",
+  minimumStock: "",
   unit: "kg",
   price: "",
   harvestDate: "",
@@ -112,6 +115,7 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
     videoUrl: row.video_url ?? undefined,
     product: row.nome_produto || row.products?.nome || "Produto sem nome",
     quantity: String(row.quantidade_disponivel ?? ""),
+    minimumStock: Number(row.estoque_minimo ?? 0) > 0 ? String(row.estoque_minimo) : "",
     unit: row.unidade || row.products?.unidade || "kg",
     price: String(row.preco ?? ""),
     harvestDate: row.data_colheita ?? "",
@@ -137,7 +141,7 @@ async function loadInventory(producerId?: string | null) {
   let query = supabase
     .from("producer_inventory")
     .select(
-      "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,seller_organization_id,seller_organization_name,seller_organization_cnpj,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel,commercialization_mode,commercial_verification_status)",
+      "id,producer_id,nome_produto,unidade,quantidade_disponivel,estoque_minimo,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,seller_organization_id,seller_organization_name,seller_organization_cnpj,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel,commercialization_mode,commercial_verification_status)",
     )
     .order("atualizado_em", { ascending: false })
     .limit(100);
@@ -217,6 +221,7 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
     nome_produto: item.product,
     unidade: item.unit,
     quantidade_disponivel: Number(String(item.quantity || 0).replace(",", ".")) || 0,
+    estoque_minimo: Number(String(item.minimumStock || 0).replace(",", ".")) || 0,
     preco: Number(String(item.price || 0).replace(",", ".")) || 0,
     data_colheita: item.harvestDate || null,
     validade: item.expiryDate || null,

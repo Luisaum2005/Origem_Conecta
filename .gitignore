@@ -17,6 +17,7 @@ dist-ssr
 .nitro
 .codex/
 *.local
+infra/evolution/.env
 
 # Wrangler / Cloudflare
 .wrangler/
