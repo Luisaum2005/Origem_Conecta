@@ -18,22 +18,10 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   systemNotifications: true,
 };
 
-const PUSH_ONBOARDING_KEY = "origem-conecta-push-onboarding";
 export const PUSH_ONBOARDING_COMPLETED_EVENT = "origem-conecta:push-onboarding-completed";
-
-export function markPushOnboardingPending(userId: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(`${PUSH_ONBOARDING_KEY}:${userId}`, "pending");
-}
-
-export function hasPendingPushOnboarding(userId: string) {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(`${PUSH_ONBOARDING_KEY}:${userId}`) === "pending";
-}
 
 export function completePushOnboarding(userId: string) {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(`${PUSH_ONBOARDING_KEY}:${userId}`);
   window.dispatchEvent(new CustomEvent(PUSH_ONBOARDING_COMPLETED_EVENT, { detail: userId }));
 }
 

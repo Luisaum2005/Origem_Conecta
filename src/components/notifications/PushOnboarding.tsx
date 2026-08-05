@@ -1,20 +1,21 @@
-import { useAuth } from "@/lib/auth";
+import { getProfileHome, useAuth } from "@/lib/auth";
+import { useLocation } from "@tanstack/react-router";
 import {
   completePushOnboarding,
   enablePush,
   getPushState,
-  hasPendingPushOnboarding,
   PUSH_ONBOARDING_COMPLETED_EVENT,
   validateVapidPublicKey,
+  type PushState,
 } from "@/lib/push-notifications";
-import { BellRing, X } from "lucide-react";
+import { BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
-
-const DISMISSED_KEY = "origem-conecta-push-onboarding-dismissed";
 
 export function PushOnboarding() {
   const { profile, isSupabaseConfigured } = useAuth();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const [visible, setVisible] = useState(false);
+  const [pushState, setPushState] = useState<PushState>("default");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const configurationError = validateVapidPublicKey(
@@ -22,15 +23,15 @@ export function PushOnboarding() {
   );
 
   useEffect(() => {
-    if (!profile || !isSupabaseConfigured || !hasPendingPushOnboarding(profile.userId)) {
+    if (!profile || !isSupabaseConfigured) {
       setVisible(false);
       return;
     }
-    if (window.sessionStorage.getItem(`${DISMISSED_KEY}:${profile.userId}`) === "true") return;
     let active = true;
     getPushState(profile.userId)
       .then((state) => {
         if (!active) return;
+        setPushState(state);
         if (state === "enabled") {
           completePushOnboarding(profile.userId);
           setVisible(false);
@@ -55,7 +56,9 @@ export function PushOnboarding() {
     return () => window.removeEventListener(PUSH_ONBOARDING_COMPLETED_EVENT, hideAfterActivation);
   }, [profile]);
 
-  if (!visible || !profile) return null;
+  const isHomeScreen = profile ? pathname === getProfileHome(profile.tipo) : false;
+
+  if (!visible || !profile || !isHomeScreen) return null;
 
   const activate = async () => {
     setBusy(true);
@@ -75,11 +78,6 @@ export function PushOnboarding() {
     }
   };
 
-  const dismiss = () => {
-    window.sessionStorage.setItem(`${DISMISSED_KEY}:${profile.userId}`, "true");
-    setVisible(false);
-  };
-
   return (
     <aside className="border-b border-leaf-200 bg-leaf-50" aria-labelledby="push-onboarding-title">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-8">
@@ -88,7 +86,7 @@ export function PushOnboarding() {
         </span>
         <div className="min-w-0 flex-1">
           <p id="push-onboarding-title" className="font-semibold text-brand-900">
-            Quer receber avisos importantes?
+            Ative as notificações para não perder atualizações
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Ative as notificações para acompanhar mensagens, negociações e alertas de estoque mesmo
@@ -99,23 +97,30 @@ export function PushOnboarding() {
               {error || configurationError}
             </p>
           )}
+          {pushState === "denied" && !error && (
+            <p className="mt-2 text-sm font-medium text-orange-700" role="alert">
+              As notificações estão bloqueadas. Libere a permissão nas configurações do navegador.
+            </p>
+          )}
+          {pushState === "unsupported" && !error && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Este navegador não oferece suporte a notificações push.
+            </p>
+          )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center">
           <button
             type="button"
             onClick={() => void activate()}
-            disabled={busy || Boolean(configurationError)}
+            disabled={
+              busy ||
+              pushState === "denied" ||
+              pushState === "unsupported" ||
+              Boolean(configurationError)
+            }
             className="min-h-11 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-gray-300"
           >
             {busy ? "Ativando..." : "Ativar notificações"}
-          </button>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-muted-foreground hover:bg-white"
-            aria-label="Lembrar de ativar notificações depois"
-          >
-            <X className="h-4 w-4" /> Agora não
           </button>
         </div>
       </div>

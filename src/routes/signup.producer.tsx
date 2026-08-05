@@ -5,7 +5,6 @@ import { FormProgress, FormSection } from "@/components/forms/FormSection";
 import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { getProfileHome, useAuth } from "@/lib/auth";
 import { isValidCnpj } from "@/lib/organizations";
-import { markPushOnboardingPending } from "@/lib/push-notifications";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 export const Route = createFileRoute("/signup/producer")({
@@ -86,7 +85,6 @@ function SignupProducer() {
           stateRegistration: String(form.get("stateRegistration") ?? ""),
         },
       });
-      markPushOnboardingPending(profile.userId);
       navigate({ to: getProfileHome(profile.tipo) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
