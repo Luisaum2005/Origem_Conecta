@@ -3,6 +3,7 @@ import { Logo } from "@/components/brand/Logo";
 import { AccessibilityControls } from "@/components/layout/AccessibilityControls";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { SupportButton } from "@/components/layout/SupportButton";
+import { PushOnboarding } from "@/components/notifications/PushOnboarding";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
 import { Bell, Building2, LogOut, User } from "lucide-react";
@@ -278,6 +279,7 @@ export function Navbar() {
           </div>
         </div>
       </header>
+      <PushOnboarding />
       <BottomNav />
     </>
   );

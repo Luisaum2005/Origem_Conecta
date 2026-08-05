@@ -2,6 +2,41 @@ import { assertSupabaseConfigured, throwSupabaseError } from "@/lib/supabase";
 
 export type PushState = "unsupported" | "default" | "denied" | "enabled" | "disabled";
 
+export type NotificationPreferences = {
+  messages: boolean;
+  orders: boolean;
+  demands: boolean;
+  ratings: boolean;
+  systemNotifications: boolean;
+};
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  messages: true,
+  orders: true,
+  demands: true,
+  ratings: true,
+  systemNotifications: true,
+};
+
+const PUSH_ONBOARDING_KEY = "origem-conecta-push-onboarding";
+export const PUSH_ONBOARDING_COMPLETED_EVENT = "origem-conecta:push-onboarding-completed";
+
+export function markPushOnboardingPending(userId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(`${PUSH_ONBOARDING_KEY}:${userId}`, "pending");
+}
+
+export function hasPendingPushOnboarding(userId: string) {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(`${PUSH_ONBOARDING_KEY}:${userId}`) === "pending";
+}
+
+export function completePushOnboarding(userId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(`${PUSH_ONBOARDING_KEY}:${userId}`);
+  window.dispatchEvent(new CustomEvent(PUSH_ONBOARDING_COMPLETED_EVENT, { detail: userId }));
+}
+
 export function supportsPush() {
   return (
     typeof window !== "undefined" &&
@@ -85,4 +120,43 @@ export async function disablePush() {
     .eq("endpoint", subscription.endpoint);
   throwSupabaseError(error);
   await subscription.unsubscribe();
+}
+
+export async function getNotificationPreferences(userId: string) {
+  const client = assertSupabaseConfigured();
+  const { data, error } = await client
+    .from("notification_preferences")
+    .select("messages,orders,demands,ratings,system_notifications")
+    .eq("user_id", userId)
+    .maybeSingle();
+  throwSupabaseError(error);
+  if (!data) return DEFAULT_NOTIFICATION_PREFERENCES;
+  return {
+    messages: data.messages !== false,
+    orders: data.orders !== false,
+    demands: data.demands !== false,
+    ratings: data.ratings !== false,
+    systemNotifications: data.system_notifications !== false,
+  } satisfies NotificationPreferences;
+}
+
+export async function saveNotificationPreferences(
+  userId: string,
+  preferences: NotificationPreferences,
+) {
+  const client = assertSupabaseConfigured();
+  const { error } = await client.from("notification_preferences").upsert(
+    {
+      user_id: userId,
+      push_enabled: true,
+      messages: preferences.messages,
+      orders: preferences.orders,
+      demands: preferences.demands,
+      ratings: preferences.ratings,
+      system_notifications: preferences.systemNotifications,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  throwSupabaseError(error);
 }

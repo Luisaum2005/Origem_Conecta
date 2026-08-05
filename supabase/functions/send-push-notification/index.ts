@@ -40,7 +40,9 @@ Deno.serve(async (request) => {
             ? "demands"
             : notification.type === "rating"
               ? "ratings"
-              : null;
+              : notification.type === "system"
+                ? "system_notifications"
+                : null;
     if (
       preferences &&
       (!preferences.push_enabled || (preferenceKey && !preferences[preferenceKey]))
