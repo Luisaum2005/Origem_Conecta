@@ -16,7 +16,6 @@ type RemoteProducer = {
   id: string;
   nome_propriedade: string | null;
   responsavel: string | null;
-  cnpj: string | null;
   localizacao: string | null;
   categorias_atendidas: string[] | null;
   ativo: boolean | null;
@@ -27,7 +26,7 @@ function mapProducer(row: RemoteProducer): RegisteredProducer {
     id: row.id,
     propertyName: row.nome_propriedade || "Propriedade sem nome",
     responsibleName: row.responsavel || "Responsável não informado",
-    cnpj: row.cnpj || "",
+    cnpj: "",
     location: row.localizacao || "",
     products: row.categorias_atendidas ?? [],
     active: row.ativo !== false,
@@ -38,7 +37,7 @@ async function loadProducers() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("producers")
-    .select("id,nome_propriedade,responsavel,cnpj,localizacao,categorias_atendidas,ativo")
+    .select("id,nome_propriedade,responsavel,localizacao,categorias_atendidas,ativo")
     .order("nome_propriedade", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((row) => mapProducer(row as RemoteProducer));

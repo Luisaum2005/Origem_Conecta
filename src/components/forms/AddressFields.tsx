@@ -12,7 +12,17 @@ function setFormValue(form: HTMLFormElement | null, name: string, value?: string
   }
 }
 
-export function AddressFields() {
+type AddressDefaults = {
+  postalCode?: string;
+  addressLine?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+};
+
+export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
   const [cepStatus, setCepStatus] = useState("");
   const [searching, setSearching] = useState(false);
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
@@ -78,6 +88,7 @@ export function AddressFields() {
             helper={cepStatus}
             aria-describedby="cep-status"
             required
+            defaultValue={defaults?.postalCode}
           />
           <button
             type="button"
@@ -92,16 +103,51 @@ export function AddressFields() {
             {cepStatus}
           </span>
         </div>
-        <Field name="logradouro" label="Logradouro" placeholder="Rua, avenida..." required />
+        <Field
+          name="logradouro"
+          label="Logradouro"
+          placeholder="Rua, avenida..."
+          defaultValue={defaults?.addressLine}
+          required
+        />
       </div>
       <div className="grid gap-5 sm:grid-cols-3">
-        <Field name="numero" label="Número" placeholder="123" required />
-        <Field name="complemento" label="Complemento" placeholder="Sala, bloco..." />
-        <Field name="bairro" label="Bairro" placeholder="Bairro" required />
+        <Field
+          name="numero"
+          label="Número"
+          placeholder="123"
+          defaultValue={defaults?.addressNumber}
+        />
+        <Field
+          name="complemento"
+          label="Complemento"
+          placeholder="Sala, bloco..."
+          defaultValue={defaults?.addressComplement}
+        />
+        <Field
+          name="bairro"
+          label="Bairro"
+          placeholder="Bairro"
+          defaultValue={defaults?.neighborhood}
+          required
+        />
       </div>
       <div className="grid gap-5 sm:grid-cols-[2fr_1fr]">
-        <Field name="municipio" label="Município" placeholder="Cidade" required />
-        <Field name="uf" label="UF" placeholder="SP" maxLength={2} required />
+        <Field
+          name="municipio"
+          label="Município"
+          placeholder="Cidade"
+          defaultValue={defaults?.city}
+          required
+        />
+        <Field
+          name="uf"
+          label="UF"
+          placeholder="SP"
+          defaultValue={defaults?.state}
+          maxLength={2}
+          required
+        />
       </div>
     </fieldset>
   );

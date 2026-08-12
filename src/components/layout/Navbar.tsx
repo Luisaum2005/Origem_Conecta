@@ -6,6 +6,11 @@ import { SupportButton } from "@/components/layout/SupportButton";
 import { PushOnboarding } from "@/components/notifications/PushOnboarding";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
+import {
+  isNavigationItemActive,
+  isOrganizationContext,
+  organizationNavigation,
+} from "@/lib/organization-navigation";
 import { Bell, Building2, LogOut, Repeat2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -39,9 +44,10 @@ export function Navbar() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
     useNotifications(profile?.userId);
-  const institutionalContext =
-    Boolean(profile?.roles?.includes("gestor_organizacao")) &&
-    (pathname.startsWith("/organizations") || pathname === "/profile/organization");
+  const institutionalContext = isOrganizationContext(
+    pathname,
+    Boolean(profile?.roles?.includes("gestor_organizacao")),
+  );
   const profilePath = institutionalContext
     ? "/profile/organization"
     : profile?.tipo === "comprador"
@@ -50,12 +56,7 @@ export function Navbar() {
         ? getProfileHome(profile.tipo)
         : "/login";
   const desktopLinks = institutionalContext
-    ? [
-        { to: "/organizations", label: "Painel" },
-        { to: "/organizations/members", label: "Associados" },
-        { to: "/organizations/negotiations", label: "Negociações" },
-        { to: "/organizations/messages", label: "Mensagens" },
-      ]
+    ? organizationNavigation
     : links
         .filter((link) => visible(link.profiles, profile?.tipo))
         .filter(
@@ -117,8 +118,11 @@ export function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900 xl:px-3 xl:text-sm"
-                  activeProps={{ className: "bg-secondary text-brand-900" }}
+                  className={`whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium hover:bg-secondary hover:text-brand-900 xl:px-3 xl:text-sm ${
+                    isNavigationItemActive(pathname, link.to, "exact" in link && link.exact)
+                      ? "bg-secondary text-brand-900"
+                      : "text-muted-foreground"
+                  }`}
                 >
                   {link.label}
                 </Link>

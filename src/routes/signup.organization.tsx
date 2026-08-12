@@ -11,7 +11,6 @@ export const Route = createFileRoute("/signup/organization")({ component: Signup
 function SignupOrganization() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
-  const [alsoProducer, setAlsoProducer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
@@ -50,23 +49,21 @@ function SignupOrganization() {
       return;
     }
     try {
-      const profile = await signUp({
-        tipo: alsoProducer ? "produtor" : "organizacao",
+      const result = await signUp({
+        tipo: "produtor",
         nome: responsible,
         email: String(form.get("email") ?? ""),
         password,
         telefone: String(form.get("telefone") ?? ""),
         cidade: String(form.get("municipio") ?? ""),
         estado: String(form.get("uf") ?? ""),
-        producer: alsoProducer
-          ? {
-              nomePropriedade: String(form.get("nomePropriedade") ?? ""),
-              responsavel: responsible,
-              cnpj: "",
-              produtos: [],
-              commercializationMode: "organization",
-            }
-          : undefined,
+        producer: {
+          nomePropriedade: String(form.get("nomePropriedade") ?? ""),
+          responsavel: responsible,
+          cnpj: "",
+          produtos: [],
+          commercializationMode: "organization",
+        },
         organization: {
           type: form.get("tipoOrganizacao") as "cooperativa" | "associacao",
           legalName: String(form.get("razaoSocial") ?? ""),
@@ -83,7 +80,15 @@ function SignupOrganization() {
           responsibleRole: String(form.get("cargo") ?? ""),
         },
       });
-      navigate({ to: getProfileHome(profile.tipo) });
+      if (result.requiresEmailConfirmation) {
+        window.sessionStorage.setItem(
+          "origem-conecta-auth-notice",
+          "Cadastro concluído. Confirme o e-mail recebido antes de entrar.",
+        );
+        navigate({ to: "/login" });
+      } else if (result.profile) {
+        navigate({ to: getProfileHome(result.profile.tipo) });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a organização.");
     } finally {
@@ -154,24 +159,17 @@ function SignupOrganization() {
         </div>
         <div data-step="3" className={step === 3 ? "space-y-6" : "hidden"}>
           <AddressFields />
-          <FormSection title="Produção própria">
-            <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={alsoProducer}
-                onChange={(event) => setAlsoProducer(event.target.checked)}
-                className="mt-1 h-5 w-5 accent-[var(--color-brand-900)]"
-              />
-              <span>
-                <span className="block text-sm font-semibold text-brand-900">
-                  Também sou produtor
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Cria o perfil de produção na mesma conta, sem outro login.
-                </span>
-              </span>
-            </label>
-            {alsoProducer && <Field name="nomePropriedade" label="Nome da propriedade" required />}
+          <FormSection title="Produção e comercialização">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              A mesma conta também terá acesso ao estoque e às negociações como produtor, sem
+              precisar de outro cadastro.
+            </p>
+            <Field
+              name="nomePropriedade"
+              label="Nome da propriedade ou unidade produtiva"
+              helper="Pode ser o nome da sede, fazenda ou unidade que publicará os produtos."
+              required
+            />
           </FormSection>
         </div>
         <div data-step="4" className={step === 4 ? "space-y-6" : "hidden"}>

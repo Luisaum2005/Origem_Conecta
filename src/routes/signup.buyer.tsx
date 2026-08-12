@@ -58,7 +58,7 @@ function SignupBuyer() {
     }
 
     try {
-      const profile = await signUp({
+      const result = await signUp({
         tipo: "comprador",
         nome: String(form.get("responsavel") ?? ""),
         email: String(form.get("email") ?? ""),
@@ -72,7 +72,15 @@ function SignupBuyer() {
           cnpj: String(form.get("cnpj") ?? ""),
         },
       });
-      navigate({ to: getProfileHome(profile.tipo) });
+      if (result.requiresEmailConfirmation) {
+        window.sessionStorage.setItem(
+          "origem-conecta-auth-notice",
+          "Cadastro concluído. Confirme o e-mail recebido antes de entrar.",
+        );
+        navigate({ to: "/login" });
+      } else if (result.profile) {
+        navigate({ to: getProfileHome(result.profile.tipo) });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
     } finally {

@@ -32,6 +32,7 @@ import { Route as ProfileProducerRouteImport } from './routes/profile.producer'
 import { Route as ProfileOrganizationRouteImport } from './routes/profile.organization'
 import { Route as ProfileBuyerRouteImport } from './routes/profile.buyer'
 import { Route as ProducerOrdersRouteImport } from './routes/producer.orders'
+import { Route as OrganizationsProductsRouteImport } from './routes/organizations.products'
 import { Route as OrganizationsNegotiationsRouteImport } from './routes/organizations.negotiations'
 import { Route as OrganizationsMessagesRouteImport } from './routes/organizations.messages'
 import { Route as OrganizationsMembersRouteImport } from './routes/organizations.members'
@@ -152,6 +153,11 @@ const ProducerOrdersRoute = ProducerOrdersRouteImport.update({
   path: '/producer/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganizationsProductsRoute = OrganizationsProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => OrganizationsRoute,
+} as any)
 const OrganizationsNegotiationsRoute =
   OrganizationsNegotiationsRouteImport.update({
     id: '/negotiations',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/organizations/members': typeof OrganizationsMembersRoute
   '/organizations/messages': typeof OrganizationsMessagesRoute
   '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
+  '/organizations/products': typeof OrganizationsProductsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/organization': typeof ProfileOrganizationRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/organizations/members': typeof OrganizationsMembersRoute
   '/organizations/messages': typeof OrganizationsMessagesRoute
   '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
+  '/organizations/products': typeof OrganizationsProductsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/organization': typeof ProfileOrganizationRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/organizations/members': typeof OrganizationsMembersRoute
   '/organizations/messages': typeof OrganizationsMessagesRoute
   '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
+  '/organizations/products': typeof OrganizationsProductsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
   '/profile/organization': typeof ProfileOrganizationRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/organizations/members'
     | '/organizations/messages'
     | '/organizations/negotiations'
+    | '/organizations/products'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/organization'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/organizations/members'
     | '/organizations/messages'
     | '/organizations/negotiations'
+    | '/organizations/products'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/organization'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/organizations/members'
     | '/organizations/messages'
     | '/organizations/negotiations'
+    | '/organizations/products'
     | '/producer/orders'
     | '/profile/buyer'
     | '/profile/organization'
@@ -542,6 +554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProducerOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizations/products': {
+      id: '/organizations/products'
+      path: '/products'
+      fullPath: '/organizations/products'
+      preLoaderRoute: typeof OrganizationsProductsRouteImport
+      parentRoute: typeof OrganizationsRoute
+    }
     '/organizations/negotiations': {
       id: '/organizations/negotiations'
       path: '/negotiations'
@@ -577,12 +596,14 @@ interface OrganizationsRouteChildren {
   OrganizationsMembersRoute: typeof OrganizationsMembersRoute
   OrganizationsMessagesRoute: typeof OrganizationsMessagesRoute
   OrganizationsNegotiationsRoute: typeof OrganizationsNegotiationsRoute
+  OrganizationsProductsRoute: typeof OrganizationsProductsRoute
 }
 
 const OrganizationsRouteChildren: OrganizationsRouteChildren = {
   OrganizationsMembersRoute: OrganizationsMembersRoute,
   OrganizationsMessagesRoute: OrganizationsMessagesRoute,
   OrganizationsNegotiationsRoute: OrganizationsNegotiationsRoute,
+  OrganizationsProductsRoute: OrganizationsProductsRoute,
 }
 
 const OrganizationsRouteWithChildren = OrganizationsRoute._addFileChildren(

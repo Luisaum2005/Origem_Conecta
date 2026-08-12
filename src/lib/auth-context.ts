@@ -18,6 +18,11 @@ export type SignInInput = {
   password: string;
 };
 
+export type SignUpResult = {
+  profile: AuthProfile | null;
+  requiresEmailConfirmation: boolean;
+};
+
 export type SignUpInput = {
   tipo: ProfileType;
   email: string;
@@ -63,7 +68,7 @@ export type AuthContextValue = {
   loading: boolean;
   isSupabaseConfigured: boolean;
   signIn: (input: SignInInput) => Promise<AuthProfile>;
-  signUp: (input: SignUpInput) => Promise<AuthProfile>;
+  signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
 };
 

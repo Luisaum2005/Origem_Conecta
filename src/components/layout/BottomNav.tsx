@@ -1,6 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import {
+  isNavigationItemActive,
+  isOrganizationContext,
+  organizationNavigation,
+} from "@/lib/organization-navigation";
+import {
   Building2,
   ClipboardList,
   Megaphone,
@@ -43,9 +48,10 @@ export function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-  const institutionalContext =
-    Boolean(profile?.roles?.includes("gestor_organizacao")) &&
-    (pathname.startsWith("/organizations") || pathname === "/profile/organization");
+  const institutionalContext = isOrganizationContext(
+    pathname,
+    Boolean(profile?.roles?.includes("gestor_organizacao")),
+  );
   const profilePath =
     profile?.tipo === "comprador"
       ? "/profile/buyer"
@@ -54,15 +60,8 @@ export function BottomNav() {
         : profile
           ? getProfileHome(profile.tipo)
           : "/login";
-  const institutionalItems = [
-    { to: "/organizations" as const, label: "Painel", icon: Building2 },
-    { to: "/organizations/members" as const, label: "Associados", icon: User },
-    { to: "/organizations/negotiations" as const, label: "Negociações", icon: ClipboardList },
-    { to: "/organizations/messages" as const, label: "Mensagens", icon: MessageSquare },
-    { to: "/profile/organization" as const, label: "Perfil", icon: User },
-  ];
   const candidateItems = institutionalContext
-    ? institutionalItems
+    ? organizationNavigation
     : profile
       ? [
           ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),
@@ -78,8 +77,9 @@ export function BottomNav() {
   const hasOverflow = visibleItems.length > 5;
   const primaryItems = hasOverflow ? visibleItems.slice(0, 4) : visibleItems;
   const overflowItems = hasOverflow ? visibleItems.slice(4) : [];
-  const isItemActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`);
-  const overflowActive = overflowItems.some((item) => isItemActive(item.to));
+  const isItemActive = (item: { to: string; exact?: boolean }) =>
+    isNavigationItemActive(pathname, item.to, item.exact);
+  const overflowActive = overflowItems.some(isItemActive);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -116,7 +116,7 @@ export function BottomNav() {
       <ul className="mx-auto flex h-[68px] max-w-md items-stretch justify-around px-1">
         {primaryItems.map((item) => {
           const Icon = item.icon;
-          const isActive = isItemActive(item.to);
+          const isActive = isItemActive(item);
           return (
             <li key={item.to} className="flex-1">
               <Link
@@ -189,7 +189,7 @@ export function BottomNav() {
               >
                 {overflowItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = isItemActive(item.to);
+                  const isActive = isItemActive(item);
                   return (
                     <Link
                       key={item.to}

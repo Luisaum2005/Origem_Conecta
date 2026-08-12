@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { assertSupabaseConfigured, supabase, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
 export type OrganizationStatus = "pending" | "active" | "rejected" | "suspended";
@@ -10,8 +10,13 @@ export type Organization = {
   cnpj: string;
   email: string;
   phone: string;
+  addressLine: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  neighborhood: string;
   city: string;
   state: string;
+  postalCode: string;
   responsibleName: string;
   responsibleRole: string;
   status: OrganizationStatus;
@@ -29,8 +34,13 @@ function mapOrganization(row: Record<string, unknown>): Organization {
     cnpj: String(row.cnpj),
     email: String(row.email),
     phone: String(row.phone),
+    addressLine: String(row.address_line ?? ""),
+    addressNumber: row.address_number ? String(row.address_number) : undefined,
+    addressComplement: row.address_complement ? String(row.address_complement) : undefined,
+    neighborhood: String(row.neighborhood ?? ""),
     city: String(row.city),
     state: String(row.state),
+    postalCode: String(row.postal_code ?? ""),
     responsibleName: String(row.responsible_name),
     responsibleRole: String(row.responsible_role),
     status: row.status as OrganizationStatus,
@@ -54,7 +64,7 @@ export function useOrganizations() {
     const { data, error: queryError } = await supabase
       .from("organizations")
       .select(
-        "id,type,legal_name,trade_name,cnpj,email,phone,city,state,responsible_name,responsible_role,status,verification_status,rejection_reason,created_at",
+        "id,type,legal_name,trade_name,cnpj,email,phone,address_line,address_number,address_complement,neighborhood,city,state,postal_code,responsible_name,responsible_role,status,verification_status,rejection_reason,created_at",
       )
       .order("created_at", { ascending: false });
     if (queryError) setError(queryError.message);
@@ -68,6 +78,67 @@ export function useOrganizations() {
     void refresh();
   }, [refresh]);
   return { organizations, loading, error, refresh };
+}
+
+export type OrganizationSettings = {
+  tradeName: string;
+  email: string;
+  phone: string;
+  addressLine: string;
+  addressNumber: string;
+  addressComplement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  responsibleName: string;
+  responsibleRole: string;
+};
+
+export function validateOrganizationSettings(settings: OrganizationSettings) {
+  const required = [
+    settings.tradeName,
+    settings.email,
+    settings.phone,
+    settings.addressLine,
+    settings.neighborhood,
+    settings.city,
+    settings.state,
+    settings.postalCode,
+    settings.responsibleName,
+    settings.responsibleRole,
+  ];
+  if (required.some((value) => !value.trim())) return "Preencha todos os campos obrigatórios.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email.trim())) return "Informe um e-mail válido.";
+  if (!/^\d{10,11}$/.test(settings.phone.replace(/\D/g, ""))) return "Informe um telefone com DDD.";
+  if (!/^\d{8}$/.test(settings.postalCode.replace(/\D/g, "")))
+    return "Informe um CEP com 8 números.";
+  if (!/^[A-Za-z]{2}$/.test(settings.state.trim())) return "Informe uma UF válida.";
+  return "";
+}
+
+export async function updateOrganizationSettings(
+  organizationId: string,
+  settings: OrganizationSettings,
+) {
+  const validationError = validateOrganizationSettings(settings);
+  if (validationError) throw new Error(validationError);
+  const { error } = await assertSupabaseConfigured().rpc("update_managed_organization_settings", {
+    p_organization_id: organizationId,
+    p_trade_name: settings.tradeName,
+    p_email: settings.email,
+    p_phone: settings.phone,
+    p_address_line: settings.addressLine,
+    p_address_number: settings.addressNumber,
+    p_address_complement: settings.addressComplement,
+    p_neighborhood: settings.neighborhood,
+    p_city: settings.city,
+    p_state: settings.state,
+    p_postal_code: settings.postalCode,
+    p_responsible_name: settings.responsibleName,
+    p_responsible_role: settings.responsibleRole,
+  });
+  throwSupabaseError(error);
 }
 
 export function isValidCnpj(value: string) {

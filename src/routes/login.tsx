@@ -12,6 +12,12 @@ function Login() {
   const { signIn, isSupabaseConfigured, profile, loading: restoringSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const message = window.sessionStorage.getItem("origem-conecta-auth-notice") ?? "";
+    window.sessionStorage.removeItem("origem-conecta-auth-notice");
+    return message;
+  });
 
   if (restoringSession) {
     return (
@@ -70,6 +76,14 @@ function Login() {
           Modo local ativo. Use qualquer e-mail e senha para testar. E-mails com "produtor" entram
           como produtor; os demais entram como comprador.
         </div>
+      )}
+      {notice && (
+        <p
+          role="status"
+          className="mb-5 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-brand-900"
+        >
+          {notice}
+        </p>
       )}
       <form className="space-y-5" onSubmit={onSubmit}>
         <Field

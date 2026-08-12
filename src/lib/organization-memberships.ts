@@ -9,6 +9,8 @@ export type Membership = {
   producerName: string;
   producerEmail: string;
   propertyName: string;
+  location?: string;
+  products: string[];
   status: MembershipStatus;
   memberNumber?: string;
   canSell: boolean;
@@ -39,6 +41,10 @@ function mapMembership(row: Record<string, unknown>): Membership {
     producerName: String(producer.responsavel ?? profile.nome ?? "Produtor"),
     producerEmail: String(profile.email ?? ""),
     propertyName: String(producer.nome_propriedade ?? "Propriedade"),
+    location: producer.localizacao ? String(producer.localizacao) : undefined,
+    products: Array.isArray(producer.categorias_atendidas)
+      ? producer.categorias_atendidas.map(String)
+      : [],
     status: row.status as MembershipStatus,
     memberNumber: row.member_number ? String(row.member_number) : undefined,
     canSell: Boolean(row.can_sell_through_organization),
@@ -59,7 +65,7 @@ export function useMemberships(organizationId?: string) {
     let query = supabase
       .from("organization_members")
       .select(
-        "id,organization_id,status,member_number,can_sell_through_organization,created_at,organizations(trade_name),producers(nome_propriedade,responsavel,profiles(nome,email))",
+        "id,organization_id,status,member_number,can_sell_through_organization,created_at,organizations(trade_name),producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,profiles(nome,email))",
       )
       .order("created_at", { ascending: false });
     if (organizationId) query = query.eq("organization_id", organizationId);
@@ -112,3 +118,5 @@ export const setCommercialPermission = (id: string, allowed: boolean) =>
   rpc("set_member_commercial_permission", { p_membership_id: id, p_allowed: allowed });
 export const deactivateMembership = (id: string) =>
   rpc("deactivate_organization_membership", { p_membership_id: id });
+export const cancelInvitation = (id: string) =>
+  rpc("cancel_organization_invitation", { p_membership_id: id });

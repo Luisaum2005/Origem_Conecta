@@ -49,13 +49,6 @@ type RemoteQuoteRequest = {
 
 export const QUOTE_REQUESTS_STORAGE_KEY = "origem-conecta-quote-requests";
 
-const appToDbStatus: Record<QuoteStatus, RemoteQuoteStatus> = {
-  Aberta: "aberta",
-  Respondida: "respondida",
-  Aprovada: "aprovada",
-  Recusada: "recusada",
-};
-
 const dbToAppStatus: Record<RemoteQuoteStatus, QuoteStatus> = {
   aberta: "Aberta",
   respondida: "Respondida",
@@ -156,30 +149,25 @@ async function loadRemoteQuotes(
   return (data ?? []).map((row) => mapRemoteQuote(row as RemoteQuoteRequest));
 }
 
-async function createRemoteQuote(profileId: string, quote: QuoteRequest) {
+async function createRemoteQuote(quote: QuoteRequest) {
   if (!supabase) return null;
-  const buyerId = await getBuyerId(profileId);
-  if (!buyerId) {
-    throw new Error("Cadastro de comprador nao encontrado para este usuario.");
-  }
-
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .insert({
-      buyer_id: buyerId,
-      nome_produto: quote.productName,
-      quantidade: Number(quote.quantity || 0),
-      unidade: quote.unit,
-      entrega_desejada: quote.deliveryDate || null,
-      preco_alvo: quote.targetPrice ? Number(String(quote.targetPrice).replace(",", ".")) : null,
-      observacoes: quote.notes || null,
-      status: appToDbStatus[quote.status],
-    })
-    .select("id,criado_em")
-    .single();
+  const { data, error } = await supabase.rpc("secure_create_quote", {
+    p_quote: {
+      productName: quote.productName,
+      quantity: Number(quote.quantity || 0),
+      unit: quote.unit,
+      deliveryDate: quote.deliveryDate || null,
+      targetPrice: quote.targetPrice ? Number(String(quote.targetPrice).replace(",", ".")) : null,
+      notes: quote.notes || null,
+    },
+  });
   if (error) throw error;
-
-  return { id: data.id as string, createdAt: data.criado_em as string };
+  const result = (Array.isArray(data) ? data[0] : data) as {
+    id?: string;
+    createdAt?: string;
+  } | null;
+  if (!result?.id || !result.createdAt) throw new Error("Não foi possível criar a solicitação.");
+  return { id: result.id, createdAt: result.createdAt };
 }
 
 async function respondRemoteQuote(
@@ -208,15 +196,6 @@ async function respondRemoteQuote(
   if (error) throw error;
   if (!data) throw new Error("Não foi possível responder à cotação.");
   return data as string;
-}
-
-async function updateRemoteQuoteStatus(id: string, status: QuoteStatus) {
-  if (!supabase) return;
-  const { error } = await supabase
-    .from("quote_requests")
-    .update({ status: appToDbStatus[status] })
-    .eq("id", id);
-  if (error) throw error;
 }
 
 export function useQuoteRequests() {
@@ -254,7 +233,7 @@ export function useQuoteRequests() {
     };
 
     if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      const remote = await createRemoteQuote(profile.id, next);
+      const remote = await createRemoteQuote(next);
       const savedQuote = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
       setQuotes((current) => [savedQuote, ...current]);
       return savedQuote;
@@ -298,14 +277,5 @@ export function useQuoteRequests() {
     );
   };
 
-  const updateStatus = async (id: string, status: QuoteStatus) => {
-    if (supabase && isSupabaseConfigured && profile?.tipo !== "produtor") {
-      await updateRemoteQuoteStatus(id, status);
-    }
-    setQuotes((current) =>
-      current.map((quote) => (quote.id === id ? { ...quote, status } : quote)),
-    );
-  };
-
-  return { quotes, addQuote, respondQuote, updateStatus };
+  return { quotes, addQuote, respondQuote };
 }

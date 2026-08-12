@@ -164,7 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             nome: input.nome,
             email: input.email,
             telefone: input.telefone,
-            roles: [defaultRole(input.tipo)],
+            roles:
+              input.organization && input.tipo === "produtor"
+                ? ["produtor", "gestor_organizacao"]
+                : [defaultRole(input.tipo)],
           };
           window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(localProfile));
           if (input.tipo === "produtor" && input.producer) {
@@ -183,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
           }
           setProfile(localProfile);
-          return localProfile;
+          return { profile: localProfile, requiresEmailConfirmation: false };
         }
 
         const signupPayload = buildSignupPayload(input);
@@ -194,6 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         throwSupabaseError(error);
         if (!data.user) throw new Error("Usuário não foi criado.");
+
+        if (!data.session) {
+          setProfile(null);
+          return { profile: null, requiresEmailConfirmation: true };
+        }
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -217,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(nextProfile));
         setProfile(nextProfile);
-        return nextProfile;
+        return { profile: nextProfile, requiresEmailConfirmation: false };
       },
       signOut: async () => {
         if (supabase) await supabase.auth.signOut();

@@ -197,17 +197,6 @@ async function getBuyer(profileId: string) {
   return data;
 }
 
-async function getProducer(profileId: string) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("producers")
-    .select("id,nome_propriedade,responsavel")
-    .eq("profile_id", profileId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
 async function loadRemoteDemands(
   profileId: string,
   profileType: "comprador" | "produtor" | "organizacao" | "admin",
@@ -236,84 +225,53 @@ async function loadRemoteDemands(
   return (data ?? []).map(mapDemand);
 }
 
-async function createRemoteDemand(profileId: string, profileName: string, input: NewDemandInput) {
+async function createRemoteDemand(input: NewDemandInput) {
   if (!supabase) return null;
-  const buyer = await getBuyer(profileId);
-  if (!buyer) throw new Error("Cadastro de comprador não encontrado.");
-
-  const { data, error } = await supabase
-    .from("demand_requests")
-    .insert({
-      buyer_id: buyer.id,
-      buyer_name: input.buyerName || buyer.nome_empresa || profileName,
-      delivery_date: input.deliveryDate,
+  const { data, error } = await supabase.rpc("secure_create_demand", {
+    p_demand: {
+      deliveryDate: input.deliveryDate,
       urgency: input.urgency,
-      status: "aberta",
-      payment_method: input.paymentMethod ?? "A combinar",
-      payment_notes: input.paymentNotes ?? null,
+      paymentMethod: input.paymentMethod ?? "A combinar",
+      paymentNotes: input.paymentNotes ?? null,
       notes: input.notes ?? null,
-    })
-    .select("id,created_at")
-    .single();
+    },
+    p_items: input.items.map((item) => ({
+      productName: item.productName,
+      quantity: item.quantity,
+      unit: item.unit,
+      productState: item.productState,
+      notes: item.notes ?? null,
+    })),
+  });
   if (error) throw error;
-
-  const itemsPayload = input.items.map((item) => ({
-    demand_id: data.id,
-    product_name: item.productName,
-    quantity: item.quantity,
-    unit: item.unit,
-    product_state: item.productState,
-    notes: item.notes ?? null,
-  }));
-
-  if (itemsPayload.length) {
-    const { error: itemsError } = await supabase.from("demand_items").insert(itemsPayload);
-    if (itemsError) throw itemsError;
-  }
-
-  return { id: data.id as string, createdAt: data.created_at as string };
+  const result = (Array.isArray(data) ? data[0] : data) as {
+    id?: string;
+    createdAt?: string;
+  } | null;
+  if (!result?.id || !result.createdAt) throw new Error("Não foi possível criar a demanda.");
+  return { id: result.id, createdAt: result.createdAt };
 }
 
-async function respondRemoteDemand(
-  profileId: string,
-  demandId: string,
-  response: NewDemandResponseInput,
-) {
+async function respondRemoteDemand(demandId: string, response: NewDemandResponseInput) {
   if (!supabase) return null;
-  const producer = await getProducer(profileId);
-  if (!producer) throw new Error("Cadastro de produtor não encontrado.");
-
-  const { data, error } = await supabase
-    .from("demand_responses")
-    .insert({
-      demand_id: demandId,
-      producer_id: producer.id,
-      producer_name: producer.responsavel || producer.nome_propriedade || response.producerName,
-      status: "enviada",
-      notes: response.notes ?? null,
-    })
-    .select("id,created_at")
-    .single();
+  const { data, error } = await supabase.rpc("secure_respond_demand", {
+    p_demand_id: demandId,
+    p_response: { notes: response.notes ?? null },
+    p_items: response.items.map((item) => ({
+      demandItemId: item.demandItemId,
+      quantity: item.quantity,
+      price: item.price,
+      canSupply: item.canSupply,
+      notes: item.notes ?? null,
+    })),
+  });
   if (error) throw error;
-
-  const itemsPayload = response.items.map((item) => ({
-    response_id: data.id,
-    demand_item_id: item.demandItemId ?? null,
-    product_name: item.productName,
-    quantity: item.quantity,
-    unit: item.unit,
-    price: item.price,
-    can_supply: item.canSupply,
-    notes: item.notes ?? null,
-  }));
-
-  if (itemsPayload.length) {
-    const { error: itemsError } = await supabase.from("demand_response_items").insert(itemsPayload);
-    if (itemsError) throw itemsError;
-  }
-
-  await supabase.from("demand_requests").update({ status: "respondida" }).eq("id", demandId);
-  return { id: data.id as string, createdAt: data.created_at as string };
+  const result = (Array.isArray(data) ? data[0] : data) as {
+    id?: string;
+    createdAt?: string;
+  } | null;
+  if (!result?.id || !result.createdAt) throw new Error("Não foi possível enviar a resposta.");
+  return { id: result.id, createdAt: result.createdAt };
 }
 
 async function approveRemoteResponse(
@@ -365,7 +323,7 @@ export function useDemandRequests() {
     };
 
     if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      const remote = await createRemoteDemand(profile.id, profile.nome, input);
+      const remote = await createRemoteDemand(input);
       const saved = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
       setDemands((current) => [saved, ...current]);
       return saved;
@@ -386,7 +344,7 @@ export function useDemandRequests() {
     };
 
     if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
-      const remote = await respondRemoteDemand(profile.id, demandId, response);
+      const remote = await respondRemoteDemand(demandId, response);
       localResponse.id = remote?.id ?? localResponse.id;
       localResponse.createdAt = remote?.createdAt ?? localResponse.createdAt;
     }

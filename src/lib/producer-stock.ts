@@ -70,6 +70,28 @@ type InventoryRow = {
   } | null;
 };
 
+type PortfolioInventoryRow = {
+  id: string;
+  producer_id: string | null;
+  product_name: string | null;
+  product_unit: string | null;
+  available_quantity: number | string | null;
+  price: number | string | null;
+  harvest_date: string | null;
+  expiry_date: string | null;
+  notes: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  seller_organization_id: string | null;
+  seller_organization_name: string | null;
+  seller_organization_cnpj: string | null;
+  producer_property: string | null;
+  producer_location: string | null;
+  producer_responsible: string | null;
+  commercialization_mode: "own" | "organization" | "undecided" | null;
+  commercial_verification_status: "self_declared" | "pending" | "verified" | "rejected" | null;
+};
+
 export const PRODUCER_STOCK_STORAGE_KEY = "origem-conecta-producer-stock";
 
 export const EMPTY_STOCK_ITEM: ProducerStockItem = {
@@ -125,6 +147,32 @@ function mapInventoryRow(row: InventoryRow): ProducerStockItem {
   };
 }
 
+function mapPortfolioInventoryRow(row: PortfolioInventoryRow): ProducerStockItem {
+  return {
+    id: row.id,
+    producerId: row.producer_id ?? undefined,
+    producerName: row.producer_property ?? undefined,
+    producerLocation: row.producer_location ?? undefined,
+    producerResponsible: row.producer_responsible ?? undefined,
+    commercializationMode: row.commercialization_mode ?? "undecided",
+    commercialVerificationStatus: row.commercial_verification_status ?? "self_declared",
+    sellerOrganizationId: row.seller_organization_id ?? undefined,
+    sellerOrganizationName: row.seller_organization_name ?? undefined,
+    sellerOrganizationCnpj: row.seller_organization_cnpj ?? undefined,
+    imageUrl: row.image_url ?? undefined,
+    videoUrl: row.video_url ?? undefined,
+    product: row.product_name || "Produto sem nome",
+    quantity: String(row.available_quantity ?? ""),
+    minimumStock: "",
+    unit: row.product_unit || "kg",
+    price: String(row.price ?? ""),
+    harvestDate: row.harvest_date ?? "",
+    expiryDate: row.expiry_date ?? "",
+    notes: row.notes ?? "",
+    status: "ativo",
+  };
+}
+
 async function getProducerId(profileId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
@@ -138,35 +186,34 @@ async function getProducerId(profileId: string) {
 
 async function loadInventory(producerId?: string | null) {
   if (!supabase) return null;
-  let query = supabase
+
+  if (!producerId) {
+    const { data, error } = await supabase.rpc("list_active_portfolio_inventory");
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      mapPortfolioInventoryRow(row as unknown as PortfolioInventoryRow),
+    );
+  }
+
+  const query = supabase
     .from("producer_inventory")
     .select(
       "id,producer_id,nome_produto,unidade,quantidade_disponivel,estoque_minimo,preco,data_colheita,validade,observacoes,imagem_url,video_url,ativo,seller_organization_id,seller_organization_name,seller_organization_cnpj,products(nome,unidade),producers(nome_propriedade,localizacao,responsavel,commercialization_mode,commercial_verification_status)",
     )
     .order("atualizado_em", { ascending: false })
-    .limit(100);
-
-  if (producerId) {
-    query = query.eq("producer_id", producerId);
-  } else {
-    query = query.eq("ativo", true);
-  }
+    .limit(100)
+    .eq("producer_id", producerId);
 
   const { data, error } = await query;
   if (error) {
-    let fallbackQuery = supabase
+    const fallbackQuery = supabase
       .from("producer_inventory")
       .select(
         "id,producer_id,nome_produto,unidade,quantidade_disponivel,preco,data_colheita,validade,observacoes,imagem_url,ativo",
       )
       .order("atualizado_em", { ascending: false })
-      .limit(100);
-
-    if (producerId) {
-      fallbackQuery = fallbackQuery.eq("producer_id", producerId);
-    } else {
-      fallbackQuery = fallbackQuery.eq("ativo", true);
-    }
+      .limit(100)
+      .eq("producer_id", producerId);
 
     const { data: fallbackData, error: fallbackError } = await fallbackQuery;
     if (fallbackError) throw fallbackError;
@@ -296,6 +343,7 @@ export function useProducerStock() {
   const [salesOrganizations, setSalesOrganizations] = useState<SalesOrganization[]>([]);
   const remoteLoadedRef = useRef(false);
   const lastSyncedRef = useRef("");
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     window.localStorage.setItem(PRODUCER_STOCK_STORAGE_KEY, JSON.stringify(items));
@@ -345,12 +393,21 @@ export function useProducerStock() {
     const serialized = JSON.stringify(items);
     if (serialized === lastSyncedRef.current) return;
 
-    lastSyncedRef.current = serialized;
-    syncProducerInventory(producerId, items).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn("Nao foi possivel sincronizar o estoque com o Supabase.", error);
-      toast.error(`Erro ao salvar estoque no Supabase: ${message}`);
-    });
+    const snapshot = items.map((item) => ({ ...item }));
+    const timeout = window.setTimeout(() => {
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await syncProducerInventory(producerId, snapshot);
+          lastSyncedRef.current = serialized;
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn("Nao foi possivel sincronizar o estoque com o Supabase.", error);
+          toast.error(`Erro ao salvar estoque no Supabase: ${message}`);
+        });
+    }, 400);
+    return () => window.clearTimeout(timeout);
   }, [isSupabaseConfigured, items, producerId]);
 
   const setItems = useCallback((next: SetStateAction<ProducerStockItem[]>) => {
