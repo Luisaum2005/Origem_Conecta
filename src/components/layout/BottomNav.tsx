@@ -43,21 +43,35 @@ export function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const institutionalContext =
+    Boolean(profile?.roles?.includes("gestor_organizacao")) &&
+    (pathname.startsWith("/organizations") || pathname === "/profile/organization");
   const profilePath =
     profile?.tipo === "comprador"
       ? "/profile/buyer"
-      : profile
-        ? getProfileHome(profile.tipo)
-        : "/login";
-  const candidateItems = profile
-    ? [
-        ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),
-        ...(profile.roles?.includes("gestor_organizacao")
-          ? [{ to: "/organizations" as const, label: "Organização", icon: Building2 }]
-          : []),
-        { to: profilePath, label: "Perfil", icon: User },
-      ]
-    : [{ to: "/login", label: "Entrar", icon: User }];
+      : profile?.tipo === "organizacao"
+        ? "/profile/organization"
+        : profile
+          ? getProfileHome(profile.tipo)
+          : "/login";
+  const institutionalItems = [
+    { to: "/organizations" as const, label: "Painel", icon: Building2 },
+    { to: "/organizations/members" as const, label: "Associados", icon: User },
+    { to: "/organizations/negotiations" as const, label: "Negociações", icon: ClipboardList },
+    { to: "/organizations/messages" as const, label: "Mensagens", icon: MessageSquare },
+    { to: "/profile/organization" as const, label: "Perfil", icon: User },
+  ];
+  const candidateItems = institutionalContext
+    ? institutionalItems
+    : profile
+      ? [
+          ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),
+          ...(profile.roles?.includes("gestor_organizacao")
+            ? [{ to: "/organizations" as const, label: "Organização", icon: Building2 }]
+            : []),
+          { to: profilePath, label: "Perfil", icon: User },
+        ]
+      : [{ to: "/login", label: "Entrar", icon: User }];
   const visibleItems = candidateItems.filter(
     (item, index, all) => all.findIndex((candidate) => candidate.to === item.to) === index,
   );

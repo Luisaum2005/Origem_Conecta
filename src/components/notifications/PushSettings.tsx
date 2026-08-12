@@ -13,6 +13,10 @@ import {
 } from "@/lib/push-notifications";
 import { BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
+import { reportAppError } from "@/lib/error-monitor";
+
+const PUSH_UNAVAILABLE_MESSAGE =
+  "As notificações estão temporariamente indisponíveis. Tente novamente mais tarde.";
 
 const preferenceOptions: Array<{
   key: keyof NotificationPreferences;
@@ -59,6 +63,15 @@ export function PushSettings() {
   const configurationError = validateVapidPublicKey(
     import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined,
   );
+
+  useEffect(() => {
+    if (configurationError) {
+      reportAppError(new Error(configurationError), {
+        source: "push-settings",
+        kind: "configuration",
+      });
+    }
+  }, [configurationError]);
 
   useEffect(() => {
     if (!profile || !isSupabaseConfigured) return;
@@ -175,7 +188,7 @@ export function PushSettings() {
           )}
           {configurationError && (
             <p className="mt-2 text-sm text-orange-700" role="alert">
-              {configurationError} O servidor também precisa ter as chaves privadas correspondentes.
+              {PUSH_UNAVAILABLE_MESSAGE}
             </p>
           )}
         </div>

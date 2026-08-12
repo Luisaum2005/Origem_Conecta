@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { AccessibilityControls } from "@/components/layout/AccessibilityControls";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -6,7 +6,7 @@ import { SupportButton } from "@/components/layout/SupportButton";
 import { PushOnboarding } from "@/components/notifications/PushOnboarding";
 import { getProfileHome, type ProfileType, useAuth } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
-import { Bell, Building2, LogOut, User } from "lucide-react";
+import { Bell, Building2, LogOut, Repeat2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const links = [
@@ -30,6 +30,7 @@ function visible(profiles: readonly ProfileType[], type?: ProfileType) {
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
@@ -38,12 +39,28 @@ export function Navbar() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
     useNotifications(profile?.userId);
-  const profilePath =
-    profile?.tipo === "comprador"
+  const institutionalContext =
+    Boolean(profile?.roles?.includes("gestor_organizacao")) &&
+    (pathname.startsWith("/organizations") || pathname === "/profile/organization");
+  const profilePath = institutionalContext
+    ? "/profile/organization"
+    : profile?.tipo === "comprador"
       ? "/profile/buyer"
       : profile
         ? getProfileHome(profile.tipo)
         : "/login";
+  const desktopLinks = institutionalContext
+    ? [
+        { to: "/organizations", label: "Painel" },
+        { to: "/organizations/members", label: "Associados" },
+        { to: "/organizations/negotiations", label: "Negociações" },
+        { to: "/organizations/messages", label: "Mensagens" },
+      ]
+    : links
+        .filter((link) => visible(link.profiles, profile?.tipo))
+        .filter(
+          (link) => link.to !== "/organizations" || profile?.roles?.includes("gestor_organizacao"),
+        );
   useEffect(() => {
     if (!open) return;
     const panel = notificationPanelRef.current;
@@ -96,22 +113,16 @@ export function Navbar() {
           <div className="flex min-w-0 items-center gap-4 xl:gap-8">
             <Logo compactOnMobile />
             <nav className="hidden min-w-0 items-center gap-0.5 lg:flex xl:gap-1">
-              {links
-                .filter((link) => visible(link.profiles, profile?.tipo))
-                .filter(
-                  (link) =>
-                    link.to !== "/organizations" || profile?.roles?.includes("gestor_organizacao"),
-                )
-                .map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900 xl:px-3 xl:text-sm"
-                    activeProps={{ className: "bg-secondary text-brand-900" }}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+              {desktopLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-brand-900 xl:px-3 xl:text-sm"
+                  activeProps={{ className: "bg-secondary text-brand-900" }}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
           </div>
           <div className="relative flex shrink-0 items-center gap-1 sm:gap-2">
@@ -237,6 +248,20 @@ export function Navbar() {
                   >
                     <User className="h-5 w-5" /> Meu perfil
                   </Link>
+                  {profile?.roles?.includes("produtor") &&
+                    profile.roles.includes("gestor_organizacao") && (
+                      <Link
+                        role="menuitem"
+                        to={institutionalContext ? "/profile/producer" : "/organizations"}
+                        onClick={() => setAccountOpen(false)}
+                        className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-brand-900 hover:bg-secondary"
+                      >
+                        <Repeat2 className="h-5 w-5" />
+                        {institutionalContext
+                          ? "Acessar perfil de produtor"
+                          : "Acessar organização"}
+                      </Link>
+                    )}
                   {profile?.tipo === "comprador" && (
                     <Link
                       role="menuitem"

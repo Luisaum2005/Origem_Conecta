@@ -10,6 +10,10 @@ import {
 } from "@/lib/push-notifications";
 import { BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
+import { reportAppError } from "@/lib/error-monitor";
+
+const PUSH_UNAVAILABLE_MESSAGE =
+  "As notificações estão temporariamente indisponíveis. Você poderá ativá-las depois em seu perfil.";
 
 export function PushOnboarding() {
   const { profile, isSupabaseConfigured } = useAuth();
@@ -21,6 +25,15 @@ export function PushOnboarding() {
   const configurationError = validateVapidPublicKey(
     import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined,
   );
+
+  useEffect(() => {
+    if (configurationError) {
+      reportAppError(new Error(configurationError), {
+        source: "push-onboarding",
+        kind: "configuration",
+      });
+    }
+  }, [configurationError]);
 
   useEffect(() => {
     if (!profile || !isSupabaseConfigured) {
@@ -94,7 +107,7 @@ export function PushOnboarding() {
           </p>
           {(error || configurationError) && (
             <p className="mt-2 text-sm font-medium text-red-700" role="alert">
-              {error || configurationError}
+              {configurationError ? PUSH_UNAVAILABLE_MESSAGE : error}
             </p>
           )}
           {pushState === "denied" && !error && (

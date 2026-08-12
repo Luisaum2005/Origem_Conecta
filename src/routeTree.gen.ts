@@ -29,8 +29,12 @@ import { Route as SignupOrganizationRouteImport } from './routes/signup.organiza
 import { Route as SignupBuyerRouteImport } from './routes/signup.buyer'
 import { Route as SignupAdminRouteImport } from './routes/signup.admin'
 import { Route as ProfileProducerRouteImport } from './routes/profile.producer'
+import { Route as ProfileOrganizationRouteImport } from './routes/profile.organization'
 import { Route as ProfileBuyerRouteImport } from './routes/profile.buyer'
 import { Route as ProducerOrdersRouteImport } from './routes/producer.orders'
+import { Route as OrganizationsNegotiationsRouteImport } from './routes/organizations.negotiations'
+import { Route as OrganizationsMessagesRouteImport } from './routes/organizations.messages'
+import { Route as OrganizationsMembersRouteImport } from './routes/organizations.members'
 import { Route as DirectoryOrganizationsRouteImport } from './routes/directory.organizations'
 
 const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
@@ -133,6 +137,11 @@ const ProfileProducerRoute = ProfileProducerRouteImport.update({
   path: '/profile/producer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileOrganizationRoute = ProfileOrganizationRouteImport.update({
+  id: '/profile/organization',
+  path: '/profile/organization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileBuyerRoute = ProfileBuyerRouteImport.update({
   id: '/profile/buyer',
   path: '/profile/buyer',
@@ -142,6 +151,22 @@ const ProducerOrdersRoute = ProducerOrdersRouteImport.update({
   id: '/producer/orders',
   path: '/producer/orders',
   getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizationsNegotiationsRoute =
+  OrganizationsNegotiationsRouteImport.update({
+    id: '/negotiations',
+    path: '/negotiations',
+    getParentRoute: () => OrganizationsRoute,
+  } as any)
+const OrganizationsMessagesRoute = OrganizationsMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => OrganizationsRoute,
+} as any)
+const OrganizationsMembersRoute = OrganizationsMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => OrganizationsRoute,
 } as any)
 const DirectoryOrganizationsRoute = DirectoryOrganizationsRouteImport.update({
   id: '/directory/organizations',
@@ -158,7 +183,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
-  '/organizations': typeof OrganizationsRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -166,8 +191,12 @@ export interface FileRoutesByFullPath {
   '/tracking': typeof TrackingRoute
   '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
+  '/organizations/members': typeof OrganizationsMembersRoute
+  '/organizations/messages': typeof OrganizationsMessagesRoute
+  '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
+  '/profile/organization': typeof ProfileOrganizationRoute
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
@@ -183,7 +212,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
-  '/organizations': typeof OrganizationsRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -191,8 +220,12 @@ export interface FileRoutesByTo {
   '/tracking': typeof TrackingRoute
   '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
+  '/organizations/members': typeof OrganizationsMembersRoute
+  '/organizations/messages': typeof OrganizationsMessagesRoute
+  '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
+  '/profile/organization': typeof ProfileOrganizationRoute
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
@@ -209,7 +242,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
-  '/organizations': typeof OrganizationsRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -217,8 +250,12 @@ export interface FileRoutesById {
   '/tracking': typeof TrackingRoute
   '/update-password': typeof UpdatePasswordRoute
   '/directory/organizations': typeof DirectoryOrganizationsRoute
+  '/organizations/members': typeof OrganizationsMembersRoute
+  '/organizations/messages': typeof OrganizationsMessagesRoute
+  '/organizations/negotiations': typeof OrganizationsNegotiationsRoute
   '/producer/orders': typeof ProducerOrdersRoute
   '/profile/buyer': typeof ProfileBuyerRoute
+  '/profile/organization': typeof ProfileOrganizationRoute
   '/profile/producer': typeof ProfileProducerRoute
   '/signup/admin': typeof SignupAdminRoute
   '/signup/buyer': typeof SignupBuyerRoute
@@ -244,8 +281,12 @@ export interface FileRouteTypes {
     | '/tracking'
     | '/update-password'
     | '/directory/organizations'
+    | '/organizations/members'
+    | '/organizations/messages'
+    | '/organizations/negotiations'
     | '/producer/orders'
     | '/profile/buyer'
+    | '/profile/organization'
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
@@ -269,8 +310,12 @@ export interface FileRouteTypes {
     | '/tracking'
     | '/update-password'
     | '/directory/organizations'
+    | '/organizations/members'
+    | '/organizations/messages'
+    | '/organizations/negotiations'
     | '/producer/orders'
     | '/profile/buyer'
+    | '/profile/organization'
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
@@ -294,8 +339,12 @@ export interface FileRouteTypes {
     | '/tracking'
     | '/update-password'
     | '/directory/organizations'
+    | '/organizations/members'
+    | '/organizations/messages'
+    | '/organizations/negotiations'
     | '/producer/orders'
     | '/profile/buyer'
+    | '/profile/organization'
     | '/profile/producer'
     | '/signup/admin'
     | '/signup/buyer'
@@ -312,7 +361,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrderRoute: typeof OrderRoute
   OrdersRoute: typeof OrdersRoute
-  OrganizationsRoute: typeof OrganizationsRoute
+  OrganizationsRoute: typeof OrganizationsRouteWithChildren
   PortfolioRoute: typeof PortfolioRoute
   ProductionRoute: typeof ProductionRoute
   RatingRoute: typeof RatingRoute
@@ -322,6 +371,7 @@ export interface RootRouteChildren {
   DirectoryOrganizationsRoute: typeof DirectoryOrganizationsRoute
   ProducerOrdersRoute: typeof ProducerOrdersRoute
   ProfileBuyerRoute: typeof ProfileBuyerRoute
+  ProfileOrganizationRoute: typeof ProfileOrganizationRoute
   ProfileProducerRoute: typeof ProfileProducerRoute
   SignupAdminRoute: typeof SignupAdminRoute
   SignupBuyerRoute: typeof SignupBuyerRoute
@@ -471,6 +521,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileProducerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile/organization': {
+      id: '/profile/organization'
+      path: '/profile/organization'
+      fullPath: '/profile/organization'
+      preLoaderRoute: typeof ProfileOrganizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile/buyer': {
       id: '/profile/buyer'
       path: '/profile/buyer'
@@ -485,6 +542,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProducerOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizations/negotiations': {
+      id: '/organizations/negotiations'
+      path: '/negotiations'
+      fullPath: '/organizations/negotiations'
+      preLoaderRoute: typeof OrganizationsNegotiationsRouteImport
+      parentRoute: typeof OrganizationsRoute
+    }
+    '/organizations/messages': {
+      id: '/organizations/messages'
+      path: '/messages'
+      fullPath: '/organizations/messages'
+      preLoaderRoute: typeof OrganizationsMessagesRouteImport
+      parentRoute: typeof OrganizationsRoute
+    }
+    '/organizations/members': {
+      id: '/organizations/members'
+      path: '/members'
+      fullPath: '/organizations/members'
+      preLoaderRoute: typeof OrganizationsMembersRouteImport
+      parentRoute: typeof OrganizationsRoute
+    }
     '/directory/organizations': {
       id: '/directory/organizations'
       path: '/directory/organizations'
@@ -495,6 +573,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface OrganizationsRouteChildren {
+  OrganizationsMembersRoute: typeof OrganizationsMembersRoute
+  OrganizationsMessagesRoute: typeof OrganizationsMessagesRoute
+  OrganizationsNegotiationsRoute: typeof OrganizationsNegotiationsRoute
+}
+
+const OrganizationsRouteChildren: OrganizationsRouteChildren = {
+  OrganizationsMembersRoute: OrganizationsMembersRoute,
+  OrganizationsMessagesRoute: OrganizationsMessagesRoute,
+  OrganizationsNegotiationsRoute: OrganizationsNegotiationsRoute,
+}
+
+const OrganizationsRouteWithChildren = OrganizationsRoute._addFileChildren(
+  OrganizationsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -504,7 +598,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrderRoute: OrderRoute,
   OrdersRoute: OrdersRoute,
-  OrganizationsRoute: OrganizationsRoute,
+  OrganizationsRoute: OrganizationsRouteWithChildren,
   PortfolioRoute: PortfolioRoute,
   ProductionRoute: ProductionRoute,
   RatingRoute: RatingRoute,
@@ -514,6 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   DirectoryOrganizationsRoute: DirectoryOrganizationsRoute,
   ProducerOrdersRoute: ProducerOrdersRoute,
   ProfileBuyerRoute: ProfileBuyerRoute,
+  ProfileOrganizationRoute: ProfileOrganizationRoute,
   ProfileProducerRoute: ProfileProducerRoute,
   SignupAdminRoute: SignupAdminRoute,
   SignupBuyerRoute: SignupBuyerRoute,

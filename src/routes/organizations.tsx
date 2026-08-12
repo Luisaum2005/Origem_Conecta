@@ -1,10 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { OrganizationMembers } from "@/components/organizations/OrganizationMembers";
-import { PushSettings } from "@/components/notifications/PushSettings";
 import { useOrganizations } from "@/lib/organizations";
-import { Building2, Clock3, ShieldCheck, Users } from "lucide-react";
+import { Building2, CheckCircle2, Clock3, MessageSquare, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/organizations")({
   component: () => (
@@ -27,6 +25,17 @@ function Organizations() {
         <p className="mt-2 text-sm text-muted-foreground">
           Gerencie as organizações vinculadas à sua conta e acompanhe a verificação cadastral.
         </p>
+        <section className="mt-6 rounded-2xl border border-leaf-200 bg-leaf-50 p-5">
+          <h2 className="text-lg font-bold text-brand-900">Primeiros passos</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use este roteiro para deixar a organização pronta para receber associados e negociar.
+          </p>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+            <GuideStep done={organizations.length > 0} text="Cadastro institucional criado" />
+            <GuideStep to="/organizations/members" text="Convidar ou aprovar associados" />
+            <GuideStep to="/profile/organization" text="Revisar perfil e notificações" />
+          </ol>
+        </section>
         {loading ? (
           <p className="mt-8 rounded-2xl border border-border bg-white p-6">
             Carregando organizações...
@@ -76,14 +85,44 @@ function Organizations() {
                     Motivo: {organization.rejectionReason}
                   </p>
                 )}
-                <OrganizationMembers organizationId={organization.id} />
+                <div className="mt-6 grid gap-2 border-t border-border pt-5 sm:grid-cols-3">
+                  <QuickLink to="/organizations/members" icon={Users} label="Associados" />
+                  <QuickLink
+                    to="/organizations/negotiations"
+                    icon={CheckCircle2}
+                    label="Negociações"
+                  />
+                  <QuickLink to="/organizations/messages" icon={MessageSquare} label="Mensagens" />
+                </div>
               </article>
             ))}
           </section>
         )}
-        <PushSettings />
       </main>
     </div>
+  );
+}
+function GuideStep({ text, done, to }: { text: string; done?: boolean; to?: string }) {
+  const content = (
+    <span className="flex min-h-12 items-center gap-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-brand-900">
+      {done ? (
+        <CheckCircle2 className="h-5 w-5 text-green-700" />
+      ) : (
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-leaf-100 text-xs">•</span>
+      )}
+      {text}
+    </span>
+  );
+  return <li>{to ? <Link to={to}>{content}</Link> : content}</li>;
+}
+function QuickLink({ to, label, icon: Icon }: { to: string; label: string; icon: typeof Users }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-brand-900 hover:bg-secondary"
+    >
+      <Icon className="h-4 w-4" /> {label}
+    </Link>
   );
 }
 function Empty() {
