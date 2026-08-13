@@ -1,5 +1,22 @@
-import { buildSignupPayload } from "@/lib/auth";
+import { AuthProvider, buildSignupPayload, useAuth } from "@/lib/auth";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
+function AuthStateProbe() {
+  const { loading, profile } = useAuth();
+  return createElement("span", null, `${loading}:${profile?.id ?? "none"}`);
+}
+
+describe("inicializaÃ§Ã£o segura da sessÃ£o", () => {
+  it("renderiza um estado neutro e carregando antes da hidrataÃ§Ã£o", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthProvider, null, createElement(AuthStateProbe)),
+    );
+
+    expect(html).toContain("true:none");
+  });
+});
 
 describe("payload transacional de cadastro", () => {
   it("não envia senha nem código administrativo aos metadados", () => {

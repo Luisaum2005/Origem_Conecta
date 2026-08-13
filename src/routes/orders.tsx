@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { SupportButton } from "@/components/layout/SupportButton";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
 import { getOperationWindow } from "@/lib/operation";
@@ -44,7 +45,15 @@ export const Route = createFileRoute("/orders")({
 });
 
 function Orders() {
-  const { orders, cancelOrder, openComplaint } = useOrders();
+  const {
+    orders,
+    loading,
+    error: loadError,
+    reload,
+    isOrderPending,
+    cancelOrder,
+    openComplaint,
+  } = useOrders();
   const operation = getOperationWindow();
   const { recurringOrders, toggleRecurringOrder, removeRecurringOrder } = useRecurringOrders();
   const products = useAvailableProducts();
@@ -165,6 +174,12 @@ function Orders() {
           {operation.issueText}
         </div>
 
+        {loadError && (
+          <div className="mt-6">
+            <DataLoadError message={loadError} onRetry={reload} />
+          </div>
+        )}
+
         {recurringOrders.length > 0 && (
           <section className="mt-8 rounded-2xl border border-border bg-white p-5 shadow-xs">
             <div>
@@ -230,7 +245,11 @@ function Orders() {
           </section>
         )}
 
-        {orders.length === 0 ? (
+        {loading && orders.length === 0 ? (
+          <div className="mt-8">
+            <DataLoading label={"Carregando suas solicita\u00e7\u00f5es..."} />
+          </div>
+        ) : !loadError && orders.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-border bg-white p-12 text-center">
             <h3 className="text-lg font-semibold text-brand-900">Nenhuma solicitação enviada</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -249,6 +268,7 @@ function Orders() {
               <BuyerOrderCard
                 key={order.id}
                 order={order}
+                pending={isOrderPending(order.id)}
                 repeatOrder={repeatOrder}
                 cancelOrder={cancelOrder}
                 openComplaint={openComplaint}
@@ -263,11 +283,13 @@ function Orders() {
 
 function BuyerOrderCard({
   order,
+  pending,
   repeatOrder,
   cancelOrder,
   openComplaint,
 }: {
   order: SavedOrder;
+  pending: boolean;
   repeatOrder: (orderId: string) => void;
   cancelOrder: (id: string, actor: "comprador", reason: string) => Promise<void>;
   openComplaint: (id: string, complaint: string) => Promise<void>;
@@ -452,6 +474,7 @@ function BuyerOrderCard({
             <button
               type="button"
               onClick={() => setIsCancelModalOpen(true)}
+              disabled={pending}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
             >
               Cancelar solicitação
@@ -476,6 +499,7 @@ function BuyerOrderCard({
                   <textarea
                     value={cancelReason}
                     onChange={(event) => setCancelReason(event.target.value)}
+                    disabled={pending}
                     placeholder="Informe o motivo do cancelamento"
                     rows={3}
                     className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
@@ -486,6 +510,7 @@ function BuyerOrderCard({
                 <button
                   type="button"
                   onClick={() => setIsCancelModalOpen(false)}
+                  disabled={pending}
                   className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
                 >
                   Voltar
@@ -493,10 +518,11 @@ function BuyerOrderCard({
                 <button
                   type="button"
                   onClick={() => void cancel()}
-                  disabled={!cancelReason.trim()}
+                  disabled={!cancelReason.trim() || pending}
+                  aria-busy={pending || undefined}
                   className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                 >
-                  Confirmar Cancelamento
+                  {pending ? "Cancelando..." : "Confirmar cancelamento"}
                 </button>
               </DialogFooter>
             </DialogContent>
@@ -513,6 +539,7 @@ function BuyerOrderCard({
             <textarea
               value={complaint}
               onChange={(event) => setComplaint(event.target.value)}
+              disabled={pending}
               rows={3}
               placeholder="Descreva o problema para a operação acompanhar."
               className="mt-2 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
@@ -521,6 +548,8 @@ function BuyerOrderCard({
           <button
             type="button"
             onClick={() => void complain()}
+            disabled={pending}
+            aria-busy={pending || undefined}
             className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
           >
             Enviar reclamação

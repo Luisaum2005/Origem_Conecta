@@ -1,6 +1,6 @@
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type BuyerProfileDetails = {
   companyName: string;
@@ -147,6 +147,10 @@ export function useBuyerProfileDetails() {
     supabase ? DEFAULT_BUYER_PROFILE : readStoredProfile(),
   );
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(Boolean(supabase));
+  const [error, setError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (supabase && isSupabaseConfigured) return;
@@ -154,33 +158,56 @@ export function useBuyerProfileDetails() {
   }, [details, isSupabaseConfigured]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured || profile?.tipo !== "comprador") return;
+    if (!supabase || !isSupabaseConfigured) {
+      setLoading(false);
+      setError("");
+      return;
+    }
+    if (profile?.tipo !== "comprador") return;
     let active = true;
+    setLoading(true);
+    setError("");
 
     loadRemoteBuyerProfile(profile.id)
       .then((remoteDetails) => {
         if (active && remoteDetails) setDetails(remoteDetails);
       })
-      .catch((error) => {
-        console.warn("Nao foi possivel carregar o perfil do comprador.", error);
+      .catch((loadError) => {
+        if (!active) return;
+        console.warn("Nao foi possivel carregar o perfil do comprador.", loadError);
+        setError("N\u00e3o conseguimos carregar os dados da sua empresa agora.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [isSupabaseConfigured, profile?.id, profile?.tipo]);
+  }, [isSupabaseConfigured, profile?.id, profile?.tipo, reloadVersion]);
 
-  const saveDetails = async (nextDetails: BuyerProfileDetails) => {
+  const saveDetails = (nextDetails: BuyerProfileDetails) => {
+    if (savePromiseRef.current) return savePromiseRef.current;
     setSaving(true);
-    try {
+    const promise = (async () => {
       if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
         await updateRemoteBuyerProfile(profile.id, nextDetails);
       }
       setDetails(nextDetails);
-    } finally {
+    })().finally(() => {
+      savePromiseRef.current = null;
       setSaving(false);
-    }
+    });
+    savePromiseRef.current = promise;
+    return promise;
   };
 
-  return { details, saveDetails, saving };
+  return {
+    details,
+    saveDetails,
+    saving,
+    loading,
+    error,
+    reload: () => setReloadVersion((current) => current + 1),
+  };
 }

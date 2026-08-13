@@ -1,6 +1,6 @@
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type ProducerProfileDetails = {
   propertyName: string;
@@ -203,6 +203,10 @@ export function useProducerProfileDetails() {
     supabase ? DEFAULT_PRODUCER_PROFILE : readStoredProfile(),
   );
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(Boolean(supabase));
+  const [error, setError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (supabase && isSupabaseConfigured) return;
@@ -213,6 +217,8 @@ export function useProducerProfileDetails() {
     if (profile?.tipo !== "produtor") return;
 
     if (!supabase || !isSupabaseConfigured) {
+      setLoading(false);
+      setError("");
       // Local/mock mode: load signup details from local storage
       try {
         const detailsJson = window.localStorage.getItem(
@@ -247,22 +253,37 @@ export function useProducerProfileDetails() {
     }
 
     let active = true;
+    setLoading(true);
+    setError("");
     loadRemoteProducerProfile(profile.id)
       .then((remoteDetails) => {
         if (active && remoteDetails) setDetails(remoteDetails);
       })
-      .catch((error) => {
-        console.warn("Nao foi possivel carregar o perfil do produtor.", error);
+      .catch((loadError) => {
+        if (!active) return;
+        console.warn("Nao foi possivel carregar o perfil do produtor.", loadError);
+        setError("N\u00e3o conseguimos carregar os dados da sua propriedade agora.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [isSupabaseConfigured, profile?.id, profile?.tipo, profile?.nome, profile?.telefone]);
+  }, [
+    isSupabaseConfigured,
+    profile?.id,
+    profile?.tipo,
+    profile?.nome,
+    profile?.telefone,
+    reloadVersion,
+  ]);
 
-  const saveDetails = async (nextDetails: ProducerProfileDetails) => {
+  const saveDetails = (nextDetails: ProducerProfileDetails) => {
+    if (savePromiseRef.current) return savePromiseRef.current;
     setSaving(true);
-    try {
+    const promise = (async () => {
       if (supabase && isSupabaseConfigured && profile?.tipo === "produtor") {
         await updateRemoteProducerProfile(profile.id, nextDetails);
       } else if (profile?.tipo === "produtor") {
@@ -288,10 +309,20 @@ export function useProducerProfileDetails() {
         );
       }
       setDetails(nextDetails);
-    } finally {
+    })().finally(() => {
+      savePromiseRef.current = null;
       setSaving(false);
-    }
+    });
+    savePromiseRef.current = promise;
+    return promise;
   };
 
-  return { details, saveDetails, saving };
+  return {
+    details,
+    saveDetails,
+    saving,
+    loading,
+    error,
+    reload: () => setReloadVersion((current) => current + 1),
+  };
 }

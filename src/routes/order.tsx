@@ -22,7 +22,7 @@ import {
   Trash2,
   Truck,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export const Route = createFileRoute("/order")({
   component: () => (
@@ -73,6 +73,7 @@ function Order() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [maturityPreference, setMaturityPreference] = useState(maturityOptions[0]);
   const [copyNotice, setCopyNotice] = useState("");
+  const orderRequestIdRef = useRef<string | null>(null);
   const items = products.filter((product) => cart[product.id]);
 
   const subtotal = items.reduce((sum, product) => {
@@ -190,24 +191,29 @@ function Order() {
     setIsConfirming(true);
     setConfirmError("");
     try {
-      const savedOrder = await addOrder({
-        buyerName: buyerDetails.companyName || buyerDetails.responsibleName || "Comprador",
-        subtotal,
-        delivery,
-        total,
-        deliveryEta: operation.deliveryLabel,
-        paymentMethod: "A combinar",
-        deliveryAddress: {
-          postalCode: buyerDetails.postalCode.replace(/\D/g, ""),
-          addressLine: buyerDetails.addressLine.trim(),
-          addressNumber: buyerDetails.addressNumber.trim() || undefined,
-          addressComplement: buyerDetails.addressComplement.trim() || undefined,
-          neighborhood: buyerDetails.neighborhood.trim() || undefined,
-          city: buyerDetails.city.trim(),
-          state: buyerDetails.state.trim().toUpperCase(),
+      orderRequestIdRef.current ??= crypto.randomUUID();
+      const savedOrder = await addOrder(
+        {
+          buyerName: buyerDetails.companyName || buyerDetails.responsibleName || "Comprador",
+          subtotal,
+          delivery,
+          total,
+          deliveryEta: operation.deliveryLabel,
+          paymentMethod: "A combinar",
+          deliveryAddress: {
+            postalCode: buyerDetails.postalCode.replace(/\D/g, ""),
+            addressLine: buyerDetails.addressLine.trim(),
+            addressNumber: buyerDetails.addressNumber.trim() || undefined,
+            addressComplement: buyerDetails.addressComplement.trim() || undefined,
+            neighborhood: buyerDetails.neighborhood.trim() || undefined,
+            city: buyerDetails.city.trim(),
+            state: buyerDetails.state.trim().toUpperCase(),
+          },
+          items: orderItems,
         },
-        items: orderItems,
-      });
+        orderRequestIdRef.current,
+      );
+      orderRequestIdRef.current = null;
       clear();
       window.sessionStorage.setItem(
         "origem-conecta-order-success",

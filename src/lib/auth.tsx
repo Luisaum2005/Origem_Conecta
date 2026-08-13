@@ -8,6 +8,7 @@ import {
   type SignInInput,
 } from "@/lib/auth-context";
 import { buildSignupPayload } from "@/lib/signup-payload";
+import { reportAppError } from "@/lib/error-monitor";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 const LOCAL_PROFILE_KEY = "origem-conecta-auth-profile";
 
@@ -33,12 +34,18 @@ function readLocalProfile() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<AuthProfile | null>(() =>
-    isDemoMode ? readLocalProfile() : null,
-  );
-  const [loading, setLoading] = useState(Boolean(supabase));
+  // Keep the server and the browser's first render identical. Browser storage is
+  // restored only after hydration, including in the explicit demo mode.
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setProfile(readLocalProfile());
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setLoading(false);
       return;
@@ -46,22 +53,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = supabase;
 
     let active = true;
+    let restoreVersion = 0;
 
     async function loadProfile(userId?: string) {
+      const currentVersion = ++restoreVersion;
+
       if (!userId) {
-        if (active) setProfile(null);
+        if (active && currentVersion === restoreVersion) setProfile(null);
         window.localStorage.removeItem(LOCAL_PROFILE_KEY);
-        if (active) setLoading(false);
+        if (active && currentVersion === restoreVersion) setLoading(false);
         return;
       }
 
-      const { data, error } = await client
-        .from("profiles")
-        .select("id,user_id,tipo,nome,email,telefone")
-        .eq("user_id", userId)
-        .maybeSingle();
+      try {
+        const { data, error } = await client
+          .from("profiles")
+          .select("id,user_id,tipo,nome,email,telefone")
+          .eq("user_id", userId)
+          .maybeSingle();
+        throwSupabaseError(error);
 
-      if (active && data) {
+        if (!active || currentVersion !== restoreVersion) return;
+        if (!data) {
+          setProfile(null);
+          window.localStorage.removeItem(LOCAL_PROFILE_KEY);
+          return;
+        }
+
         const restoredProfile: AuthProfile = {
           id: data.id,
           userId: data.user_id,
@@ -71,22 +89,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           telefone: data.telefone ?? undefined,
           roles: await getProfileRoles(data.id, data.tipo as ProfileType),
         };
+        if (!active || currentVersion !== restoreVersion) return;
         setProfile(restoredProfile);
         window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(restoredProfile));
-      } else if (active) {
+      } catch (error) {
+        if (!active || currentVersion !== restoreVersion) return;
+        reportAppError(error, { source: "auth-session-restore" });
         setProfile(null);
         window.localStorage.removeItem(LOCAL_PROFILE_KEY);
+      } finally {
+        if (active && currentVersion === restoreVersion) setLoading(false);
       }
-      if (active) setLoading(false);
     }
 
-    void client.auth.getSession().then(({ data }) => {
-      void loadProfile(data.session?.user.id);
-    });
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
       // Run outside the auth callback to avoid competing with Supabase's session lock.
+      setLoading(true);
       window.setTimeout(() => void loadProfile(session?.user.id), 0);
     });
+    void client.auth
+      .getSession()
+      .then(({ data, error }) => {
+        throwSupabaseError(error);
+        return loadProfile(data.session?.user.id);
+      })
+      .catch((error) => {
+        if (!active) return;
+        reportAppError(error, { source: "auth-session-read" });
+        setProfile(null);
+        setLoading(false);
+      });
 
     return () => {
       active = false;

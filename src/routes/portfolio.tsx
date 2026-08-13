@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProductCard } from "@/components/marketplace/ProductCard";
-import { useAvailableProducts } from "@/lib/available-products";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
+import { useAvailableProductsResource } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
 import { Building2, Search, ShoppingBag } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/portfolio")({
 });
 
 function Portfolio() {
-  const products = useAvailableProducts();
+  const { products, loading, error, reload } = useAvailableProductsResource();
   const categories = useMemo(
     () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
     [products],
@@ -86,20 +87,32 @@ function Portfolio() {
           })}
         </div>
 
-        <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              qty={cart[product.id] ?? 0}
-              onChange={(qty) => setQty(product.id, qty)}
-              selectedUnit={selectedUnits[product.id] ?? product.unit}
-              onUnitChange={(unit) => setUnit(product.id, unit)}
-            />
-          ))}
-        </section>
+        {error && (
+          <div className="mt-8">
+            <DataLoadError message={error} onRetry={reload} />
+          </div>
+        )}
 
-        {filtered.length === 0 && (
+        {loading && products.length === 0 ? (
+          <div className="mt-10">
+            <DataLoading label={"Carregando produtos dispon\u00edveis..."} />
+          </div>
+        ) : (
+          <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                qty={cart[product.id] ?? 0}
+                onChange={(qty) => setQty(product.id, qty)}
+                selectedUnit={selectedUnits[product.id] ?? product.unit}
+                onUnitChange={(unit) => setUnit(product.id, unit)}
+              />
+            ))}
+          </section>
+        )}
+
+        {!loading && !error && filtered.length === 0 && (
           <div className="mt-10 rounded-2xl border border-border bg-canvas p-12 text-center">
             <h3 className="text-lg font-semibold text-brand-900">Nenhum produto disponível</h3>
             <p className="mt-2 text-sm text-muted-foreground">

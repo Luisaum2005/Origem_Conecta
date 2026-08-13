@@ -26,9 +26,13 @@ function inferEmoji(productName: string) {
 }
 
 export function useAvailableProducts() {
-  const [stock] = useProducerStock();
+  return useAvailableProductsResource().products;
+}
 
-  return useMemo<Product[]>(() => {
+export function useAvailableProductsResource() {
+  const [stock, , resource] = useProducerStock();
+
+  const products = useMemo<Product[]>(() => {
     let localProducer: {
       nome_propriedade?: string;
       responsavel?: string;
@@ -94,4 +98,11 @@ export function useAvailableProducts() {
         };
       });
   }, [stock]);
+
+  return {
+    products,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+  };
 }

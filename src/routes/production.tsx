@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { InstallButton } from "@/components/pwa/InstallButton";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,8 +59,20 @@ function organizationOptionLabel(organization: SalesOrganization) {
 }
 
 function Production() {
-  const [items, setItems, { uploadImage, uploadVideo, deleteItem, salesOrganizations }] =
-    useProducerStock();
+  const [
+    items,
+    setItems,
+    {
+      uploadImage,
+      uploadVideo,
+      deleteItem,
+      salesOrganizations,
+      loading,
+      error,
+      reload,
+      deletingItemIds,
+    },
+  ] = useProducerStock();
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -185,9 +198,17 @@ function Production() {
           />
         </section>
 
+        {error && (
+          <div className="mt-6">
+            <DataLoadError message={error} onRetry={reload} />
+          </div>
+        )}
+
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
           <section>
-            {items.length === 0 ? (
+            {loading && items.length === 0 ? (
+              <DataLoading label="Carregando seu estoque..." />
+            ) : !error && items.length === 0 ? (
               <div className="rounded-2xl border border-border bg-canvas p-10 text-center">
                 <Sprout className="mx-auto h-10 w-10 text-leaf-600" />
                 <h3 className="mt-4 text-lg font-semibold text-brand-900">
@@ -207,6 +228,7 @@ function Production() {
                     onDelete={() => void remove(item)}
                     onToggleStatus={() => toggleStatus(item.id)}
                     editing={editingId === item.id}
+                    deleting={deletingItemIds.has(item.id)}
                   />
                 ))}
               </ul>
@@ -634,12 +656,14 @@ function StockRow({
   onDelete,
   onToggleStatus,
   editing,
+  deleting,
 }: {
   item: ProducerStockItem;
   onEdit: () => void;
   onDelete: () => void;
   onToggleStatus: () => void;
   editing: boolean;
+  deleting: boolean;
 }) {
   const fmt = (date: string) => {
     if (!date) return "sem data";
@@ -717,6 +741,7 @@ function StockRow({
         <button
           type="button"
           onClick={onToggleStatus}
+          disabled={deleting}
           className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
         >
           {item.status === "ativo" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -725,6 +750,7 @@ function StockRow({
         <button
           type="button"
           onClick={onEdit}
+          disabled={deleting}
           className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
         >
           <Pencil className="h-4 w-4" />
@@ -734,6 +760,7 @@ function StockRow({
           <AlertDialogTrigger asChild>
             <button
               type="button"
+              disabled={deleting}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
             >
               <Trash2 className="h-4 w-4" /> Excluir
@@ -750,9 +777,11 @@ function StockRow({
               <AlertDialogCancel>Manter produto</AlertDialogCancel>
               <AlertDialogAction
                 onClick={onDelete}
+                disabled={deleting}
+                aria-busy={deleting || undefined}
                 className="bg-red-700 text-white hover:bg-red-800"
               >
-                Excluir produto
+                {deleting ? "Excluindo..." : "Excluir produto"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

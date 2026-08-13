@@ -4,6 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { PushSettings } from "@/components/notifications/PushSettings";
 import { ProducerMemberships } from "@/components/organizations/ProducerMemberships";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { useAuth } from "@/lib/auth";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import { type ProducerProfileDetails, useProducerProfileDetails } from "@/lib/producer-profile";
@@ -42,9 +43,16 @@ const PRODUCER_NAME = "Produtor";
 
 function ProducerProfile() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const { details, saveDetails, saving } = useProducerProfileDetails();
-  const [stock] = useProducerStock();
-  const { orders } = useOrders();
+  const {
+    details,
+    saveDetails,
+    saving,
+    loading: profileLoading,
+    error: profileError,
+    reload: reloadProfile,
+  } = useProducerProfileDetails();
+  const [stock, , stockResource] = useProducerStock();
+  const { orders, loading: ordersLoading, error: ordersError, reload: reloadOrders } = useOrders();
   const producerName =
     details.propertyName || (profile?.tipo === "produtor" ? profile.nome : PRODUCER_NAME);
 
@@ -101,6 +109,30 @@ function ProducerProfile() {
             </Link>
           </div>
         </div>
+
+        {(profileLoading || stockResource.loading || ordersLoading) &&
+          !profileError &&
+          !stockResource.error &&
+          !ordersError && (
+            <div className="mt-6">
+              <DataLoading label="Atualizando seu painel..." />
+            </div>
+          )}
+        {profileError && (
+          <div className="mt-6">
+            <DataLoadError message={profileError} onRetry={reloadProfile} />
+          </div>
+        )}
+        {stockResource.error && (
+          <div className="mt-6">
+            <DataLoadError message={stockResource.error} onRetry={stockResource.reload} />
+          </div>
+        )}
+        {ordersError && (
+          <div className="mt-6">
+            <DataLoadError message={ordersError} onRetry={reloadOrders} />
+          </div>
+        )}
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />

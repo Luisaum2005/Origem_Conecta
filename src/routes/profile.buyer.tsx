@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { PushSettings } from "@/components/notifications/PushSettings";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { type BuyerProfileDetails, useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import {
@@ -32,8 +33,15 @@ export const Route = createFileRoute("/profile/buyer")({
 });
 
 function BuyerProfile() {
-  const { details, saveDetails, saving } = useBuyerProfileDetails();
-  const { orders } = useOrders();
+  const {
+    details,
+    saveDetails,
+    saving,
+    loading: profileLoading,
+    error: profileError,
+    reload: reloadProfile,
+  } = useBuyerProfileDetails();
+  const { orders, loading: ordersLoading, error: ordersError, reload: reloadOrders } = useOrders();
   const location = [details.city, details.state].filter(Boolean).join(", ");
   const activeOrders = orders.filter((order) => order.status !== "Cancelado");
   const deliveredOrders = activeOrders.filter((order) => order.status === "Entregue");
@@ -80,6 +88,22 @@ function BuyerProfile() {
             Novo pedido
           </Link>
         </div>
+
+        {(profileLoading || ordersLoading) && !profileError && !ordersError && (
+          <div className="mt-6">
+            <DataLoading label="Atualizando seu painel..." />
+          </div>
+        )}
+        {profileError && (
+          <div className="mt-6">
+            <DataLoadError message={profileError} onRetry={reloadProfile} />
+          </div>
+        )}
+        {ordersError && (
+          <div className="mt-6">
+            <DataLoadError message={ordersError} onRetry={reloadOrders} />
+          </div>
+        )}
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Metric icon={ShieldCheck} label="Pedidos entregues" value={`${onTimeRate}%`} />

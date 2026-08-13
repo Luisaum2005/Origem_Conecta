@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { AuthLayout, Field, FormError, PrimaryButton } from "@/components/auth/AuthShell";
 import { getProfileHome, useAuth } from "@/lib/auth";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 export const Route = createFileRoute("/login")({
   component: Login,
@@ -12,12 +12,13 @@ function Login() {
   const { signIn, isDemoMode, profile, loading: restoringSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [notice] = useState(() => {
-    if (typeof window === "undefined") return "";
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
     const message = window.sessionStorage.getItem("origem-conecta-auth-notice") ?? "";
     window.sessionStorage.removeItem("origem-conecta-auth-notice");
-    return message;
-  });
+    setNotice(message);
+  }, []);
 
   if (restoringSession) {
     return (

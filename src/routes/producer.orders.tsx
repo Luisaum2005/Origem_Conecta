@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { useAuth } from "@/lib/auth";
 import {
   canCancelOrder,
@@ -50,7 +51,17 @@ const PRODUCER_NAME = "Produtor";
 
 function ProducerOrders() {
   const { profile, isSupabaseConfigured } = useAuth();
-  const { orders, updateStatus, confirmDelivery, cancelOrder, completeDelivery } = useOrders();
+  const {
+    orders,
+    loading: ordersLoading,
+    error: ordersError,
+    reload: reloadOrders,
+    isOrderPending,
+    updateStatus,
+    confirmDelivery,
+    cancelOrder,
+    completeDelivery,
+  } = useOrders();
   const producerName = profile?.tipo === "produtor" ? profile.nome : PRODUCER_NAME;
   const producerOrders = getProducerOrders(
     orders,
@@ -144,7 +155,11 @@ function ProducerOrders() {
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <Panel title="Fila operacional" icon={ClipboardList}>
-            {producerOrders.length === 0 ? (
+            {ordersError ? (
+              <DataLoadError message={ordersError} onRetry={reloadOrders} />
+            ) : ordersLoading && producerOrders.length === 0 ? (
+              <DataLoading label={"Carregando solicita\u00e7\u00f5es recebidas..."} />
+            ) : producerOrders.length === 0 ? (
               <EmptyState />
             ) : (
               <ul className="space-y-4">
@@ -152,6 +167,7 @@ function ProducerOrders() {
                   <ProducerOrderCard
                     key={order.id}
                     order={order}
+                    pending={isOrderPending(order.id)}
                     updateStatus={updateStatus}
                     confirmDelivery={confirmDelivery}
                     cancelOrder={cancelOrder}
@@ -219,6 +235,7 @@ function ProducerOrders() {
 
 function ProducerOrderCard({
   order,
+  pending,
   updateStatus,
   confirmDelivery,
   cancelOrder,
@@ -227,6 +244,7 @@ function ProducerOrderCard({
   onRate,
 }: {
   order: SavedOrder;
+  pending: boolean;
   updateStatus: (id: string, status: OrderStatus) => Promise<void>;
   confirmDelivery: (id: string, deliveryAt: string) => Promise<void>;
   cancelOrder: (id: string, actor: "produtor", reason: string) => Promise<void>;
@@ -248,6 +266,7 @@ function ProducerOrderCard({
   const [ratingComment, setRatingComment] = useState("");
   const [submittingRating, setSubmittingRating] = useState(false);
   const cancelAllowed = canCancelOrder(order);
+  const operationPending = saving || pending;
   const hasDeliveryAddress = Boolean(
     order.deliveryAddress?.addressLine && order.deliveryAddress.city && order.deliveryAddress.state,
   );
@@ -337,6 +356,20 @@ function ProducerOrderCard({
       setDeliveryCode("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível concluir a entrega.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const shipOrder = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await updateStatus(order.id, "Em entrega");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "N\u00e3o foi poss\u00edvel atualizar o pedido.",
+      );
     } finally {
       setSaving(false);
     }
@@ -471,14 +504,14 @@ function ProducerOrderCard({
             <button
               type="button"
               onClick={() => void confirmOrder()}
-              disabled={saving || !hasDeliveryAddress}
+              disabled={operationPending || !hasDeliveryAddress}
               title={
                 !hasDeliveryAddress ? "Aguardando o endereço de entrega do comprador" : undefined
               }
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
             >
               <CalendarClock className="h-4 w-4" />
-              {saving
+              {operationPending
                 ? "Confirmando..."
                 : hasDeliveryAddress
                   ? "Confirmar pedido"
@@ -494,11 +527,13 @@ function ProducerOrderCard({
         {order.status === "Em separação" && (
           <button
             type="button"
-            onClick={() => void updateStatus(order.id, "Em entrega")}
+            onClick={() => void shipOrder()}
+            disabled={operationPending}
+            aria-busy={operationPending || undefined}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
           >
             <Truck className="h-4 w-4 text-leaf-700" />
-            Saiu para entrega
+            {operationPending ? "Atualizando..." : "Saiu para entrega"}
           </button>
         )}
         {order.status === "Em entrega" && (
@@ -516,11 +551,12 @@ function ProducerOrderCard({
             <button
               type="button"
               onClick={() => void finishDelivery()}
-              disabled={saving}
+              disabled={operationPending}
+              aria-busy={operationPending || undefined}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
             >
               <PackageCheck className="h-4 w-4" />
-              Concluir entrega
+              {operationPending ? "Concluindo..." : "Concluir entrega"}
             </button>
           </div>
         )}
@@ -530,7 +566,7 @@ function ProducerOrderCard({
               <button
                 type="button"
                 onClick={() => setIsCancelModalOpen(true)}
-                disabled={saving}
+                disabled={operationPending}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer disabled:opacity-60"
               >
                 Cancelar solicitação
@@ -556,6 +592,7 @@ function ProducerOrderCard({
                     <textarea
                       value={cancelReason}
                       onChange={(event) => setCancelReason(event.target.value)}
+                      disabled={operationPending}
                       placeholder="Informe o motivo do cancelamento"
                       rows={3}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
@@ -573,10 +610,11 @@ function ProducerOrderCard({
                   <button
                     type="button"
                     onClick={() => void cancel()}
-                    disabled={!cancelReason.trim() || saving}
+                    disabled={!cancelReason.trim() || operationPending}
+                    aria-busy={operationPending || undefined}
                     className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                   >
-                    Confirmar Cancelamento
+                    {operationPending ? "Cancelando..." : "Confirmar cancelamento"}
                   </button>
                 </DialogFooter>
               </DialogContent>

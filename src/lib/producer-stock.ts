@@ -341,6 +341,11 @@ export function useProducerStock() {
   const [items, setItemsState] = useState<ProducerStockItem[]>(readStoredStock);
   const [producerId, setProducerId] = useState<string | null>(null);
   const [salesOrganizations, setSalesOrganizations] = useState<SalesOrganization[]>([]);
+  const [loading, setLoading] = useState(Boolean(supabase));
+  const [error, setError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const deletingItemsRef = useRef(new Map<string, Promise<void>>());
+  const [deletingItemIds, setDeletingItemIds] = useState<Set<string>>(new Set());
   const remoteLoadedRef = useRef(false);
   const lastSyncedRef = useRef("");
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -350,9 +355,15 @@ export function useProducerStock() {
   }, [items]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured) return;
+    if (!supabase || !isSupabaseConfigured) {
+      setLoading(false);
+      setError("");
+      return;
+    }
 
     let active = true;
+    setLoading(true);
+    setError("");
 
     async function loadRemoteStock() {
       try {
@@ -374,10 +385,14 @@ export function useProducerStock() {
         lastSyncedRef.current = JSON.stringify(remoteItems);
         remoteLoadedRef.current = true;
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        if (!active) return;
         console.warn("Nao foi possivel carregar o estoque do Supabase.", error);
-        toast.error(`Erro ao carregar estoque do Supabase: ${message}`);
+        setError(
+          "N\u00e3o conseguimos consultar o estoque agora. Os dados anteriores foram preservados.",
+        );
         remoteLoadedRef.current = false;
+      } finally {
+        if (active) setLoading(false);
       }
     }
 
@@ -386,7 +401,7 @@ export function useProducerStock() {
     return () => {
       active = false;
     };
-  }, [isSupabaseConfigured, profile?.id, profile?.tipo]);
+  }, [isSupabaseConfigured, profile?.id, profile?.tipo, reloadVersion]);
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured || !producerId || !remoteLoadedRef.current) return;
@@ -489,12 +504,27 @@ export function useProducerStock() {
   );
 
   const deleteItem = useCallback(
-    async (itemId: string) => {
-      if (supabase && isSupabaseConfigured) {
-        if (!producerId) throw new Error("Cadastro de produtor não encontrado.");
-        await deleteRemoteInventory(producerId, itemId);
-      }
-      setItemsState((current) => current.filter((item) => item.id !== itemId));
+    (itemId: string) => {
+      const existing = deletingItemsRef.current.get(itemId);
+      if (existing) return existing;
+
+      setDeletingItemIds((current) => new Set(current).add(itemId));
+      const promise = (async () => {
+        if (supabase && isSupabaseConfigured) {
+          if (!producerId) throw new Error("Cadastro de produtor não encontrado.");
+          await deleteRemoteInventory(producerId, itemId);
+        }
+        setItemsState((current) => current.filter((item) => item.id !== itemId));
+      })().finally(() => {
+        deletingItemsRef.current.delete(itemId);
+        setDeletingItemIds((current) => {
+          const next = new Set(current);
+          next.delete(itemId);
+          return next;
+        });
+      });
+      deletingItemsRef.current.set(itemId, promise);
+      return promise;
     },
     [isSupabaseConfigured, producerId],
   );
@@ -508,6 +538,10 @@ export function useProducerStock() {
       canUploadRemoteImage: Boolean(producerId),
       deleteItem,
       salesOrganizations,
+      loading,
+      error,
+      reload: () => setReloadVersion((current) => current + 1),
+      deletingItemIds,
     },
   ] as const;
 }

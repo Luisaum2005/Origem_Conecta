@@ -1,6 +1,8 @@
 import { useAuth } from "@/lib/auth";
+import { reportAppError } from "@/lib/error-monitor";
+import { runDeduplicatedMutation } from "@/lib/mutation-guard";
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type PaymentMethod = "Pix" | "Dinheiro na entrega" | "A combinar";
 
@@ -411,7 +413,7 @@ async function loadRemoteOrders(
   );
 }
 
-async function createRemoteOrder(profileId: string, order: SavedOrder) {
+async function createRemoteOrder(profileId: string, order: SavedOrder, idempotencyKey: string) {
   if (!supabase) return null;
   const buyerId = await getBuyerId(profileId);
   if (!buyerId) {
@@ -427,6 +429,7 @@ async function createRemoteOrder(profileId: string, order: SavedOrder) {
 
   const { data, error } = await supabase.rpc("secure_create_portfolio_order", {
     p_order: {
+      idempotencyKey,
       buyerName: order.buyerName,
       delivery: order.delivery,
       deliveryEta: order.deliveryEta,
@@ -514,11 +517,18 @@ async function complainRemoteOrder(id: string, complaint: string) {
 
 export function useOrders() {
   const { profile, isSupabaseConfigured } = useAuth();
+  const profileId = profile?.id;
+  const profileType = profile?.tipo;
   const [orders, setOrders] = useState<SavedOrder[]>(() =>
     supabase
       ? []
       : readOrders().map((order) => ({ ...order, status: normalizeStatus(order.status) })),
   );
+  const [loading, setLoading] = useState(Boolean(supabase));
+  const [error, setError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const pendingMutationsRef = useRef(new Map<string, Promise<unknown>>());
+  const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (supabase && isSupabaseConfigured) return;
@@ -526,148 +536,213 @@ export function useOrders() {
   }, [isSupabaseConfigured, orders]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured || !profile) return;
+    if (!supabase || !isSupabaseConfigured) {
+      setLoading(false);
+      setError("");
+      return;
+    }
+    if (!profileId || !profileType) return;
     let active = true;
+    setLoading(true);
+    setError("");
 
-    loadRemoteOrders(profile.id, profile.tipo)
+    loadRemoteOrders(profileId, profileType)
       .then((remoteOrders) => {
         if (active && remoteOrders) setOrders(remoteOrders);
       })
       .catch((error) => {
+        if (!active) return;
+        reportAppError(error, { source: "orders-load" });
+        setError(
+          "N\u00e3o conseguimos consultar seus pedidos agora. Tente novamente em instantes.",
+        );
         console.warn("Não foi possível carregar pedidos do Supabase.", error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [isSupabaseConfigured, profile]);
+  }, [isSupabaseConfigured, profileId, profileType, reloadVersion]);
 
-  const addOrder = async (order: Omit<SavedOrder, "id" | "createdAt" | "status">) => {
-    const buyerId = profile?.tipo === "comprador" ? await getBuyerId(profile.id) : undefined;
-    const next: SavedOrder = {
-      ...order,
-      id: String(Math.floor(1000 + Math.random() * 9000)),
-      createdAt: new Date().toISOString(),
-      status: "Recebido",
-      buyerId: buyerId ?? undefined,
-      cancellationDeadline: addHours(new Date().toISOString(), CANCELLATION_LIMIT_HOURS),
-      deliveryCode: generateDeliveryCode(),
-    };
+  const reload = useCallback(() => setReloadVersion((current) => current + 1), []);
 
-    if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
-      const remote = await createRemoteOrder(profile.id, next);
-      const savedOrder = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
-      setOrders((current) => [savedOrder, ...current]);
-      return savedOrder;
+  const runMutation = useCallback(<T>(key: string, operation: () => Promise<T>) => {
+    return runDeduplicatedMutation(
+      pendingMutationsRef.current,
+      key,
+      operation,
+      () => setPendingActions((current) => new Set(current).add(key)),
+      () =>
+        setPendingActions((current) => {
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        }),
+    );
+  }, []);
+
+  const reconcileRemoteOrders = useCallback(() => {
+    if (supabase && isSupabaseConfigured) {
+      setReloadVersion((current) => current + 1);
     }
+  }, [isSupabaseConfigured]);
 
-    setOrders((current) => [next, ...current]);
-    return next;
+  const addOrder = async (
+    order: Omit<SavedOrder, "id" | "createdAt" | "status">,
+    requestId: string = crypto.randomUUID(),
+  ) => {
+    return runMutation("create-order", async () => {
+      const buyerId = profile?.tipo === "comprador" ? await getBuyerId(profile.id) : undefined;
+      const next: SavedOrder = {
+        ...order,
+        id: String(Math.floor(1000 + Math.random() * 9000)),
+        createdAt: new Date().toISOString(),
+        status: "Recebido",
+        buyerId: buyerId ?? undefined,
+        cancellationDeadline: addHours(new Date().toISOString(), CANCELLATION_LIMIT_HOURS),
+        deliveryCode: generateDeliveryCode(),
+      };
+
+      if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
+        const remote = await createRemoteOrder(profile.id, next, requestId);
+        const savedOrder = remote ? { ...next, id: remote.id, createdAt: remote.createdAt } : next;
+        setOrders((current) => [savedOrder, ...current]);
+        reconcileRemoteOrders();
+        return savedOrder;
+      }
+
+      setOrders((current) => [next, ...current]);
+      return next;
+    });
   };
 
   const updateStatus = async (id: string, status: OrderStatus) => {
-    if (supabase && isSupabaseConfigured) {
-      await updateRemoteStatus(id, status);
-    }
-    setOrders((current) =>
-      current.map((order) => (order.id === id ? { ...order, status } : order)),
-    );
+    return runMutation(`status:${id}`, async () => {
+      if (supabase && isSupabaseConfigured) {
+        await updateRemoteStatus(id, status);
+      }
+      setOrders((current) =>
+        current.map((order) => (order.id === id ? { ...order, status } : order)),
+      );
+      reconcileRemoteOrders();
+    });
   };
 
   const confirmDelivery = async (id: string, deliveryAt: string) => {
-    const deliveryEta =
-      supabase && isSupabaseConfigured
-        ? await confirmRemoteDelivery(id, deliveryAt)
-        : formatDeliveryDateTime(deliveryAt);
+    return runMutation(`confirm:${id}`, async () => {
+      const deliveryEta =
+        supabase && isSupabaseConfigured
+          ? await confirmRemoteDelivery(id, deliveryAt)
+          : formatDeliveryDateTime(deliveryAt);
 
-    setOrders((current) =>
-      current.map((order) =>
-        order.id === id
-          ? {
-              ...order,
-              status: "Em separação",
-              deliveryAt: new Date(deliveryAt).toISOString(),
-              deliveryEta: deliveryEta ?? formatDeliveryDateTime(deliveryAt),
-              confirmedAt: new Date().toISOString(),
-            }
-          : order,
-      ),
-    );
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === id
+            ? {
+                ...order,
+                status: "Em separação",
+                deliveryAt: new Date(deliveryAt).toISOString(),
+                deliveryEta: deliveryEta ?? formatDeliveryDateTime(deliveryAt),
+                confirmedAt: new Date().toISOString(),
+              }
+            : order,
+        ),
+      );
+      reconcileRemoteOrders();
+    });
   };
 
   const cancelOrder = async (id: string, actor: SavedOrder["canceledBy"], reason: string) => {
-    const order = orders.find((item) => item.id === id);
-    if (!order) throw new Error("Pedido não encontrado.");
-    if (!canCancelOrder(order)) {
-      throw new Error(
-        "O prazo de cancelamento terminou. Abra uma reclamação ou fale com o suporte.",
+    return runMutation(`cancel:${id}`, async () => {
+      const order = orders.find((item) => item.id === id);
+      if (!order) throw new Error("Pedido não encontrado.");
+      if (!canCancelOrder(order)) {
+        throw new Error(
+          "O prazo de cancelamento terminou. Abra uma reclamação ou fale com o suporte.",
+        );
+      }
+      const cancellationReason = reason.trim() || "Cancelado pelo usuário.";
+      if (supabase && isSupabaseConfigured) {
+        await cancelRemoteOrder(id, cancellationReason);
+      }
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: "Cancelado",
+                canceledAt: new Date().toISOString(),
+                canceledBy: actor,
+                cancellationReason,
+              }
+            : item,
+        ),
       );
-    }
-    const cancellationReason = reason.trim() || "Cancelado pelo usuário.";
-    if (supabase && isSupabaseConfigured) {
-      await cancelRemoteOrder(id, cancellationReason);
-    }
-    setOrders((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "Cancelado",
-              canceledAt: new Date().toISOString(),
-              canceledBy: actor,
-              cancellationReason,
-            }
-          : item,
-      ),
-    );
+      reconcileRemoteOrders();
+    });
   };
 
   const completeDelivery = async (id: string, code: string) => {
-    const order = orders.find((item) => item.id === id);
-    if (!order) throw new Error("Pedido não encontrado.");
-    if (order.deliveryCode && code.trim() !== order.deliveryCode) {
-      throw new Error("Código de entrega incorreto.");
-    }
-    let receiptCode = order.receiptCode ?? generateReceiptCode();
-    if (supabase && isSupabaseConfigured) {
-      receiptCode = (await completeRemoteDelivery(id, code)) ?? receiptCode;
-    }
-    setOrders((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "Entregue",
-              deliveredAt: new Date().toISOString(),
-              receiptCode,
-            }
-          : item,
-      ),
-    );
+    return runMutation(`complete:${id}`, async () => {
+      const order = orders.find((item) => item.id === id);
+      if (!order) throw new Error("Pedido não encontrado.");
+      if (order.deliveryCode && code.trim() !== order.deliveryCode) {
+        throw new Error("Código de entrega incorreto.");
+      }
+      let receiptCode = order.receiptCode ?? generateReceiptCode();
+      if (supabase && isSupabaseConfigured) {
+        receiptCode = (await completeRemoteDelivery(id, code)) ?? receiptCode;
+      }
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: "Entregue",
+                deliveredAt: new Date().toISOString(),
+                receiptCode,
+              }
+            : item,
+        ),
+      );
+      reconcileRemoteOrders();
+    });
   };
 
   const openComplaint = async (id: string, complaint: string) => {
-    const text = complaint.trim();
-    if (!text) throw new Error("Descreva o problema antes de enviar.");
-    if (supabase && isSupabaseConfigured) {
-      await complainRemoteOrder(id, text);
-    }
-    setOrders((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              complaint: text,
-              complaintStatus: "Aberta",
-              complaintCreatedAt: new Date().toISOString(),
-            }
-          : item,
-      ),
-    );
+    return runMutation(`complaint:${id}`, async () => {
+      const text = complaint.trim();
+      if (!text) throw new Error("Descreva o problema antes de enviar.");
+      if (supabase && isSupabaseConfigured) {
+        await complainRemoteOrder(id, text);
+      }
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                complaint: text,
+                complaintStatus: "Aberta",
+                complaintCreatedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+      reconcileRemoteOrders();
+    });
   };
 
   return {
     orders,
+    loading,
+    error,
+    reload,
+    pendingActions,
+    isOrderPending: (id: string) =>
+      Array.from(pendingActions).some((action) => action.endsWith(`:${id}`)),
     addOrder,
     updateStatus,
     confirmDelivery,
