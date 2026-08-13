@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
+import { FormSection } from "@/components/forms/FormSection";
 import { PushSettings } from "@/components/notifications/PushSettings";
 import { ProducerMemberships } from "@/components/organizations/ProducerMemberships";
 import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
@@ -358,6 +359,9 @@ function ProducerDetailsPanel({
   const [cepStatus, setCepStatus] = useState("");
   const [searchingCep, setSearchingCep] = useState(false);
   const cepRequestRef = useRef<AbortController | null>(null);
+  const addressNumberRef = useRef<HTMLInputElement>(null);
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(details);
+  const missingFields = getMissingProducerProfileFields(details);
 
   useEffect(() => {
     setDraft(details);
@@ -365,10 +369,20 @@ function ProducerDetailsPanel({
 
   useEffect(() => () => cepRequestRef.current?.abort(), []);
 
+  useEffect(() => {
+    if (!editing || !isDirty) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [editing, isDirty]);
+
   const searchCep = async () => {
     const postalCode = draft.postalCode.replace(/\D/g, "");
     if (postalCode.length !== 8) {
-      setCepStatus(postalCode.length ? "Informe um CEP com 8 numeros." : "");
+      setCepStatus(postalCode.length ? "Informe um CEP com 8 n\u00fameros." : "");
       return;
     }
 
@@ -376,7 +390,7 @@ function ProducerDetailsPanel({
     const controller = new AbortController();
     cepRequestRef.current = controller;
     setSearchingCep(true);
-    setCepStatus("Buscando endereco...");
+    setCepStatus("Buscando endere\u00e7o...");
 
     try {
       const address = await lookupAddressByCep(postalCode, controller.signal);
@@ -388,13 +402,14 @@ function ProducerDetailsPanel({
         city: address.city || current.city,
         state: address.state || current.state,
       }));
-      setCepStatus(`Endereco preenchido via ${address.source}.`);
+      setCepStatus(`Endere\u00e7o preenchido via ${address.source}.`);
+      window.setTimeout(() => addressNumberRef.current?.focus(), 0);
     } catch (lookupError) {
       if (controller.signal.aborted) return;
       setCepStatus(
         lookupError instanceof CepLookupError && lookupError.reason === "not_found"
-          ? "CEP nao encontrado. Confira o numero ou preencha o endereco manualmente."
-          : "Nao foi possivel consultar o CEP agora. Preencha o endereco manualmente.",
+          ? "CEP n\u00e3o encontrado. Confira o n\u00famero ou preencha o endere\u00e7o manualmente."
+          : "N\u00e3o foi poss\u00edvel consultar o CEP agora. Preencha o endere\u00e7o manualmente.",
       );
     } finally {
       if (cepRequestRef.current === controller) {
@@ -406,6 +421,11 @@ function ProducerDetailsPanel({
 
   const save = async () => {
     setError("");
+    const validationError = validateProducerProfile(draft);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     try {
       await onSave(draft);
       setEditing(false);
@@ -434,6 +454,12 @@ function ProducerDetailsPanel({
               value={formatProducerAddress(details) || "Não informado"}
             />
           </dl>
+          {missingFields.length > 0 && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Complete seu perfil para facilitar as negociaÃ§Ãµes.</p>
+              <p className="mt-1">Faltam: {missingFields.join(", ")}.</p>
+            </div>
+          )}
           <div className="mt-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Produtos atendidos
@@ -466,137 +492,184 @@ function ProducerDetailsPanel({
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <Pencil className="h-4 w-4 text-leaf-700" />
-            Editar dados
+            {missingFields.length ? "Completar perfil" : "Editar dados"}
           </button>
         </div>
       ) : (
         <div className="grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              icon={Store}
-              label="Nome da propriedade"
-              value={draft.propertyName}
-              onChange={(propertyName) => setDraft({ ...draft, propertyName })}
-            />
-            <TextField
-              icon={User}
-              label="Responsável"
-              value={draft.responsibleName}
-              onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
-            />
-            <label className="block">
-              <span className="block text-sm font-medium text-brand-900">
-                Como pretende comercializar
-              </span>
-              <select
-                value={draft.commercializationMode}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    commercializationMode: event.target.value as typeof draft.commercializationMode,
-                  })
-                }
-                className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4 text-sm text-brand-900"
-              >
-                <option value="own">Em nome próprio</option>
-                <option value="organization">Por cooperativa ou associação</option>
-                <option value="undecided">Ainda estou definindo</option>
-              </select>
-            </label>
-            {draft.commercializationMode === "own" && (
-              <>
+          <div className="grid gap-4">
+            <FormSection
+              title={"Identifica\u00e7\u00e3o da propriedade"}
+              caption={"Campos com * s\u00e3o obrigat\u00f3rios."}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
                 <TextField
                   icon={Store}
-                  label="CNPJ próprio, se possuir"
-                  value={draft.cnpj}
-                  onChange={(cnpj) => setDraft({ ...draft, cnpj })}
-                  placeholder="Digite o CNPJ"
+                  label="Nome da propriedade"
+                  value={draft.propertyName}
+                  onChange={(propertyName) => setDraft({ ...draft, propertyName })}
+                  required
+                  autoComplete="organization"
                 />
                 <TextField
-                  icon={Store}
-                  label="CAEPF, se aplicável"
-                  value={draft.caepf}
-                  onChange={(caepf) => setDraft({ ...draft, caepf })}
+                  icon={User}
+                  label="Responsável"
+                  value={draft.responsibleName}
+                  onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
+                  required
+                  autoComplete="name"
+                />
+              </div>
+            </FormSection>
+            <FormSection
+              title={"Forma de comercializa\u00e7\u00e3o"}
+              caption={"A escolha define quais dados comerciais ser\u00e3o solicitados."}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-medium text-brand-900">
+                    Como pretende comercializar
+                  </span>
+                  <select
+                    value={draft.commercializationMode}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        commercializationMode: event.target
+                          .value as typeof draft.commercializationMode,
+                      })
+                    }
+                    className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4 text-sm text-brand-900"
+                  >
+                    <option value="own">Em nome próprio</option>
+                    <option value="organization">Por cooperativa ou associação</option>
+                    <option value="undecided">Ainda estou definindo</option>
+                  </select>
+                </label>
+                {draft.commercializationMode === "own" && (
+                  <>
+                    <TextField
+                      icon={Store}
+                      label="CNPJ próprio, se possuir"
+                      value={draft.cnpj}
+                      onChange={(cnpj) => setDraft({ ...draft, cnpj: formatCnpj(cnpj) })}
+                      inputMode="numeric"
+                      placeholder="Digite o CNPJ"
+                    />
+                    <TextField
+                      icon={Store}
+                      label="CAEPF, se aplicável"
+                      value={draft.caepf}
+                      onChange={(caepf) => setDraft({ ...draft, caepf: onlyDigits(caepf, 14) })}
+                      inputMode="numeric"
+                    />
+                    <TextField
+                      icon={Store}
+                      label="Inscrição estadual, se aplicável"
+                      value={draft.stateRegistration}
+                      onChange={(stateRegistration) => setDraft({ ...draft, stateRegistration })}
+                    />
+                  </>
+                )}
+              </div>
+            </FormSection>
+            <FormSection
+              title={"Contato e endere\u00e7o"}
+              caption={"Use o CEP para preencher o endere\u00e7o e confira o n\u00famero."}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  icon={Phone}
+                  label="Telefone/WhatsApp"
+                  value={draft.phone}
+                  onChange={(phone) => setDraft({ ...draft, phone: formatPhone(phone) })}
+                  required
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+                <div>
+                  <TextField
+                    icon={MapPin}
+                    label="CEP"
+                    value={draft.postalCode}
+                    onChange={(postalCode) => {
+                      cepRequestRef.current?.abort();
+                      setCepStatus("");
+                      setDraft({ ...draft, postalCode: formatPostalCode(postalCode) });
+                    }}
+                    onBlur={() => void searchCep()}
+                    placeholder="00000-000"
+                    inputMode="numeric"
+                    helper={cepStatus}
+                    required
+                    autoComplete="postal-code"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void searchCep()}
+                    disabled={searchingCep}
+                    className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Search className="h-4 w-4 text-leaf-700" />
+                    {searchingCep ? "Buscando CEP..." : "Buscar CEP"}
+                  </button>
+                </div>
+                <TextField
+                  icon={MapPin}
+                  label="Logradouro"
+                  value={draft.addressLine}
+                  onChange={(addressLine) => setDraft({ ...draft, addressLine })}
+                  placeholder="Rua, avenida..."
+                  required
+                  autoComplete="address-line1"
                 />
                 <TextField
-                  icon={Store}
-                  label="Inscrição estadual, se aplicável"
-                  value={draft.stateRegistration}
-                  onChange={(stateRegistration) => setDraft({ ...draft, stateRegistration })}
+                  icon={MapPin}
+                  label="Número"
+                  value={draft.addressNumber}
+                  onChange={(addressNumber) => setDraft({ ...draft, addressNumber })}
+                  inputRef={addressNumberRef}
+                  autoComplete="address-line2"
                 />
-              </>
-            )}
-            <TextField
-              icon={Phone}
-              label="Telefone/WhatsApp"
-              value={draft.phone}
-              onChange={(phone) => setDraft({ ...draft, phone })}
-            />
-            <div>
-              <TextField
-                icon={MapPin}
-                label="CEP"
-                value={draft.postalCode}
-                onChange={(postalCode) => {
-                  cepRequestRef.current?.abort();
-                  setCepStatus("");
-                  setDraft({ ...draft, postalCode });
-                }}
-                onBlur={() => void searchCep()}
-                placeholder="00000-000"
-                inputMode="numeric"
-                helper={cepStatus}
-              />
-              <button
-                type="button"
-                onClick={() => void searchCep()}
-                disabled={searchingCep}
-                className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 disabled:cursor-wait disabled:opacity-60"
-              >
-                <Search className="h-4 w-4 text-leaf-700" />
-                {searchingCep ? "Buscando CEP..." : "Buscar CEP"}
-              </button>
-            </div>
-            <TextField
-              icon={MapPin}
-              label="Logradouro"
-              value={draft.addressLine}
-              onChange={(addressLine) => setDraft({ ...draft, addressLine })}
-              placeholder="Rua, avenida..."
-            />
-            <TextField
-              icon={MapPin}
-              label="Número"
-              value={draft.addressNumber}
-              onChange={(addressNumber) => setDraft({ ...draft, addressNumber })}
-            />
-            <TextField
-              icon={MapPin}
-              label="Complemento"
-              value={draft.addressComplement}
-              onChange={(addressComplement) => setDraft({ ...draft, addressComplement })}
-            />
-            <TextField
-              icon={MapPin}
-              label="Bairro"
-              value={draft.neighborhood}
-              onChange={(neighborhood) => setDraft({ ...draft, neighborhood })}
-            />
-            <TextField
-              icon={MapPin}
-              label="Município"
-              value={draft.city}
-              onChange={(city) => setDraft({ ...draft, city })}
-            />
-            <TextField
-              icon={MapPin}
-              label="UF"
-              value={draft.state}
-              onChange={(state) => setDraft({ ...draft, state })}
-              placeholder="SP"
-            />
+                <TextField
+                  icon={MapPin}
+                  label="Complemento"
+                  value={draft.addressComplement}
+                  onChange={(addressComplement) => setDraft({ ...draft, addressComplement })}
+                />
+                <TextField
+                  icon={MapPin}
+                  label="Bairro"
+                  value={draft.neighborhood}
+                  onChange={(neighborhood) => setDraft({ ...draft, neighborhood })}
+                  required
+                  autoComplete="address-level3"
+                />
+                <TextField
+                  icon={MapPin}
+                  label="Município"
+                  value={draft.city}
+                  onChange={(city) => setDraft({ ...draft, city })}
+                  required
+                  autoComplete="address-level2"
+                />
+                <TextField
+                  icon={MapPin}
+                  label="UF"
+                  value={draft.state}
+                  onChange={(state) => setDraft({ ...draft, state: formatState(state) })}
+                  placeholder="SP"
+                  required
+                  maxLength={2}
+                  autoComplete="address-level1"
+                />
+              </div>
+            </FormSection>
           </div>
-          <div>
+          <FormSection
+            title="Produtos atendidos"
+            caption={"Informe o que voc\u00ea produz ou fornece."}
+          >
             <SupplierProductPicker
               value={draft.products}
               onChange={(products) => setDraft({ ...draft, products })}
@@ -605,8 +678,13 @@ function ProducerDetailsPanel({
               Esta lista representa tudo que você fornece. O estoque publicado pode conter apenas os
               produtos disponíveis no momento.
             </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
+          </FormSection>
+          <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white/95 p-3 shadow-lg backdrop-blur">
+            {isDirty && (
+              <p className="mr-auto text-sm font-medium text-amber-800">
+                {"Altera\u00e7\u00f5es n\u00e3o salvas."}
+              </p>
+            )}
             {error && (
               <p className="w-full rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
                 {error}
@@ -640,6 +718,61 @@ function ProducerDetailsPanel({
   );
 }
 
+function onlyDigits(value: string, maxLength?: number) {
+  const digits = value.replace(/\D/g, "");
+  return maxLength ? digits.slice(0, maxLength) : digits;
+}
+
+function formatPostalCode(value: string) {
+  const digits = onlyDigits(value, 8);
+  return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
+
+function formatPhone(value: string) {
+  const digits = onlyDigits(value, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : "";
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10)
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatCnpj(value: string) {
+  const digits = onlyDigits(value, 14);
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2}\.\d{3})(\d)/, "$1.$2")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function formatState(value: string) {
+  return value
+    .replace(/[^a-z]/gi, "")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function getMissingProducerProfileFields(details: ProducerProfileDetails) {
+  const fields = [
+    ["nome da propriedade", details.propertyName],
+    ["respons\u00e1vel", details.responsibleName],
+    ["telefone", details.phone.replace(/\D/g, "").length >= 10 ? "ok" : ""],
+    ["CEP", details.postalCode.replace(/\D/g, "").length === 8 ? "ok" : ""],
+    ["logradouro", details.addressLine],
+    ["bairro", details.neighborhood],
+    ["munic\u00edpio", details.city],
+    ["UF", details.state.length === 2 ? "ok" : ""],
+  ];
+  return fields.filter(([, value]) => !value.trim()).map(([label]) => label);
+}
+
+function validateProducerProfile(details: ProducerProfileDetails) {
+  const missing = getMissingProducerProfileFields(details);
+  if (missing.length) return `Complete os campos obrigat\u00f3rios: ${missing.join(", ")}.`;
+  return "";
+}
+
 function commercializationLabel(mode: "own" | "organization" | "undecided") {
   if (mode === "own") return "Em nome próprio";
   if (mode === "organization") return "Por organização";
@@ -668,8 +801,12 @@ function TextField({
   onBlur,
   inputMode,
   helper,
+  required = false,
+  autoComplete,
+  maxLength,
+  inputRef,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -677,22 +814,36 @@ function TextField({
   onBlur?: () => void;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   helper?: string;
+  required?: boolean;
+  autoComplete?: string;
+  maxLength?: number;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
     <label className="block">
-      <span className="block text-sm font-medium text-brand-900">{label}</span>
+      <span className="block text-sm font-medium text-brand-900">
+        {label} {required && <span className="text-[var(--color-error-fg)]">*</span>}
+      </span>
       <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-white px-3 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-100">
-        <Icon className="h-4 w-4 text-leaf-700" />
+        {Icon && <Icon className="h-4 w-4 text-leaf-700" />}
         <input
+          ref={inputRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onBlur={onBlur}
           inputMode={inputMode}
+          autoComplete={autoComplete}
+          maxLength={maxLength}
+          required={required}
           placeholder={placeholder}
           className="h-11 w-full bg-transparent text-sm text-brand-900 focus:outline-none"
         />
       </div>
-      {helper && <span className="mt-1.5 block text-xs text-muted-foreground">{helper}</span>}
+      {helper && (
+        <span className="mt-1.5 block text-xs text-muted-foreground" aria-live="polite">
+          {helper}
+        </span>
+      )}
     </label>
   );
 }
