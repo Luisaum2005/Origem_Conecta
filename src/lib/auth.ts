@@ -1,6 +1,6 @@
 export { AuthProvider } from "./auth.tsx";
 export { buildSignupPayload } from "./signup-payload";
-export { getProfileHome, useAuth } from "./auth-context";
+export { getProfileHome, shouldRestoreProfileForAuthEvent, useAuth } from "./auth-context";
 export type {
   AuthProfile,
   ProfileRole,

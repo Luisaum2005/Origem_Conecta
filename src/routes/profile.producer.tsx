@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
 import { type ProducerProfileDetails, useProducerProfileDetails } from "@/lib/producer-profile";
 import { useProducerStock } from "@/lib/producer-stock";
+import { CepLookupError, lookupAddressByCep } from "@/lib/cep";
 import {
   AlertTriangle,
   CalendarClock,
@@ -20,6 +21,7 @@ import {
   Phone,
   RefreshCw,
   Save,
+  Search,
   ShieldCheck,
   Sprout,
   Store,
@@ -28,7 +30,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const Route = createFileRoute("/profile/producer")({
   component: () => (
@@ -353,10 +355,54 @@ function ProducerDetailsPanel({
   const [draft, setDraft] = useState(details);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [cepStatus, setCepStatus] = useState("");
+  const [searchingCep, setSearchingCep] = useState(false);
+  const cepRequestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setDraft(details);
   }, [details]);
+
+  useEffect(() => () => cepRequestRef.current?.abort(), []);
+
+  const searchCep = async () => {
+    const postalCode = draft.postalCode.replace(/\D/g, "");
+    if (postalCode.length !== 8) {
+      setCepStatus(postalCode.length ? "Informe um CEP com 8 numeros." : "");
+      return;
+    }
+
+    cepRequestRef.current?.abort();
+    const controller = new AbortController();
+    cepRequestRef.current = controller;
+    setSearchingCep(true);
+    setCepStatus("Buscando endereco...");
+
+    try {
+      const address = await lookupAddressByCep(postalCode, controller.signal);
+      setDraft((current) => ({
+        ...current,
+        postalCode,
+        addressLine: address.street || current.addressLine,
+        neighborhood: address.neighborhood || current.neighborhood,
+        city: address.city || current.city,
+        state: address.state || current.state,
+      }));
+      setCepStatus(`Endereco preenchido via ${address.source}.`);
+    } catch (lookupError) {
+      if (controller.signal.aborted) return;
+      setCepStatus(
+        lookupError instanceof CepLookupError && lookupError.reason === "not_found"
+          ? "CEP nao encontrado. Confira o numero ou preencha o endereco manualmente."
+          : "Nao foi possivel consultar o CEP agora. Preencha o endereco manualmente.",
+      );
+    } finally {
+      if (cepRequestRef.current === controller) {
+        cepRequestRef.current = null;
+        setSearchingCep(false);
+      }
+    }
+  };
 
   const save = async () => {
     setError("");
@@ -486,13 +532,31 @@ function ProducerDetailsPanel({
               value={draft.phone}
               onChange={(phone) => setDraft({ ...draft, phone })}
             />
-            <TextField
-              icon={MapPin}
-              label="CEP"
-              value={draft.postalCode}
-              onChange={(postalCode) => setDraft({ ...draft, postalCode })}
-              placeholder="00000-000"
-            />
+            <div>
+              <TextField
+                icon={MapPin}
+                label="CEP"
+                value={draft.postalCode}
+                onChange={(postalCode) => {
+                  cepRequestRef.current?.abort();
+                  setCepStatus("");
+                  setDraft({ ...draft, postalCode });
+                }}
+                onBlur={() => void searchCep()}
+                placeholder="00000-000"
+                inputMode="numeric"
+                helper={cepStatus}
+              />
+              <button
+                type="button"
+                onClick={() => void searchCep()}
+                disabled={searchingCep}
+                className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Search className="h-4 w-4 text-leaf-700" />
+                {searchingCep ? "Buscando CEP..." : "Buscar CEP"}
+              </button>
+            </div>
             <TextField
               icon={MapPin}
               label="Logradouro"
@@ -601,12 +665,18 @@ function TextField({
   value,
   onChange,
   placeholder,
+  onBlur,
+  inputMode,
+  helper,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  onBlur?: () => void;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  helper?: string;
 }) {
   return (
     <label className="block">
@@ -616,10 +686,13 @@ function TextField({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          inputMode={inputMode}
           placeholder={placeholder}
           className="h-11 w-full bg-transparent text-sm text-brand-900 focus:outline-none"
         />
       </div>
+      {helper && <span className="mt-1.5 block text-xs text-muted-foreground">{helper}</span>}
     </label>
   );
 }

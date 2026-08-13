@@ -92,6 +92,15 @@ export function getProfileHome(tipo: ProfileType) {
   return "/portfolio";
 }
 
+export function shouldRestoreProfileForAuthEvent(
+  event: string,
+  knownUserId: string | null,
+  sessionUserId?: string,
+) {
+  if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return false;
+  return !(event === "SIGNED_IN" && sessionUserId === knownUserId);
+}
+
 export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error("AuthProvider missing");

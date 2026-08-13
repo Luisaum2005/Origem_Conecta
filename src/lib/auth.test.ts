@@ -1,4 +1,9 @@
-import { AuthProvider, buildSignupPayload, useAuth } from "@/lib/auth";
+import {
+  AuthProvider,
+  buildSignupPayload,
+  shouldRestoreProfileForAuthEvent,
+  useAuth,
+} from "@/lib/auth";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -15,6 +20,14 @@ describe("inicializaÃ§Ã£o segura da sessÃ£o", () => {
     );
 
     expect(html).toContain("true:none");
+  });
+});
+
+describe("eventos de sessao", () => {
+  it("ignora a renovacao silenciosa que ocorre ao voltar para a aba", () => {
+    expect(shouldRestoreProfileForAuthEvent("TOKEN_REFRESHED", "user-1", "user-1")).toBe(false);
+    expect(shouldRestoreProfileForAuthEvent("SIGNED_IN", "user-1", "user-1")).toBe(false);
+    expect(shouldRestoreProfileForAuthEvent("USER_UPDATED", "user-1", "user-1")).toBe(true);
   });
 });
 

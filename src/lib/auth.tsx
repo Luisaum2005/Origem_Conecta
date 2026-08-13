@@ -1,6 +1,7 @@
 import { isDemoMode, supabase, throwSupabaseError } from "@/lib/supabase";
 import {
   AuthContext,
+  shouldRestoreProfileForAuthEvent,
   type AuthContextValue,
   type AuthProfile,
   type ProfileRole,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/auth-context";
 import { buildSignupPayload } from "@/lib/signup-payload";
 import { reportAppError } from "@/lib/error-monitor";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 const LOCAL_PROFILE_KEY = "origem-conecta-auth-profile";
 
 function defaultRole(tipo: ProfileType): ProfileRole {
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // restored only after hydration, including in the explicit demo mode.
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const restoredUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isDemoMode) {
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentVersion = ++restoreVersion;
 
       if (!userId) {
+        restoredUserIdRef.current = null;
         if (active && currentVersion === restoreVersion) setProfile(null);
         window.localStorage.removeItem(LOCAL_PROFILE_KEY);
         if (active && currentVersion === restoreVersion) setLoading(false);
@@ -75,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!active || currentVersion !== restoreVersion) return;
         if (!data) {
+          restoredUserIdRef.current = null;
           setProfile(null);
           window.localStorage.removeItem(LOCAL_PROFILE_KEY);
           return;
@@ -90,11 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           roles: await getProfileRoles(data.id, data.tipo as ProfileType),
         };
         if (!active || currentVersion !== restoreVersion) return;
+        restoredUserIdRef.current = userId;
         setProfile(restoredProfile);
         window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(restoredProfile));
       } catch (error) {
         if (!active || currentVersion !== restoreVersion) return;
         reportAppError(error, { source: "auth-session-restore" });
+        restoredUserIdRef.current = null;
         setProfile(null);
         window.localStorage.removeItem(LOCAL_PROFILE_KEY);
       } finally {
@@ -102,7 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+      if (!shouldRestoreProfileForAuthEvent(event, restoredUserIdRef.current, session?.user.id)) {
+        return;
+      }
       // Run outside the auth callback to avoid competing with Supabase's session lock.
       setLoading(true);
       window.setTimeout(() => void loadProfile(session?.user.id), 0);
