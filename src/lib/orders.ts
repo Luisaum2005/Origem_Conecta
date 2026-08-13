@@ -54,6 +54,17 @@ export type SavedOrder = {
   originQuoteId?: string;
   paymentMethod?: PaymentMethod;
   paymentNotes?: string;
+  deliveryAddress?: DeliveryAddress;
+};
+
+export type DeliveryAddress = {
+  postalCode?: string;
+  addressLine: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  neighborhood?: string;
+  city: string;
+  state: string;
 };
 
 type RemoteOrderItem = {
@@ -189,7 +200,11 @@ export function formatCancellationDeadline(order: SavedOrder) {
   );
 }
 
-function mapRemoteOrder(order: RemoteOrder, deriveProducerProgress = false): SavedOrder {
+function mapRemoteOrder(
+  order: RemoteOrder,
+  deriveProducerProgress = false,
+  deliveryAddress?: DeliveryAddress,
+): SavedOrder {
   const deliveryAt = order.entrega_prevista ?? undefined;
   const items = (order.order_items ?? []).map((item) => ({
     productId: item.product_ref || item.product_name,
@@ -252,8 +267,61 @@ function mapRemoteOrder(order: RemoteOrder, deriveProducerProgress = false): Sav
     originQuoteId: order.origem_solicitacao_id ?? undefined,
     paymentMethod: normalizePaymentMethod(order.payment_method),
     paymentNotes: order.payment_notes ?? undefined,
+    deliveryAddress,
     items,
   };
+}
+
+export function formatDeliveryAddress(address?: DeliveryAddress) {
+  if (!address?.addressLine || !address.city || !address.state)
+    return "Endereço de entrega não informado";
+  const street = [address.addressLine, address.addressNumber].filter(Boolean).join(", ");
+  return [
+    street,
+    address.addressComplement,
+    address.neighborhood,
+    `${address.city}, ${address.state}`,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+}
+
+async function loadOrderDeliveryAddresses(orderIds: string[]) {
+  if (!supabase || orderIds.length === 0) return new Map<string, DeliveryAddress>();
+  try {
+    const { data, error } = await supabase.rpc("get_my_order_delivery_addresses", {
+      p_order_ids: orderIds,
+    });
+    if (error) throw error;
+    return new Map(
+      (
+        (data ?? []) as Array<{
+          order_id: string;
+          postal_code: string | null;
+          address_line: string | null;
+          address_number: string | null;
+          address_complement: string | null;
+          neighborhood: string | null;
+          city: string | null;
+          state: string | null;
+        }>
+      ).map((item) => [
+        item.order_id,
+        {
+          postalCode: item.postal_code ?? undefined,
+          addressLine: item.address_line ?? "",
+          addressNumber: item.address_number ?? undefined,
+          addressComplement: item.address_complement ?? undefined,
+          neighborhood: item.neighborhood ?? undefined,
+          city: item.city ?? "",
+          state: item.state ?? "",
+        },
+      ]),
+    );
+  } catch (error) {
+    console.warn("Não foi possível carregar os endereços de entrega.", error);
+    return new Map<string, DeliveryAddress>();
+  }
 }
 
 export async function getBuyerId(profileId: string) {
@@ -285,13 +353,13 @@ async function loadRemoteOrders(
   if (!supabase) return null;
   if (profileType === "organizacao") return [];
   let select =
-    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
+    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
 
   if (profileType === "produtor") {
     const producerId = await getProducerId(profileId);
     if (!producerId) return [];
     select =
-      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_entrega,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
+      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
     const { data, error } = await supabase
       .from("orders")
       .select(select)
@@ -299,7 +367,9 @@ async function loadRemoteOrders(
       .order("criado_em", { ascending: false })
       .limit(100);
     if (error) throw error;
-    return (data ?? []).map((order) => mapRemoteOrder(order as unknown as RemoteOrder, true));
+    const remoteOrders = (data ?? []) as unknown as RemoteOrder[];
+    const addresses = await loadOrderDeliveryAddresses(remoteOrders.map((order) => order.id));
+    return remoteOrders.map((order) => mapRemoteOrder(order, true, addresses.get(order.id)));
   }
 
   let query = supabase
@@ -316,7 +386,29 @@ async function loadRemoteOrders(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((order) => mapRemoteOrder(order as unknown as RemoteOrder));
+  const remoteOrders = (data ?? []) as unknown as RemoteOrder[];
+  const addresses = await loadOrderDeliveryAddresses(remoteOrders.map((order) => order.id));
+  if (profileType !== "comprador" || remoteOrders.length === 0) {
+    return remoteOrders.map((order) => mapRemoteOrder(order, false, addresses.get(order.id)));
+  }
+
+  const { data: deliveryCodes, error: deliveryCodesError } = await supabase.rpc(
+    "get_my_order_delivery_codes",
+    { p_order_ids: remoteOrders.map((order) => order.id) },
+  );
+  if (deliveryCodesError) throw deliveryCodesError;
+  const codesByOrder = new Map(
+    ((deliveryCodes ?? []) as Array<{ order_id: string; delivery_code: string | null }>).map(
+      (item) => [item.order_id, item.delivery_code],
+    ),
+  );
+  return remoteOrders.map((order) =>
+    mapRemoteOrder(
+      { ...order, codigo_entrega: codesByOrder.get(order.id) ?? null },
+      false,
+      addresses.get(order.id),
+    ),
+  );
 }
 
 async function createRemoteOrder(profileId: string, order: SavedOrder) {
@@ -391,7 +483,23 @@ async function completeRemoteDelivery(id: string, deliveryCode: string) {
     p_delivery_code: deliveryCode,
   });
   if (error) throw error;
-  const result = data as { receiptCode?: string } | null;
+  const result = data as {
+    success?: boolean;
+    errorCode?: "invalid_delivery_code" | "delivery_code_locked";
+    attemptsRemaining?: number;
+    lockedUntil?: string;
+    receiptCode?: string;
+  } | null;
+  if (result?.success === false) {
+    if (result.errorCode === "delivery_code_locked") {
+      throw new Error("Muitas tentativas incorretas. Aguarde 15 minutos e tente novamente.");
+    }
+    const suffix =
+      typeof result.attemptsRemaining === "number"
+        ? ` Você ainda tem ${result.attemptsRemaining} tentativa${result.attemptsRemaining === 1 ? "" : "s"}.`
+        : "";
+    throw new Error(`Código de entrega incorreto.${suffix}`);
+  }
   return result?.receiptCode;
 }
 

@@ -13,6 +13,13 @@ export type ProducerProfileDetails = {
   commercialVerificationStatus: "self_declared" | "pending" | "verified" | "rejected";
   caepf: string;
   stateRegistration: string;
+  postalCode: string;
+  addressLine: string;
+  addressNumber: string;
+  addressComplement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
 };
 
 const PRODUCER_PROFILE_STORAGE_KEY = "origem-conecta-producer-profile";
@@ -28,17 +35,31 @@ const DEFAULT_PRODUCER_PROFILE: ProducerProfileDetails = {
   commercialVerificationStatus: "self_declared",
   caepf: "",
   stateRegistration: "",
+  postalCode: "",
+  addressLine: "",
+  addressNumber: "",
+  addressComplement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
 };
 
 type RemoteProducerProfile = {
   nome: string | null;
   telefone: string | null;
+  cidade: string | null;
+  estado: string | null;
   producers?:
     | {
         nome_propriedade?: string | null;
         responsavel?: string | null;
         cnpj?: string | null;
         localizacao?: string | null;
+        postal_code?: string | null;
+        address_line?: string | null;
+        address_number?: string | null;
+        address_complement?: string | null;
+        neighborhood?: string | null;
         categorias_atendidas?: string[] | null;
         commercialization_mode?: "own" | "organization" | "undecided" | null;
         commercial_verification_status?:
@@ -58,6 +79,11 @@ type RemoteProducerProfile = {
         responsavel?: string | null;
         cnpj?: string | null;
         localizacao?: string | null;
+        postal_code?: string | null;
+        address_line?: string | null;
+        address_number?: string | null;
+        address_complement?: string | null;
+        neighborhood?: string | null;
         categorias_atendidas?: string[] | null;
         commercialization_mode?: "own" | "organization" | "undecided" | null;
         commercial_verification_status?:
@@ -100,6 +126,13 @@ function mapRemoteProfile(row: RemoteProducerProfile): ProducerProfileDetails {
     commercialVerificationStatus: producer?.commercial_verification_status ?? "self_declared",
     caepf: documents?.caepf ?? "",
     stateRegistration: documents?.state_registration ?? "",
+    postalCode: producer?.postal_code ?? "",
+    addressLine: producer?.address_line ?? "",
+    addressNumber: producer?.address_number ?? "",
+    addressComplement: producer?.address_complement ?? "",
+    neighborhood: producer?.neighborhood ?? "",
+    city: row.cidade ?? "",
+    state: row.estado ?? "",
   };
 }
 
@@ -108,7 +141,7 @@ async function loadRemoteProducerProfile(profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "nome,telefone,producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,commercialization_mode,commercial_verification_status,producer_commercial_documents(cnpj,caepf,state_registration))",
+      "nome,telefone,cidade,estado,producers(nome_propriedade,responsavel,localizacao,postal_code,address_line,address_number,address_complement,neighborhood,categorias_atendidas,commercialization_mode,commercial_verification_status,producer_commercial_documents(cnpj,caepf,state_registration))",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -124,6 +157,8 @@ async function updateRemoteProducerProfile(profileId: string, details: ProducerP
     .update({
       nome: details.responsibleName,
       telefone: details.phone || null,
+      cidade: details.city || null,
+      estado: details.state.toUpperCase() || null,
     })
     .eq("id", profileId);
   if (profileError) throw profileError;
@@ -133,7 +168,12 @@ async function updateRemoteProducerProfile(profileId: string, details: ProducerP
     .update({
       nome_propriedade: details.propertyName,
       responsavel: details.responsibleName,
-      localizacao: details.location || null,
+      localizacao: [details.city, details.state.toUpperCase()].filter(Boolean).join(", ") || null,
+      postal_code: details.postalCode.replace(/\D/g, "") || null,
+      address_line: details.addressLine || null,
+      address_number: details.addressNumber || null,
+      address_complement: details.addressComplement || null,
+      neighborhood: details.neighborhood || null,
       categorias_atendidas: details.products,
       commercialization_mode: details.commercializationMode,
     })
@@ -191,6 +231,13 @@ export function useProducerProfileDetails() {
             commercialVerificationStatus: "self_declared",
             caepf: localDetails.caepf || "",
             stateRegistration: localDetails.state_registration || "",
+            postalCode: localDetails.postal_code || "",
+            addressLine: localDetails.address_line || "",
+            addressNumber: localDetails.address_number || "",
+            addressComplement: localDetails.address_complement || "",
+            neighborhood: localDetails.neighborhood || "",
+            city: localDetails.cidade || "",
+            state: localDetails.estado || "",
           });
         }
       } catch (e) {
@@ -230,6 +277,13 @@ export function useProducerProfileDetails() {
             commercialization_mode: nextDetails.commercializationMode,
             caepf: nextDetails.caepf,
             state_registration: nextDetails.stateRegistration,
+            postal_code: nextDetails.postalCode,
+            address_line: nextDetails.addressLine,
+            address_number: nextDetails.addressNumber,
+            address_complement: nextDetails.addressComplement,
+            neighborhood: nextDetails.neighborhood,
+            cidade: nextDetails.city,
+            estado: nextDetails.state,
           }),
         );
       }

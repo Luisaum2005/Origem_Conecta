@@ -36,6 +36,11 @@ export type SignUpInput = {
     nomeEmpresa: string;
     tipoEmpresa: string;
     cnpj: string;
+    postalCode: string;
+    addressLine: string;
+    addressNumber?: string;
+    addressComplement?: string;
+    neighborhood: string;
   };
   producer?: {
     nomePropriedade: string;
@@ -45,6 +50,11 @@ export type SignUpInput = {
     commercializationMode: "own" | "organization" | "undecided";
     caepf?: string;
     stateRegistration?: string;
+    postalCode?: string;
+    addressLine?: string;
+    addressNumber?: string;
+    addressComplement?: string;
+    neighborhood?: string;
   };
   organization?: {
     type: "cooperativa" | "associacao";
@@ -67,6 +77,7 @@ export type AuthContextValue = {
   profile: AuthProfile | null;
   loading: boolean;
   isSupabaseConfigured: boolean;
+  isDemoMode: boolean;
   signIn: (input: SignInInput) => Promise<AuthProfile>;
   signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signOut: () => Promise<void>;

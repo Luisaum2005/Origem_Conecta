@@ -1,4 +1,4 @@
-import { supabase, throwSupabaseError } from "@/lib/supabase";
+import { isDemoMode, supabase, throwSupabaseError } from "@/lib/supabase";
 import {
   AuthContext,
   type AuthContextValue,
@@ -34,7 +34,7 @@ function readLocalProfile() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(() =>
-    supabase ? null : readLocalProfile(),
+    isDemoMode ? readLocalProfile() : null,
   );
   const [loading, setLoading] = useState(Boolean(supabase));
 
@@ -99,8 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       isSupabaseConfigured: Boolean(supabase),
+      isDemoMode,
       signIn: async ({ email, password }) => {
         if (!supabase) {
+          if (!isDemoMode) {
+            throw new Error("O serviço de autenticação está temporariamente indisponível.");
+          }
           const tipo: ProfileType = email.toLowerCase().includes("produtor")
             ? "produtor"
             : "comprador";
@@ -157,6 +161,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!supabase) {
+          if (!isDemoMode) {
+            throw new Error("O serviço de autenticação está temporariamente indisponível.");
+          }
           const localProfile: AuthProfile = {
             id: `local-${input.tipo}`,
             userId: `local-user-${input.tipo}`,
@@ -182,6 +189,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 caepf: input.producer.caepf,
                 state_registration: input.producer.stateRegistration,
                 localizacao: location || "Localização não informada",
+                postal_code: input.producer.postalCode,
+                address_line: input.producer.addressLine,
+                address_number: input.producer.addressNumber,
+                address_complement: input.producer.addressComplement,
+                neighborhood: input.producer.neighborhood,
+                cidade: input.cidade,
+                estado: input.estado,
+              }),
+            );
+          }
+          if (input.tipo === "comprador" && input.buyer) {
+            window.localStorage.setItem(
+              "origem-conecta-buyer-profile",
+              JSON.stringify({
+                companyName: input.buyer.nomeEmpresa,
+                businessType: input.buyer.tipoEmpresa,
+                cnpj: input.buyer.cnpj,
+                responsibleName: input.nome,
+                phone: input.telefone ?? "",
+                postalCode: input.buyer.postalCode,
+                addressLine: input.buyer.addressLine,
+                addressNumber: input.buyer.addressNumber ?? "",
+                addressComplement: input.buyer.addressComplement ?? "",
+                neighborhood: input.buyer.neighborhood,
+                city: input.cidade ?? "",
+                state: input.estado ?? "",
+                currentSupplier: "",
+                monthlySpend: "",
               }),
             );
           }

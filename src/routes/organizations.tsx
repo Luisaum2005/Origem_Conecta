@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { useOrganizationDashboard } from "@/lib/organization-dashboard";
 import { useOrganizations } from "@/lib/organizations";
+import { isOrganizationDashboardPath } from "@/lib/organization-navigation";
 import {
   BadgeCheck,
   Building2,
@@ -19,14 +20,19 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/organizations")({
-  component: () => (
-    <RequireProfile roles={["gestor_organizacao"]}>
-      <Organizations />
-    </RequireProfile>
-  ),
+  component: OrganizationRoute,
 });
 
-function Organizations() {
+function OrganizationRoute() {
+  const { pathname } = useLocation();
+  return (
+    <RequireProfile roles={["gestor_organizacao"]}>
+      {isOrganizationDashboardPath(pathname) ? <OrganizationsDashboard /> : <Outlet />}
+    </RequireProfile>
+  );
+}
+
+function OrganizationsDashboard() {
   const { organizations, loading, error } = useOrganizations();
   const organizationIds = organizations.map((organization) => organization.id);
   const dashboard = useOrganizationDashboard(organizationIds);

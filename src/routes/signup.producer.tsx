@@ -83,6 +83,11 @@ function SignupProducer() {
           commercializationMode,
           caepf: String(form.get("caepf") ?? ""),
           stateRegistration: String(form.get("stateRegistration") ?? ""),
+          postalCode: String(form.get("cep") ?? ""),
+          addressLine: String(form.get("logradouro") ?? ""),
+          addressNumber: String(form.get("numero") ?? ""),
+          addressComplement: String(form.get("complemento") ?? ""),
+          neighborhood: String(form.get("bairro") ?? ""),
         },
       });
       if (result.requiresEmailConfirmation) {

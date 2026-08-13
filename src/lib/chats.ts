@@ -31,7 +31,57 @@ export type SavedMessage = {
   message: string;
   createdAt: string;
   readAt?: string;
+  messageType?: "text" | "audio";
+  audioPath?: string;
+  audioUrl?: string;
+  audioDurationSeconds?: number;
+  audioMimeType?: string;
 };
+
+type DbMessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  read_at: string | null;
+  message_type?: "text" | "audio" | null;
+  audio_path?: string | null;
+  audio_duration_seconds?: number | null;
+  audio_mime_type?: string | null;
+};
+
+async function mapMessage(row: DbMessageRow): Promise<SavedMessage> {
+  let audioUrl: string | undefined;
+  if (supabase && row.message_type === "audio" && row.audio_path) {
+    const { data } = await supabase.storage
+      .from("chat-audio")
+      .createSignedUrl(row.audio_path, 3600);
+    audioUrl = data?.signedUrl;
+  }
+
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    senderId: row.sender_id,
+    message: row.message,
+    createdAt: row.created_at,
+    readAt: row.read_at || undefined,
+    messageType: row.message_type || "text",
+    audioPath: row.audio_path || undefined,
+    audioUrl,
+    audioDurationSeconds: row.audio_duration_seconds ?? undefined,
+    audioMimeType: row.audio_mime_type || undefined,
+  };
+}
+
+function getAudioExtension(mimeType: string) {
+  if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
+  if (mimeType.includes("ogg")) return "ogg";
+  if (mimeType.includes("mpeg")) return "mp3";
+  if (mimeType.includes("wav")) return "wav";
+  return "webm";
+}
 
 const CONVERSATIONS_STORAGE_KEY = "origem-conecta-conversations";
 const MESSAGES_STORAGE_KEY = "origem-conecta-messages";
@@ -256,6 +306,51 @@ export async function sendMessage(
   }
 }
 
+export async function sendAudioMessage(
+  conversationId: string,
+  senderId: string,
+  audio: Blob,
+  durationSeconds: number,
+): Promise<SavedMessage> {
+  if (!supabase) {
+    throw new Error("O envio de áudio precisa da conexão com o Supabase.");
+  }
+  if (!audio.size) throw new Error("A gravação está vazia.");
+  if (audio.size > 10 * 1024 * 1024) throw new Error("O áudio excede o limite de 10 MB.");
+
+  const safeDuration = Math.max(1, Math.min(120, Math.round(durationSeconds)));
+  const mimeType = (audio.type || "audio/webm").split(";")[0];
+  const path = `${conversationId}/${crypto.randomUUID()}.${getAudioExtension(mimeType)}`;
+  const { error: uploadError } = await supabase.storage.from("chat-audio").upload(path, audio, {
+    contentType: mimeType,
+    upsert: false,
+  });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      message: "Mensagem de áudio",
+      message_type: "audio",
+      audio_path: path,
+      audio_duration_seconds: safeDuration,
+      audio_mime_type: mimeType,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    await supabase.storage.from("chat-audio").remove([path]);
+    throw error;
+  }
+
+  const msg = await mapMessage(data as DbMessageRow);
+  chatEmitter.notifyNewMessage(conversationId, msg, "INSERT");
+  return msg;
+}
+
 export async function getConversationMessages(
   conversationId: string,
   limit = 20,
@@ -283,16 +378,8 @@ export async function getConversationMessages(
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data ?? [])
-      .map((row) => ({
-        id: row.id,
-        conversationId: row.conversation_id,
-        senderId: row.sender_id,
-        message: row.message,
-        createdAt: row.created_at,
-        readAt: row.read_at || undefined,
-      }))
-      .reverse(); // Reverse to chronological order for UI bubble flow
+    const mapped = await Promise.all((data ?? []).map((row) => mapMessage(row as DbMessageRow)));
+    return mapped.reverse(); // Reverse to chronological order for UI bubble flow
   } else {
     // Local fallback
     let all = readLocalMessages().filter((m) => m.conversationId === conversationId);
@@ -454,28 +541,13 @@ export function subscribeToMessages(
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        (payload) => {
-          interface DbMessageRow {
-            id: string;
-            conversation_id: string;
-            sender_id: string;
-            message: string;
-            created_at: string;
-            read_at: string | null;
-          }
-
+        async (payload) => {
           const row = (payload.new || payload.old) as unknown as DbMessageRow;
           if (!row || !row.id) return;
+          const message = await mapMessage(row);
           onEvent({
             eventType: payload.eventType as "INSERT" | "UPDATE",
-            message: {
-              id: row.id,
-              conversationId: row.conversation_id,
-              senderId: row.sender_id,
-              message: row.message || "",
-              createdAt: row.created_at,
-              readAt: row.read_at || undefined,
-            },
+            message,
           });
         },
       )

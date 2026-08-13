@@ -10,6 +10,7 @@ import {
   isNavigationItemActive,
   isOrganizationContext,
   organizationNavigation,
+  producerAreaNavigationItem,
 } from "@/lib/organization-navigation";
 import { Bell, Building2, LogOut, Repeat2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -56,7 +57,10 @@ export function Navbar() {
         ? getProfileHome(profile.tipo)
         : "/login";
   const desktopLinks = institutionalContext
-    ? organizationNavigation
+    ? [
+        ...organizationNavigation,
+        ...(profile?.roles?.includes("produtor") ? [producerAreaNavigationItem] : []),
+      ]
     : links
         .filter((link) => visible(link.profiles, profile?.tipo))
         .filter(

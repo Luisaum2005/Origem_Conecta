@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import {
   canCancelOrder,
   formatCancellationDeadline,
+  formatDeliveryAddress,
   formatOrderDate,
   getProducerId,
   type OrderStatus,
@@ -21,6 +22,7 @@ import {
   Truck,
   Star,
   MessageSquare,
+  MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -246,8 +248,17 @@ function ProducerOrderCard({
   const [ratingComment, setRatingComment] = useState("");
   const [submittingRating, setSubmittingRating] = useState(false);
   const cancelAllowed = canCancelOrder(order);
+  const hasDeliveryAddress = Boolean(
+    order.deliveryAddress?.addressLine && order.deliveryAddress.city && order.deliveryAddress.state,
+  );
 
   const confirmOrder = async () => {
+    if (!hasDeliveryAddress) {
+      setError(
+        "O comprador precisa completar o endereço de entrega antes da confirmação. Use Conversar para avisá-lo.",
+      );
+      return;
+    }
     if (!deliveryAt) {
       setError("Informe a data e a hora da entrega antes de confirmar o pedido.");
       return;
@@ -344,7 +355,11 @@ function ProducerOrderCard({
             </span>
             <Link
               to="/chat"
-              search={{ orderId: order.id, producerId: order.items[0]?.producerId }}
+              search={{
+                orderId: order.id,
+                buyerId: order.buyerId,
+                producerId: order.items[0]?.producerId,
+              }}
               className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-white px-2.5 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
             >
               <MessageSquare className="h-3 w-3 text-leaf-700" />
@@ -396,6 +411,28 @@ function ProducerOrderCard({
         </div>
       </div>
 
+      <section
+        className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 p-4"
+        aria-label="Endereço de entrega"
+      >
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-leaf-700">
+            <MapPin className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-brand-900">Endereço de entrega</p>
+            <p className="mt-1 text-sm leading-relaxed text-brand-900">
+              {formatDeliveryAddress(order.deliveryAddress)}
+            </p>
+            {!order.deliveryAddress?.addressLine && (
+              <p className="mt-1 text-xs text-orange-800">
+                Peça ao comprador que complete o endereço no perfil antes de confirmar a entrega.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <ul className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-canvas">
         {order.items.map((item) => (
           <li
@@ -434,11 +471,18 @@ function ProducerOrderCard({
             <button
               type="button"
               onClick={() => void confirmOrder()}
-              disabled={saving}
+              disabled={saving || !hasDeliveryAddress}
+              title={
+                !hasDeliveryAddress ? "Aguardando o endereço de entrega do comprador" : undefined
+              }
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
             >
               <CalendarClock className="h-4 w-4" />
-              {saving ? "Confirmando..." : "Confirmar pedido"}
+              {saving
+                ? "Confirmando..."
+                : hasDeliveryAddress
+                  ? "Confirmar pedido"
+                  : "Aguardando endereço"}
             </button>
             {error && (
               <p className="rounded-lg bg-[var(--color-error-bg)] px-3 py-2 text-xs font-semibold text-[var(--color-error-fg)] sm:col-span-2">

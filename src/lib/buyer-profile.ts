@@ -8,6 +8,11 @@ export type BuyerProfileDetails = {
   cnpj: string;
   responsibleName: string;
   phone: string;
+  postalCode: string;
+  addressLine: string;
+  addressNumber: string;
+  addressComplement: string;
+  neighborhood: string;
   city: string;
   state: string;
   currentSupplier: string;
@@ -22,6 +27,11 @@ const DEFAULT_BUYER_PROFILE: BuyerProfileDetails = {
   cnpj: "",
   responsibleName: "",
   phone: "",
+  postalCode: "",
+  addressLine: "",
+  addressNumber: "",
+  addressComplement: "",
+  neighborhood: "",
   city: "",
   state: "",
   currentSupplier: "",
@@ -38,11 +48,21 @@ type RemoteBuyerProfile = {
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
         cnpj?: string | null;
+        postal_code?: string | null;
+        address_line?: string | null;
+        address_number?: string | null;
+        address_complement?: string | null;
+        neighborhood?: string | null;
       }
     | Array<{
         nome_empresa?: string | null;
         tipo_empresa?: string | null;
         cnpj?: string | null;
+        postal_code?: string | null;
+        address_line?: string | null;
+        address_number?: string | null;
+        address_complement?: string | null;
+        neighborhood?: string | null;
       }>
     | null;
 };
@@ -66,6 +86,11 @@ function mapRemoteProfile(row: RemoteBuyerProfile): BuyerProfileDetails {
     cnpj: buyer?.cnpj || "",
     responsibleName: row.nome || DEFAULT_BUYER_PROFILE.responsibleName,
     phone: row.telefone || "",
+    postalCode: buyer?.postal_code || "",
+    addressLine: buyer?.address_line || "",
+    addressNumber: buyer?.address_number || "",
+    addressComplement: buyer?.address_complement || "",
+    neighborhood: buyer?.neighborhood || "",
     city: row.cidade || "",
     state: row.estado || "",
     currentSupplier: "",
@@ -77,7 +102,9 @@ async function loadRemoteBuyerProfile(profileId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select("nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,cnpj)")
+    .select(
+      "nome,telefone,cidade,estado,buyers(nome_empresa,tipo_empresa,cnpj,postal_code,address_line,address_number,address_complement,neighborhood)",
+    )
     .eq("id", profileId)
     .maybeSingle();
   if (error) throw error;
@@ -104,6 +131,11 @@ async function updateRemoteBuyerProfile(profileId: string, details: BuyerProfile
       nome_empresa: details.companyName,
       tipo_empresa: details.businessType,
       cnpj: details.cnpj || null,
+      postal_code: details.postalCode.replace(/\D/g, "") || null,
+      address_line: details.addressLine || null,
+      address_number: details.addressNumber || null,
+      address_complement: details.addressComplement || null,
+      neighborhood: details.neighborhood || null,
     })
     .eq("profile_id", profileId);
   if (buyerError) throw buyerError;

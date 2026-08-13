@@ -9,7 +9,7 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const navigate = useNavigate();
-  const { signIn, isSupabaseConfigured, profile, loading: restoringSession } = useAuth();
+  const { signIn, isDemoMode, profile, loading: restoringSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice] = useState(() => {
@@ -71,10 +71,11 @@ function Login() {
         </div>
       }
     >
-      {!isSupabaseConfigured && (
+      {isDemoMode && (
         <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-          Modo local ativo. Use qualquer e-mail e senha para testar. E-mails com "produtor" entram
-          como produtor; os demais entram como comprador.
+          Ambiente de demonstração ativo. Os dados ficam somente neste navegador e não representam
+          operações reais. E-mails com "produtor" entram como produtor; os demais entram como
+          comprador.
         </div>
       )}
       {notice && (

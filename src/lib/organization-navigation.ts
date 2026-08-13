@@ -1,4 +1,12 @@
-import { Building2, ClipboardList, MessageSquare, Package, User, Users } from "lucide-react";
+import {
+  Building2,
+  ClipboardList,
+  MessageSquare,
+  Package,
+  Repeat2,
+  User,
+  Users,
+} from "lucide-react";
 
 export const organizationNavigation = [
   { to: "/organizations" as const, label: "Painel", icon: Building2, exact: true },
@@ -18,6 +26,17 @@ export const organizationNavigation = [
   },
   { to: "/profile/organization" as const, label: "Perfil", icon: User, exact: false },
 ] as const;
+
+export const producerAreaNavigationItem = {
+  to: "/profile/producer" as const,
+  label: "Área do produtor",
+  icon: Repeat2,
+  exact: false,
+} as const;
+
+export function isOrganizationDashboardPath(pathname: string) {
+  return pathname === "/organizations" || pathname === "/organizations/";
+}
 
 export function isOrganizationContext(pathname: string, canManageOrganization: boolean) {
   return (

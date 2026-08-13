@@ -4,6 +4,7 @@ import {
   isNavigationItemActive,
   isOrganizationContext,
   organizationNavigation,
+  producerAreaNavigationItem,
 } from "@/lib/organization-navigation";
 import {
   Building2,
@@ -61,7 +62,10 @@ export function BottomNav() {
           ? getProfileHome(profile.tipo)
           : "/login";
   const candidateItems = institutionalContext
-    ? organizationNavigation
+    ? [
+        ...organizationNavigation,
+        ...(profile?.roles?.includes("produtor") ? [producerAreaNavigationItem] : []),
+      ]
     : profile
       ? [
           ...items.filter((item) => visibleForProfile(item.profiles, profile.tipo)),

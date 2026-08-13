@@ -351,6 +351,10 @@ function ProducerDetailsPanel({
             />
             <Mini label="Telefone" value={details.phone || "Não informado"} />
             <Mini label="Localização" value={details.location || "Não informado"} />
+            <Mini
+              label="Endereço cadastrado"
+              value={formatProducerAddress(details) || "Não informado"}
+            />
           </dl>
           <div className="mt-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -452,10 +456,48 @@ function ProducerDetailsPanel({
             />
             <TextField
               icon={MapPin}
-              label="Localização"
-              value={draft.location}
-              onChange={(location) => setDraft({ ...draft, location })}
-              placeholder="Digite a cidade e UF"
+              label="CEP"
+              value={draft.postalCode}
+              onChange={(postalCode) => setDraft({ ...draft, postalCode })}
+              placeholder="00000-000"
+            />
+            <TextField
+              icon={MapPin}
+              label="Logradouro"
+              value={draft.addressLine}
+              onChange={(addressLine) => setDraft({ ...draft, addressLine })}
+              placeholder="Rua, avenida..."
+            />
+            <TextField
+              icon={MapPin}
+              label="Número"
+              value={draft.addressNumber}
+              onChange={(addressNumber) => setDraft({ ...draft, addressNumber })}
+            />
+            <TextField
+              icon={MapPin}
+              label="Complemento"
+              value={draft.addressComplement}
+              onChange={(addressComplement) => setDraft({ ...draft, addressComplement })}
+            />
+            <TextField
+              icon={MapPin}
+              label="Bairro"
+              value={draft.neighborhood}
+              onChange={(neighborhood) => setDraft({ ...draft, neighborhood })}
+            />
+            <TextField
+              icon={MapPin}
+              label="Município"
+              value={draft.city}
+              onChange={(city) => setDraft({ ...draft, city })}
+            />
+            <TextField
+              icon={MapPin}
+              label="UF"
+              value={draft.state}
+              onChange={(state) => setDraft({ ...draft, state })}
+              placeholder="SP"
             />
           </div>
           <div>
@@ -506,6 +548,19 @@ function commercializationLabel(mode: "own" | "organization" | "undecided") {
   if (mode === "own") return "Em nome próprio";
   if (mode === "organization") return "Por organização";
   return "Ainda não definida";
+}
+
+function formatProducerAddress(details: ProducerProfileDetails) {
+  if (!details.addressLine || !details.city || !details.state) return "";
+  const street = [details.addressLine, details.addressNumber].filter(Boolean).join(", ");
+  return [
+    street,
+    details.addressComplement,
+    details.neighborhood,
+    `${details.city}, ${details.state}`,
+  ]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 function TextField({

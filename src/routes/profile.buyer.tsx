@@ -289,6 +289,10 @@ function BuyerDetailsPanel({
             <Mini label="CNPJ" value={details.cnpj || "Não informado"} />
             <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
             <Mini label="Telefone" value={details.phone || "Não informado"} />
+            <Mini
+              label="Endereço de entrega"
+              value={formatBuyerAddress(details) || "Não informado"}
+            />
             <Mini label="Cidade" value={details.city || "Não informado"} />
             <Mini label="Estado" value={details.state || "Não informado"} />
           </dl>
@@ -344,6 +348,40 @@ function BuyerDetailsPanel({
             />
             <TextField
               icon={MapPin}
+              label="CEP"
+              value={draft.postalCode}
+              onChange={(postalCode) => setDraft({ ...draft, postalCode })}
+              placeholder="00000-000"
+            />
+            <TextField
+              icon={MapPin}
+              label="Logradouro"
+              value={draft.addressLine}
+              onChange={(addressLine) => setDraft({ ...draft, addressLine })}
+              placeholder="Rua, avenida..."
+            />
+            <TextField
+              icon={MapPin}
+              label="Número"
+              value={draft.addressNumber}
+              onChange={(addressNumber) => setDraft({ ...draft, addressNumber })}
+              placeholder="123"
+            />
+            <TextField
+              icon={MapPin}
+              label="Complemento"
+              value={draft.addressComplement}
+              onChange={(addressComplement) => setDraft({ ...draft, addressComplement })}
+              placeholder="Sala, bloco..."
+            />
+            <TextField
+              icon={MapPin}
+              label="Bairro"
+              value={draft.neighborhood}
+              onChange={(neighborhood) => setDraft({ ...draft, neighborhood })}
+            />
+            <TextField
+              icon={MapPin}
               label="Cidade"
               value={draft.city}
               onChange={(city) => setDraft({ ...draft, city })}
@@ -388,6 +426,13 @@ function BuyerDetailsPanel({
       )}
     </Panel>
   );
+}
+
+function formatBuyerAddress(details: BuyerProfileDetails) {
+  const street = [details.addressLine, details.addressNumber].filter(Boolean).join(", ");
+  return [street, details.addressComplement, details.neighborhood, details.city, details.state]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 function summarizeProducts(orders: SavedOrder[]) {

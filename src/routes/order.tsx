@@ -181,6 +181,12 @@ function Order() {
 
   const handleConfirmOrder = async () => {
     if (isConfirming || hasStockIssues) return;
+    if (!hasCompleteDeliveryAddress(buyerDetails)) {
+      setConfirmError(
+        "Complete o endereço de entrega no seu perfil antes de enviar a solicitação.",
+      );
+      return;
+    }
     setIsConfirming(true);
     setConfirmError("");
     try {
@@ -191,6 +197,15 @@ function Order() {
         total,
         deliveryEta: operation.deliveryLabel,
         paymentMethod: "A combinar",
+        deliveryAddress: {
+          postalCode: buyerDetails.postalCode.replace(/\D/g, ""),
+          addressLine: buyerDetails.addressLine.trim(),
+          addressNumber: buyerDetails.addressNumber.trim() || undefined,
+          addressComplement: buyerDetails.addressComplement.trim() || undefined,
+          neighborhood: buyerDetails.neighborhood.trim() || undefined,
+          city: buyerDetails.city.trim(),
+          state: buyerDetails.state.trim().toUpperCase(),
+        },
         items: orderItems,
       });
       clear();
@@ -428,6 +443,19 @@ function Order() {
                   documentação serão combinados diretamente com o produtor ou organização.
                 </div>
 
+                {!hasCompleteDeliveryAddress(buyerDetails) && (
+                  <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+                    <p className="font-semibold">Endereço de entrega pendente</p>
+                    <p className="mt-1">
+                      Antes de enviar, complete o endereço em seu perfil. Ele será mostrado apenas
+                      aos produtores que participarem desta solicitação.
+                    </p>
+                    <Link to="/profile/buyer" className="mt-3 inline-flex font-semibold underline">
+                      Completar endereço
+                    </Link>
+                  </div>
+                )}
+
                 <div className="mt-5 rounded-xl border border-border bg-white p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm font-semibold text-brand-900">Resumo para conferência</p>
@@ -517,6 +545,22 @@ function Order() {
         )}
       </main>
     </div>
+  );
+}
+
+function hasCompleteDeliveryAddress(details: {
+  postalCode: string;
+  addressLine: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}) {
+  return (
+    details.postalCode.replace(/\D/g, "").length === 8 &&
+    Boolean(details.addressLine.trim()) &&
+    Boolean(details.neighborhood.trim()) &&
+    Boolean(details.city.trim()) &&
+    /^[A-Za-z]{2}$/.test(details.state.trim())
   );
 }
 

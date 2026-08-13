@@ -1,10 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
+import { resolveBackendMode } from "@/lib/backend-mode";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+export const backendMode = resolveBackendMode({
+  supabaseUrl,
+  supabaseAnonKey,
+  demoModeRequested: import.meta.env.VITE_ENABLE_DEMO_MODE as string | undefined,
+  isDevelopment: import.meta.env.DEV,
+});
+export const isDemoMode = backendMode === "demo";
+export const isBackendUnavailable = backendMode === "unavailable";
 
 export const supabase =
-  supabaseUrl && supabaseAnonKey
+  backendMode === "supabase" && supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: true,
@@ -45,7 +54,7 @@ export function throwSupabaseError(error: SupabaseLikeError | null | undefined) 
 
 export function assertSupabaseConfigured() {
   if (!supabase) {
-    throw new Error("Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para usar o Supabase.");
+    throw new Error("O serviço de dados está temporariamente indisponível.");
   }
   return supabase;
 }

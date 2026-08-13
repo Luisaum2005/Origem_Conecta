@@ -7,6 +7,7 @@ import {
   getOrCreateConversation,
   getConversationMessages,
   sendMessage,
+  sendAudioMessage,
   markAsRead,
   subscribeToMessages,
   formatMessageTime,
@@ -25,6 +26,9 @@ import {
   Check,
   CheckCheck,
   MessageSquare,
+  Mic,
+  Square,
+  Trash2,
 } from "lucide-react";
 import { getProduct } from "@/lib/catalog";
 import { useEffect, useRef, useState } from "react";
@@ -69,10 +73,48 @@ function ChatRoom() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [audioPreview, setAudioPreview] = useState<{
+    blob: Blob;
+    url: string;
+    durationSeconds: number;
+  } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const oldestMessageIdRef = useRef<string | null>(null);
   const isAtBottomRef = useRef(true);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingSecondsRef = useRef(0);
+  const recordingTimerRef = useRef<number | null>(null);
+
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const releaseMicrophone = () => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  };
+
+  useEffect(() => {
+    return () => {
+      clearRecordingTimer();
+      releaseMicrophone();
+      if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (audioPreview?.url) URL.revokeObjectURL(audioPreview.url);
+    };
+  }, [audioPreview]);
 
   // Initialize conversation
   useEffect(() => {
@@ -391,6 +433,94 @@ function ChatRoom() {
     }
   };
 
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
+  };
+
+  const startRecording = async () => {
+    if (sending || isRecording || audioPreview) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Este navegador não oferece suporte à gravação de áudio.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredTypes = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"];
+      const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      recordingSecondsRef.current = 0;
+      setRecordingSeconds(0);
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        clearRecordingTimer();
+        releaseMicrophone();
+        setIsRecording(false);
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        if (blob.size > 0) {
+          setAudioPreview({
+            blob,
+            url: URL.createObjectURL(blob),
+            durationSeconds: Math.max(1, recordingSecondsRef.current),
+          });
+        }
+      });
+
+      recorder.start(250);
+      setIsRecording(true);
+      recordingTimerRef.current = window.setInterval(() => {
+        recordingSecondsRef.current += 1;
+        setRecordingSeconds(recordingSecondsRef.current);
+        if (recordingSecondsRef.current >= 120) stopRecording();
+      }, 1000);
+    } catch (err) {
+      releaseMicrophone();
+      console.error("Erro ao acessar o microfone:", err);
+      toast.error("Não foi possível acessar o microfone. Confira a permissão do navegador.");
+    }
+  };
+
+  const discardAudio = () => {
+    if (isRecording) stopRecording();
+    setAudioPreview(null);
+  };
+
+  const handleSendAudio = async () => {
+    if (sending || !audioPreview || !conversation?.id || !profile?.id) return;
+    setSending(true);
+    try {
+      await sendAudioMessage(
+        conversation.id,
+        profile.id,
+        audioPreview.blob,
+        audioPreview.durationSeconds,
+      );
+      setAudioPreview(null);
+      isAtBottomRef.current = true;
+      scrollToBottom();
+    } catch (err) {
+      console.error("Erro ao enviar áudio:", err);
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar o áudio.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatRecordingTime = (seconds: number) =>
+    `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -588,7 +718,26 @@ function ChatRoom() {
                           : "bg-white text-brand-900 border border-border rounded-tl-none shadow-xs"
                       }`}
                     >
-                      {msg.message}
+                      {msg.messageType === "audio" ? (
+                        msg.audioUrl ? (
+                          <div className="min-w-[220px]">
+                            <span className="mb-1 block text-xs font-semibold">
+                              Mensagem de áudio
+                            </span>
+                            <audio
+                              controls
+                              preload="metadata"
+                              src={msg.audioUrl}
+                              className="h-10 w-full max-w-[280px]"
+                              aria-label={`Mensagem de áudio de ${msg.audioDurationSeconds ?? 0} segundos`}
+                            />
+                          </div>
+                        ) : (
+                          <span>Áudio indisponível</span>
+                        )
+                      ) : (
+                        msg.message
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 px-1">
                       <span className="text-[10px] text-muted-foreground">
@@ -613,35 +762,95 @@ function ChatRoom() {
 
         {/* Input box section */}
         <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 lg:static lg:border-x-0">
-          <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
-            <textarea
-              aria-label="Mensagem da negociação"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value.slice(0, 2000))}
-              onKeyDown={handleKeyDown}
-              placeholder="Digite sua mensagem de negociação..."
-              rows={1}
-              className="min-w-0 flex-1 max-h-24 resize-none bg-transparent py-1.5 px-2 text-base text-brand-900 focus:outline-none focus:ring-0 leading-relaxed font-sans placeholder-muted-foreground sm:text-sm"
-              style={{ height: "auto" }}
-            />
-            <div className="flex flex-col justify-end shrink-0 gap-1.5">
-              <span
-                className="px-1 text-right text-sm text-muted-foreground select-none"
-                aria-live="polite"
-              >
-                {inputText.length}/2000
-              </span>
+          {isRecording ? (
+            <div
+              className="flex min-h-16 items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-2.5"
+              role="status"
+            >
+              <span className="ml-1 h-3 w-3 animate-pulse rounded-full bg-red-600 motion-reduce:animate-none" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-brand-900">Gravando áudio</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatRecordingTime(recordingSeconds)} / 2:00
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => void handleSend()}
-                disabled={sending || !inputText.trim()}
-                className="grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-xl bg-brand-900 text-white transition-colors hover:bg-brand-800 disabled:pointer-events-none disabled:opacity-50"
-                aria-label="Enviar mensagem"
+                onClick={stopRecording}
+                className="grid h-12 w-12 place-items-center rounded-xl bg-red-600 text-white hover:bg-red-700"
+                aria-label="Parar gravação"
               >
-                <Send className="h-4.5 w-4.5" />
+                <Square className="h-5 w-5 fill-current" />
               </button>
             </div>
-          </div>
+          ) : audioPreview ? (
+            <div className="flex min-h-16 items-center gap-2 rounded-2xl border border-border bg-canvas p-2">
+              <audio
+                controls
+                preload="metadata"
+                src={audioPreview.url}
+                className="h-10 min-w-0 flex-1"
+                aria-label="Ouvir áudio antes de enviar"
+              />
+              <button
+                type="button"
+                onClick={discardAudio}
+                disabled={sending}
+                className="grid h-12 w-12 place-items-center rounded-xl border border-border text-red-700 hover:bg-red-50 disabled:opacity-50"
+                aria-label="Descartar áudio"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSendAudio()}
+                disabled={sending}
+                className="grid h-12 w-12 place-items-center rounded-xl bg-brand-900 text-white hover:bg-brand-800 disabled:opacity-50"
+                aria-label="Enviar áudio"
+              >
+                <Send className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
+              <textarea
+                aria-label="Mensagem da negociação"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value.slice(0, 2000))}
+                onKeyDown={handleKeyDown}
+                placeholder="Digite sua mensagem de negociação..."
+                rows={1}
+                className="min-w-0 flex-1 max-h-24 resize-none bg-transparent py-1.5 px-2 text-base text-brand-900 focus:outline-none focus:ring-0 leading-relaxed font-sans placeholder-muted-foreground sm:text-sm"
+                style={{ height: "auto" }}
+              />
+              <button
+                type="button"
+                onClick={() => void startRecording()}
+                disabled={sending || !!inputText.trim()}
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:border-leaf-600 hover:bg-leaf-50 disabled:pointer-events-none disabled:opacity-50"
+                aria-label="Gravar mensagem de áudio"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+              <div className="flex flex-col justify-end shrink-0 gap-1.5">
+                <span
+                  className="px-1 text-right text-sm text-muted-foreground select-none"
+                  aria-live="polite"
+                >
+                  {inputText.length}/2000
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleSend()}
+                  disabled={sending || !inputText.trim()}
+                  className="grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-xl bg-brand-900 text-white transition-colors hover:bg-brand-800 disabled:pointer-events-none disabled:opacity-50"
+                  aria-label="Enviar mensagem"
+                >
+                  <Send className="h-4.5 w-4.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </footer>
       </div>
     </div>
