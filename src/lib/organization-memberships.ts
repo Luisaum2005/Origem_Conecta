@@ -6,6 +6,9 @@ export type Membership = {
   id: string;
   organizationId: string;
   organizationName: string;
+  organizationType?: "cooperativa" | "associacao";
+  organizationCity?: string;
+  organizationState?: string;
   producerName: string;
   producerEmail: string;
   propertyName: string;
@@ -30,24 +33,35 @@ export type OrganizationSearchResult = {
 function one(value: unknown): Record<string, unknown> {
   return (Array.isArray(value) ? value[0] : (value ?? {})) as Record<string, unknown>;
 }
-function mapMembership(row: Record<string, unknown>): Membership {
+export function mapMembership(row: Record<string, unknown>): Membership {
   const organization = one(row.organizations);
   const producer = one(row.producers);
   const profile = one(producer.profiles);
   return {
     id: String(row.id),
     organizationId: String(row.organization_id),
-    organizationName: String(organization.trade_name ?? "Organização"),
-    producerName: String(producer.responsavel ?? profile.nome ?? "Produtor"),
-    producerEmail: String(profile.email ?? ""),
-    propertyName: String(producer.nome_propriedade ?? "Propriedade"),
-    location: producer.localizacao ? String(producer.localizacao) : undefined,
-    products: Array.isArray(producer.categorias_atendidas)
-      ? producer.categorias_atendidas.map(String)
-      : [],
+    organizationName: String(row.organization_name ?? organization.trade_name ?? "Organização"),
+    organizationType: (row.organization_type ?? organization.type) as
+      | Membership["organizationType"]
+      | undefined,
+    organizationCity: String(row.organization_city ?? organization.city ?? "") || undefined,
+    organizationState: String(row.organization_state ?? organization.state ?? "") || undefined,
+    producerName: String(row.producer_name ?? producer.responsavel ?? profile.nome ?? "Produtor"),
+    producerEmail: String(row.producer_email ?? profile.email ?? ""),
+    propertyName: String(row.property_name ?? producer.nome_propriedade ?? "Propriedade"),
+    location: row.producer_location
+      ? String(row.producer_location)
+      : producer.localizacao
+        ? String(producer.localizacao)
+        : undefined,
+    products: Array.isArray(row.products)
+      ? row.products.map(String)
+      : Array.isArray(producer.categorias_atendidas)
+        ? producer.categorias_atendidas.map(String)
+        : [],
     status: row.status as MembershipStatus,
     memberNumber: row.member_number ? String(row.member_number) : undefined,
-    canSell: Boolean(row.can_sell_through_organization),
+    canSell: Boolean(row.can_sell ?? row.can_sell_through_organization),
     createdAt: String(row.created_at),
   };
 }
@@ -62,17 +76,19 @@ export function useMemberships(organizationId?: string) {
       return;
     }
     setLoading(true);
-    let query = supabase
-      .from("organization_members")
-      .select(
-        "id,organization_id,status,member_number,can_sell_through_organization,created_at,organizations(trade_name),producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,profiles(nome,email))",
-      )
-      .order("created_at", { ascending: false });
-    if (organizationId) query = query.eq("organization_id", organizationId);
-    const { data, error: queryError } = await query;
+    const result = organizationId
+      ? await supabase
+          .from("organization_members")
+          .select(
+            "id,organization_id,status,member_number,can_sell_through_organization,created_at,organizations(trade_name,type,city,state),producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,profiles(nome,email))",
+          )
+          .eq("organization_id", organizationId)
+          .order("created_at", { ascending: false })
+      : await supabase.rpc("list_my_producer_memberships");
+    const { data, error: queryError } = result;
     if (queryError) setError(queryError.message);
     else {
-      setMemberships((data ?? []).map((row) => mapMembership(row as Record<string, unknown>)));
+      setMemberships((data ?? []).map((row: Record<string, unknown>) => mapMembership(row)));
       setError("");
     }
     setLoading(false);

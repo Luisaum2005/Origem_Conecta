@@ -68,8 +68,20 @@ export function ProducerMemberships() {
           <p className="text-xs font-semibold uppercase text-orange-700">Convites</p>
           <ul className="mt-2 space-y-2">
             {invites.map((item) => (
-              <li key={item.id} className="rounded-xl bg-orange-50 p-3">
-                <p className="font-semibold text-brand-900">{item.organizationName}</p>
+              <li key={item.id} className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+                  Convite de
+                </p>
+                <p className="mt-1 font-semibold text-brand-900">{item.organizationName}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.organizationType === "associacao" ? "Associação" : "Cooperativa"}
+                  {item.organizationCity && item.organizationState
+                    ? ` · ${item.organizationCity}/${item.organizationState}`
+                    : ""}
+                </p>
+                <p className="mt-2 text-sm text-brand-800">
+                  Esta organização convidou você para fazer parte do quadro de associados.
+                </p>
                 <div className="mt-3 flex gap-2">
                   <button
                     disabled={busy === item.id}
