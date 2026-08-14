@@ -11,7 +11,7 @@ export const Route = createFileRoute("/")({
 function Splash() {
   const { profile, loading } = useAuth();
   if (loading) return <AuthRestoring />;
-  if (profile) return <Navigate to={getProfileHome(profile.tipo)} replace />;
+  if (profile) return <Navigate to={getProfileHome(profile.tipo, profile.roles)} replace />;
 
   return (
     <div className="min-h-screen bg-canvas">

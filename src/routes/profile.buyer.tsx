@@ -82,7 +82,7 @@ function BuyerProfile() {
           </div>
           <Link
             to="/portfolio"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
           >
             <ShoppingBasket className="h-3.5 w-3.5 text-leaf-600" />
             Novo pedido
@@ -262,7 +262,7 @@ function BuyerProfile() {
 
             <Panel title="Contato principal" icon={Phone}>
               <p className="text-sm text-muted-foreground">
-                Confirmacoes de pedido e entrega serao enviadas para{" "}
+                Confirmações de pedido e entrega serão enviadas para{" "}
                 {details.phone || "o telefone cadastrado"}.
               </p>
             </Panel>

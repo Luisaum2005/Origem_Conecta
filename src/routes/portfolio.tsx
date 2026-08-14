@@ -22,7 +22,7 @@ function Portfolio() {
     () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
     [products],
   );
-  const { cart, selectedUnits, setQty, setUnit, totalItems } = useCart();
+  const { cart, setQty, totalItems } = useCart();
   const [cat, setCat] = useState("Todos");
   const [q, setQ] = useState("");
 
@@ -48,7 +48,7 @@ function Portfolio() {
               </h1>
               <Link
                 to="/directory/organizations"
-                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-leaf-700 hover:underline"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-leaf-700 hover:underline"
               >
                 <Building2 className="h-4 w-4" />
                 Conhecer cooperativas e associações
@@ -105,8 +105,6 @@ function Portfolio() {
                 product={product}
                 qty={cart[product.id] ?? 0}
                 onChange={(qty) => setQty(product.id, qty)}
-                selectedUnit={selectedUnits[product.id] ?? product.unit}
-                onUnitChange={(unit) => setUnit(product.id, unit)}
               />
             ))}
           </section>

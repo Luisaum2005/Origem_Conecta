@@ -87,7 +87,7 @@ function SignupOrganization() {
         );
         navigate({ to: "/login" });
       } else if (result.profile) {
-        navigate({ to: getProfileHome(result.profile.tipo) });
+        navigate({ to: getProfileHome(result.profile.tipo, result.profile.roles) });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a organização.");

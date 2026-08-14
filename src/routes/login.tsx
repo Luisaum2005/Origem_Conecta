@@ -27,7 +27,7 @@ function Login() {
       </AuthLayout>
     );
   }
-  if (profile) return <Navigate to={getProfileHome(profile.tipo)} replace />;
+  if (profile) return <Navigate to={getProfileHome(profile.tipo, profile.roles)} replace />;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -40,7 +40,7 @@ function Login() {
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
       });
-      navigate({ to: getProfileHome(profile.tipo) });
+      navigate({ to: getProfileHome(profile.tipo, profile.roles) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível entrar.");
     } finally {

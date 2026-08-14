@@ -152,9 +152,11 @@ function ProducerProfile() {
           />
         </section>
 
-        <section className="mt-6">
-          <ProducerDetailsPanel details={details} onSave={saveDetails} saving={saving} />
-        </section>
+        {!profileLoading && !profileError && (
+          <section className="mt-6">
+            <ProducerDetailsPanel details={details} onSave={saveDetails} saving={saving} />
+          </section>
+        )}
 
         <ProducerMemberships />
 
@@ -456,7 +458,7 @@ function ProducerDetailsPanel({
           </dl>
           {missingFields.length > 0 && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <p className="font-semibold">Complete seu perfil para facilitar as negociaÃ§Ãµes.</p>
+              <p className="font-semibold">Complete seu perfil para facilitar as negociações.</p>
               <p className="mt-1">Faltam: {missingFields.join(", ")}.</p>
             </div>
           )}

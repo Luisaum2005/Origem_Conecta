@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { formatOrderDate, type OrderStatus, type SavedOrder, useOrders } from "@/lib/orders";
-import { Check, ClipboardList, Package, ShieldCheck, Sparkles, Star, Truck } from "lucide-react";
+import { Check, ClipboardList, Package, ShieldCheck, Sparkles, Truck } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/tracking")({
@@ -82,8 +82,7 @@ function Tracking() {
               Acompanhamento da entrega
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Veja o status real do pedido conforme comprador, produtor ou admin atualizam a
-              operação.
+              Veja o status real do pedido conforme comprador e produtores atualizam a operação.
             </p>
           </div>
 
@@ -204,7 +203,11 @@ function Tracking() {
               </section>
             )}
 
-            <section className="mt-6 grid gap-4 md:grid-cols-2">
+            <section
+              className={`mt-6 grid gap-4 ${
+                selectedOrder.status === "Cancelado" ? "" : "md:grid-cols-2"
+              }`}
+            >
               <div className="rounded-2xl border border-[var(--border-strong)] bg-surface-brand-soft p-6">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-leaf-700" />
@@ -225,36 +228,27 @@ function Tracking() {
                 </ul>
               </div>
 
-              <div className="rounded-2xl border border-border bg-white p-6">
-                <h3 className="font-semibold text-brand-900">Segurança da entrega</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Informe o código ao produtor somente quando receber e conferir os produtos.
-                </p>
-                <p className="mt-3 inline-flex rounded-lg bg-canvas px-3 py-2 text-lg font-bold tracking-widest text-brand-900">
-                  Código: {selectedOrder.deliveryCode ?? "gerando"}
-                </p>
-                {selectedOrder.receiptCode && (
-                  <p className="mt-2 text-sm font-semibold text-brand-900">
-                    Recibo: {selectedOrder.receiptCode}
+              {selectedOrder.status !== "Cancelado" && (
+                <div className="rounded-2xl border border-border bg-white p-6">
+                  <h3 className="font-semibold text-brand-900">Segurança da entrega</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Informe o código ao produtor somente quando receber e conferir os produtos.
                   </p>
-                )}
-                {selectedOrder.complaint && (
-                  <p className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800">
-                    Reclamação aberta: {selectedOrder.complaint}
+                  <p className="mt-3 inline-flex rounded-lg bg-canvas px-3 py-2 text-lg font-bold tracking-widest text-brand-900">
+                    Código: {selectedOrder.deliveryCode ?? "gerando"}
                   </p>
-                )}
-                <Link
-                  to="/rating"
-                  className={`mt-4 inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${
-                    selectedOrder.status === "Entregue"
-                      ? "border-leaf-600 bg-leaf-600 text-white hover:bg-leaf-700"
-                      : "border-border bg-white text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
-                  }`}
-                >
-                  <Star className="h-4 w-4" />
-                  Avaliar entrega
-                </Link>
-              </div>
+                  {selectedOrder.receiptCode && (
+                    <p className="mt-2 text-sm font-semibold text-brand-900">
+                      Recibo: {selectedOrder.receiptCode}
+                    </p>
+                  )}
+                  {selectedOrder.complaint && (
+                    <p className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800">
+                      Reclamação aberta: {selectedOrder.complaint}
+                    </p>
+                  )}
+                </div>
+              )}
             </section>
           </>
         )}

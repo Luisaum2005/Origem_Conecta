@@ -253,7 +253,7 @@ function mapRemoteOrder(
     canceledAt: order.cancelado_em ?? undefined,
     canceledBy: (order.cancelado_por as SavedOrder["canceledBy"]) ?? undefined,
     cancellationReason: order.motivo_cancelamento ?? undefined,
-    deliveryCode: order.codigo_entrega ?? undefined,
+    deliveryCode: order.status === "cancelado" ? undefined : (order.codigo_entrega ?? undefined),
     receiptCode: order.codigo_recibo ?? undefined,
     complaint: order.reclamacao_texto ?? undefined,
     complaintStatus:
@@ -677,6 +677,7 @@ export function useOrders() {
                 canceledAt: new Date().toISOString(),
                 canceledBy: actor,
                 cancellationReason,
+                deliveryCode: undefined,
               }
             : item,
         ),

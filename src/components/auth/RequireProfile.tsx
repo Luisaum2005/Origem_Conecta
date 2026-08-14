@@ -23,11 +23,11 @@ export function RequireProfile({ allowed, roles, children }: RequireProfileProps
   if (!profile) return <Navigate to="/login" replace />;
 
   if (roles && !roles.some((role) => profile.roles?.includes(role))) {
-    return <Navigate to={getProfileHome(profile.tipo)} replace />;
+    return <Navigate to={getProfileHome(profile.tipo, profile.roles)} replace />;
   }
 
   if (allowed && !allowed.includes(profile.tipo)) {
-    return <Navigate to={getProfileHome(profile.tipo)} replace />;
+    return <Navigate to={getProfileHome(profile.tipo, profile.roles)} replace />;
   }
 
   return children;

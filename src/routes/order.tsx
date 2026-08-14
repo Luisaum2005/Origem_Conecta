@@ -61,7 +61,7 @@ function clampQuantity(value: number, max: number) {
 function Order() {
   const products = useAvailableProducts();
   const operation = getOperationWindow();
-  const { cart, selectedUnits, setQty, setUnit, clear } = useCart();
+  const { cart, setQty, clear } = useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const { addRecurringOrder } = useRecurringOrders();
@@ -90,7 +90,7 @@ function Order() {
       productId: product.id,
       productName: product.name,
       quantity,
-      unit: selectedUnits[product.id] ?? product.unit,
+      unit: product.unit,
       unitPrice: selectedProducer.price,
       producerId: selectedProducer.id,
       producerName: selectedProducer.name,
@@ -315,7 +315,7 @@ function Order() {
               {items.map((product) => {
                 const selectedProducer = preferredProducer(product);
                 const lineTotal = selectedProducer.price * cart[product.id];
-                const currentUnit = selectedUnits[product.id] ?? product.unit;
+                const currentUnit = product.unit;
                 return (
                   <div
                     key={product.id}
@@ -373,7 +373,6 @@ function Order() {
                           onQuantityChange={(qty) =>
                             updateQuantity(product.id, qty, selectedProducer.stock)
                           }
-                          onUnitChange={(unit) => setUnit(product.id, unit)}
                         />
 
                         <button
@@ -576,14 +575,12 @@ function OrderItemControls({
   unit,
   maxStock,
   onQuantityChange,
-  onUnitChange,
 }: {
   productId: string;
   quantity: number;
   unit: string;
   maxStock: number;
   onQuantityChange: (qty: number) => void;
-  onUnitChange: (unit: string) => void;
 }) {
   const [inputValue, setInputValue] = useState(
     quantity > 0 ? quantity.toString().replace(".", ",") : "",
@@ -613,19 +610,9 @@ function OrderItemControls({
           className="h-11 w-full rounded-xl border border-border bg-white px-3 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
         />
       </div>
-      <select
-        value={unit}
-        onChange={(event) => onUnitChange(event.target.value)}
-        className="h-11 w-24 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-      >
-        <option value="kg">kg</option>
-        <option value="caixa">caixa</option>
-        <option value="unidade">unid</option>
-        <option value="cacho">cacho</option>
-        <option value="pote">pote</option>
-        <option value="pacote">pacote</option>
-        <option value="saco">saco</option>
-      </select>
+      <span className="inline-flex h-11 w-24 items-center justify-center rounded-xl border border-border bg-canvas px-2 text-center text-sm font-semibold text-brand-900">
+        {unit}
+      </span>
     </div>
   );
 }

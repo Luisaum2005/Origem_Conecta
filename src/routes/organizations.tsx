@@ -184,7 +184,7 @@ function OperationalSummary({
           </div>
           <Link
             to="/organizations/members"
-            className="text-sm font-semibold text-leaf-700 hover:underline"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-leaf-700 hover:underline"
           >
             Gerenciar associados
           </Link>
@@ -319,7 +319,7 @@ function ActionAlert({ title, text, to }: { title: string; text: string; to: str
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p>
       <Link
         to={to}
-        className="mt-2 inline-flex min-h-9 items-center text-sm font-semibold text-leaf-700 hover:underline"
+        className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-leaf-700 hover:underline"
       >
         Resolver agora
       </Link>

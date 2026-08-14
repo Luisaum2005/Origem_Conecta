@@ -69,7 +69,7 @@ export function PushOnboarding() {
     return () => window.removeEventListener(PUSH_ONBOARDING_COMPLETED_EVENT, hideAfterActivation);
   }, [profile]);
 
-  const isHomeScreen = profile ? pathname === getProfileHome(profile.tipo) : false;
+  const isHomeScreen = profile ? pathname === getProfileHome(profile.tipo, profile.roles) : false;
 
   if (!visible || !profile || !isHomeScreen) return null;
 

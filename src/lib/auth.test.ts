@@ -1,6 +1,7 @@
 import {
   AuthProvider,
   buildSignupPayload,
+  getProfileHome,
   shouldRestoreProfileForAuthEvent,
   useAuth,
 } from "@/lib/auth";
@@ -13,8 +14,8 @@ function AuthStateProbe() {
   return createElement("span", null, `${loading}:${profile?.id ?? "none"}`);
 }
 
-describe("inicializaÃ§Ã£o segura da sessÃ£o", () => {
-  it("renderiza um estado neutro e carregando antes da hidrataÃ§Ã£o", () => {
+describe("inicialização segura da sessão", () => {
+  it("renderiza um estado neutro e carregando antes da hidratação", () => {
     const html = renderToStaticMarkup(
       createElement(AuthProvider, null, createElement(AuthStateProbe)),
     );
@@ -28,6 +29,16 @@ describe("eventos de sessao", () => {
     expect(shouldRestoreProfileForAuthEvent("TOKEN_REFRESHED", "user-1", "user-1")).toBe(false);
     expect(shouldRestoreProfileForAuthEvent("SIGNED_IN", "user-1", "user-1")).toBe(false);
     expect(shouldRestoreProfileForAuthEvent("USER_UPDATED", "user-1", "user-1")).toBe(true);
+  });
+});
+
+describe("destino inicial por perfil", () => {
+  it("prioriza o painel institucional para um produtor que também gerencia organização", () => {
+    expect(getProfileHome("produtor", ["produtor", "gestor_organizacao"])).toBe("/organizations");
+  });
+
+  it("mantém produtores sem papel institucional no painel do produtor", () => {
+    expect(getProfileHome("produtor", ["produtor"])).toBe("/profile/producer");
   });
 });
 

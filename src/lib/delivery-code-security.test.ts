@@ -7,6 +7,10 @@ const migration = readFileSync(
   "utf8",
 );
 const ordersSource = readFileSync(resolve(process.cwd(), "src/lib/orders.ts"), "utf8");
+const profileFixMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/042_secure_producer_profile.sql"),
+  "utf8",
+);
 
 describe("delivery confirmation code protection", () => {
   it("removes direct delivery-code reads and exposes a buyer-only RPC", () => {
@@ -32,5 +36,11 @@ describe("delivery confirmation code protection", () => {
     expect(orderSelects.length).toBeGreaterThan(0);
     expect(orderSelects.every((select) => !select.includes("codigo_entrega"))).toBe(true);
     expect(ordersSource).toContain('"get_my_order_delivery_codes"');
+  });
+
+  it("does not return a delivery code after cancellation", () => {
+    expect(profileFixMigration).toContain("and o.status<>'cancelado'");
+    expect(ordersSource).toContain('order.status === "cancelado" ? undefined');
+    expect(ordersSource).toContain("deliveryCode: undefined");
   });
 });

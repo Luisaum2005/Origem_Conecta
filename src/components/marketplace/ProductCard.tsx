@@ -41,14 +41,10 @@ export function ProductCard({
   product,
   qty,
   onChange,
-  selectedUnit,
-  onUnitChange,
 }: {
   product: Product;
   qty: number;
   onChange: (qty: number) => void;
-  selectedUnit: string;
-  onUnitChange: (unit: string) => void;
 }) {
   const [hover, setHover] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -73,15 +69,9 @@ export function ProductCard({
 
   // Smooth decimal input state
   const [inputValue, setInputValue] = useState(qty > 0 ? qty.toString().replace(".", ",") : "");
-  const [draftUnit, setDraftUnit] = useState(selectedUnit);
-
   useEffect(() => {
     setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
   }, [qty]);
-
-  useEffect(() => {
-    setDraftUnit(selectedUnit);
-  }, [selectedUnit]);
 
   const handleInputChange = (valueStr: string) => {
     setInputValue(valueStr);
@@ -101,7 +91,6 @@ export function ProductCard({
       return;
     }
     const confirmedQuantity = clampQuantity(requestedQuantity, availableStock);
-    onUnitChange(draftUnit);
     onChange(confirmedQuantity);
     setInputValue(String(confirmedQuantity).replace(".", ","));
     setAdded(true);
@@ -265,7 +254,7 @@ export function ProductCard({
         <div className="min-w-0">
           <p className="text-2xl font-bold tracking-tight text-brand-900">
             R$ {selectedProducer.price.toFixed(2)}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">/{draftUnit}</span>
+            <span className="ml-1 text-sm font-medium text-muted-foreground">/{product.unit}</span>
           </p>
         </div>
 
@@ -287,23 +276,9 @@ export function ProductCard({
                   aria-label={`Quantidade de ${product.name}`}
                 />
               </div>
-              <select
-                value={draftUnit}
-                onChange={(event) => {
-                  setDraftUnit(event.target.value);
-                  setAdded(false);
-                }}
-                className="h-11 w-28 rounded-xl border border-border bg-white px-2 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-              >
-                <option value="kg">kg</option>
-                <option value="g">g</option>
-                <option value="caixa">caixa</option>
-                <option value="unidade">unid</option>
-                <option value="cacho">cacho</option>
-                <option value="pote">pote</option>
-                <option value="pacote">pacote</option>
-                <option value="saco">saco</option>
-              </select>
+              <span className="inline-flex h-11 w-28 items-center justify-center rounded-xl border border-border bg-canvas px-2 text-center text-sm font-semibold text-brand-900">
+                {product.unit}
+              </span>
             </div>
 
             <button
@@ -319,7 +294,7 @@ export function ProductCard({
               <div className="animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
                   <span className="inline-block h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  {formatQuantity(qty)} {selectedUnit} na lista de interesse
+                  {formatQuantity(qty)} {product.unit} na lista de interesse
                 </div>
               </div>
             )}

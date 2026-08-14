@@ -85,8 +85,8 @@ export type AuthContextValue = {
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function getProfileHome(tipo: ProfileType) {
-  if (tipo === "organizacao") return "/organizations";
+export function getProfileHome(tipo: ProfileType, roles: readonly ProfileRole[] = []) {
+  if (tipo === "organizacao" || roles.includes("gestor_organizacao")) return "/organizations";
   if (tipo === "produtor") return "/profile/producer";
   if (tipo === "admin") return "/admin";
   return "/portfolio";
