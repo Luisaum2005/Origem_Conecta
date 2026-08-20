@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ALL_SUPPLIER_PRODUCTS, SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
 import { mapCatalogProduct, mapProductRequestResult } from "@/lib/product-catalog";
 
 const migration = readFileSync(
@@ -9,6 +10,10 @@ const migration = readFileSync(
 );
 const requestMigration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/048_product_catalog_requests.sql"),
+  "utf8",
+);
+const cleanupMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/053_clean_and_expand_product_catalog.sql"),
   "utf8",
 );
 
@@ -67,5 +72,35 @@ describe("catálogo central de produtos", () => {
     expect(requestMigration).toContain("if not public.is_platform_admin()");
     expect(requestMigration).toContain("product-request:");
     expect(requestMigration).toContain("grant execute on function public.request_catalog_product");
+  });
+
+  it("mantém a lista do cadastro limpa, clara e sem duplicidades", () => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    const normalizedProducts = ALL_SUPPLIER_PRODUCTS.map(normalize);
+
+    expect(new Set(normalizedProducts).size).toBe(normalizedProducts.length);
+    expect(ALL_SUPPLIER_PRODUCTS).toContain("Limão Tahiti");
+    expect(ALL_SUPPLIER_PRODUCTS).not.toContain("Limão Taiti");
+    expect(ALL_SUPPLIER_PRODUCTS).not.toContain("Murcot");
+    expect(ALL_SUPPLIER_PRODUCTS).not.toContain("Poncã");
+    expect(ALL_SUPPLIER_PRODUCTS).not.toContain("Leite Cru");
+    expect(ALL_SUPPLIER_PRODUCTS).toContain("Acerola");
+    expect(SUPPLIER_PRODUCT_GROUPS.map((group) => group.group)).toContain(
+      "Raízes, tubérculos e bulbos",
+    );
+  });
+
+  it("migra nomes antigos sem perder os vínculos dos produtores", () => {
+    expect(cleanupMigration).toContain("insert into public.producer_products");
+    expect(cleanupMigration).toContain("update public.producer_inventory set product_id=v_target_id");
+    expect(cleanupMigration).toContain("'Limão Taiti','Limão Tahiti'");
+    expect(cleanupMigration).toContain("'Mussarela','Muçarela'");
+    expect(cleanupMigration).toContain("('Acerola','Frutas','kg')");
   });
 });

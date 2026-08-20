@@ -3,7 +3,8 @@ import {
   proposalTotal,
   type NegotiationProposal,
 } from "@/lib/negotiation-proposals";
-import { Check, Clock3, Handshake, RefreshCw, X } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Check, Clock3, Handshake, RefreshCw, ShoppingBag, X } from "lucide-react";
 
 const statusLabels = {
   pending: "Aguardando resposta",
@@ -17,6 +18,7 @@ export function ProposalCard({
   proposal,
   currentProfileId,
   otherPartyName,
+  orderHref,
   busy,
   onAccept,
   onReject,
@@ -25,6 +27,7 @@ export function ProposalCard({
   proposal: NegotiationProposal;
   currentProfileId?: string;
   otherPartyName?: string;
+  orderHref: "/orders" | "/producer/orders";
   busy: boolean;
   onAccept: () => void;
   onReject: () => void;
@@ -159,6 +162,14 @@ export function ProposalCard({
         >
           <RefreshCw className="h-4 w-4" /> Substituir proposta
         </button>
+      )}
+      {status === "accepted" && proposal.orderId && (
+        <Link
+          to={orderHref}
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800"
+        >
+          <ShoppingBag className="h-4 w-4" /> Ver pedido
+        </Link>
       )}
     </article>
   );

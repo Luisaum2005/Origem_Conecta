@@ -44,7 +44,7 @@ import {
   Mic,
   Square,
   Trash2,
-  Handshake,
+  DollarSign,
 } from "lucide-react";
 import { getProduct } from "@/lib/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -761,44 +761,20 @@ function ChatRoom() {
           <SupportButton compact />
         </header>
 
-        {/* Info panel for Order/Demand context */}
-        {conversation && !loading && (conversation.orderId || conversation.demandId) && (
+        {/* Demand context remains useful; the order is available in its accepted proposal. */}
+        {conversation && !loading && conversation.demandId && !conversation.orderId && (
           <div className="bg-canvas border-b border-border p-3 shrink-0 text-xs flex flex-wrap items-center justify-between gap-3">
-            {conversation.orderId ? (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-brand-900">Total do Pedido:</span>
-                <span className="text-brand-850 font-bold">
-                  R$ {conversation.orderTotal?.toFixed(2) ?? "0.00"}
-                </span>
-                <span className="mx-1.5 text-muted-foreground">·</span>
-                <span className="font-semibold text-brand-900">Status:</span>
-                <span className="rounded-full bg-secondary px-2 py-0.5 font-medium text-brand-900 capitalize">
-                  {conversation.orderStatus}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-brand-900 font-medium">
-                  Chat vinculado a uma Demanda aberta
-                </span>
-              </div>
-            )}
-
-            {conversation.orderId ? (
-              <Link
-                to={isBuyer ? "/orders" : "/producer/orders"}
-                className="font-bold text-leaf-700 hover:underline hover:text-leaf-800"
-              >
-                Ver solicitação
-              </Link>
-            ) : (
-              <Link
-                to="/demands"
-                className="font-bold text-leaf-700 hover:underline hover:text-leaf-800"
-              >
-                Ver demandas
-              </Link>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-brand-900 font-medium">
+                Chat vinculado a uma Demanda aberta
+              </span>
+            </div>
+            <Link
+              to="/demands"
+              className="font-bold text-leaf-700 hover:underline hover:text-leaf-800"
+            >
+              Ver demandas
+            </Link>
           </div>
         )}
 
@@ -853,45 +829,6 @@ function ChatRoom() {
             );
           })()}
 
-        {conversation && !loading && (
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-white px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-brand-900">Proposta comercial</p>
-              <p className="text-xs text-muted-foreground">
-                {conversation.orderId
-                  ? "Esta conversa já possui um pedido vinculado."
-                  : "Registre quantidade, preço, pagamento e entrega combinados."}
-              </p>
-            </div>
-            {conversation.orderId ? (
-              <Link
-                to={isBuyer ? "/orders" : "/producer/orders"}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900"
-              >
-                <ShoppingBag className="h-4 w-4" /> Ver pedido
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openProposalComposer(activeProposal)}
-                disabled={proposalBusy || proposalLoading || proposalInventory.length === 0}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
-              >
-                <Handshake className="h-4 w-4" />
-                {proposalLoading
-                  ? "Carregando..."
-                  : proposalInventory.length === 0
-                    ? "Sem produto disponível"
-                    : activeProposal
-                      ? activeProposal.createdBy === profile?.id
-                        ? "Substituir proposta"
-                        : "Fazer contraproposta"
-                      : "Fazer proposta"}
-              </button>
-            )}
-          </div>
-        )}
-
         {proposalError && (
           <div
             role="alert"
@@ -936,6 +873,7 @@ function ChatRoom() {
                       proposal={event.proposal}
                       currentProfileId={profile?.id}
                       otherPartyName={conversation?.otherPartyName}
+                      orderHref={isBuyer ? "/orders" : "/producer/orders"}
                       busy={proposalBusy}
                       onAccept={() => void acceptProposal(event.proposal)}
                       onReject={() => void rejectProposal(event.proposal)}
@@ -1075,6 +1013,38 @@ function ChatRoom() {
               >
                 <Mic className="h-5 w-5" />
               </button>
+              {conversation && (
+                <button
+                  type="button"
+                  onClick={() => openProposalComposer(activeProposal)}
+                  disabled={proposalBusy || proposalLoading || proposalInventory.length === 0}
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:border-leaf-600 hover:bg-leaf-50 disabled:pointer-events-none disabled:opacity-50"
+                  aria-label={
+                    proposalLoading
+                      ? "Carregando produtos para proposta"
+                      : proposalInventory.length === 0
+                        ? "Não há produto disponível para proposta"
+                        : activeProposal
+                          ? activeProposal.createdBy === profile?.id
+                            ? "Substituir proposta"
+                            : "Fazer contraproposta"
+                          : "Fazer proposta"
+                  }
+                  title={
+                    proposalLoading
+                      ? "Carregando produtos..."
+                      : proposalInventory.length === 0
+                        ? "Sem produto disponível"
+                        : activeProposal
+                          ? activeProposal.createdBy === profile?.id
+                            ? "Substituir proposta"
+                            : "Fazer contraproposta"
+                          : "Fazer proposta"
+                  }
+                >
+                  <DollarSign className="h-5 w-5" aria-hidden="true" />
+                </button>
+              )}
               <div className="flex flex-col justify-end shrink-0 gap-1.5">
                 <span
                   className="px-1 text-right text-sm text-muted-foreground select-none"
