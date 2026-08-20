@@ -36,20 +36,12 @@ function SignupProducer() {
         return false;
       }
     }
-    if (targetStep === 3 && picked.length === 0) {
-      setError("Selecione pelo menos um produto antes de continuar.");
-      return false;
-    }
     setError("");
     return true;
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (picked.length === 0) {
-      setError("Selecione pelo menos um produto que você produz ou fornece.");
-      return;
-    }
     setLoading(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -224,8 +216,17 @@ function SignupProducer() {
         </div>
 
         <div data-step="3" className={step === 3 ? "space-y-6" : "hidden"}>
-          <FormSection title="O que você produz" caption="Selecione tudo que fornece">
-            <SupplierProductPicker value={picked} onChange={setPicked} required />
+          <FormSection
+            title="O que você produz"
+            caption="Opcional — selecione agora ou informe seus produtos depois, no perfil."
+          >
+            <SupplierProductPicker value={picked} onChange={setPicked} />
+            {picked.length === 0 && (
+              <p className="mt-3 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-brand-800">
+                Você pode concluir o cadastro sem produtos. Depois do login, lembraremos você de
+                completar essa informação para aparecer nas buscas e receber demandas compatíveis.
+              </p>
+            )}
           </FormSection>
         </div>
 
@@ -278,7 +279,7 @@ function SignupProducer() {
               }}
               className="h-[52px] flex-1 rounded-xl bg-brand-900 font-semibold text-white"
             >
-              Continuar
+              {step === 3 && picked.length === 0 ? "Cadastrar depois" : "Continuar"}
             </button>
           ) : (
             <PrimaryButton loading={loading}>Criar conta de produtor</PrimaryButton>

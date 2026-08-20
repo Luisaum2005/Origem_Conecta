@@ -113,4 +113,22 @@ describe("payload transacional de cadastro", () => {
       produtos: ["Abacate"],
     });
   });
+
+  it("permite enviar o cadastro do produtor sem produtos selecionados", () => {
+    const payload = buildSignupPayload({
+      tipo: "produtor",
+      nome: "Ana Produtora",
+      email: "ana@example.com",
+      password: "segredo-123",
+      producer: {
+        nomePropriedade: "Sítio Boa Safra",
+        responsavel: "Ana Produtora",
+        cnpj: "",
+        produtos: [],
+        commercializationMode: "undecided",
+      },
+    });
+
+    expect(payload.producer?.produtos).toEqual([]);
+  });
 });

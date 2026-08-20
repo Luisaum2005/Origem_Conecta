@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isOrganizationProductOutdated } from "@/lib/organization-products";
+import {
+  isOrganizationProductLowStock,
+  isOrganizationProductOutdated,
+} from "@/lib/organization-products";
 
 describe("isOrganizationProductOutdated", () => {
   const now = new Date("2026-08-12T12:00:00.000Z");
@@ -10,5 +13,11 @@ describe("isOrganizationProductOutdated", () => {
 
   it("mantém como atual uma publicação atualizada nos últimos 30 dias", () => {
     expect(isOrganizationProductOutdated("2026-08-01T12:00:00.000Z", now)).toBe(false);
+  });
+
+  it("identifica estoque igual ou abaixo do mínimo", () => {
+    expect(isOrganizationProductLowStock({ availableQuantity: 10, minimumStock: 10 })).toBe(true);
+    expect(isOrganizationProductLowStock({ availableQuantity: 11, minimumStock: 10 })).toBe(false);
+    expect(isOrganizationProductLowStock({ availableQuantity: 0, minimumStock: 0 })).toBe(false);
   });
 });

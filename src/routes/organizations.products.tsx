@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   isOrganizationProductOutdated,
+  isOrganizationProductLowStock,
   setOrganizationProductPaused,
   useOrganizationProducts,
   type OrganizationProduct,
@@ -21,7 +22,13 @@ import { AlertTriangle, Boxes, CalendarClock, Package, PauseCircle, Search } fro
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type StatusFilter = "all" | "active" | "organization-paused" | "producer-paused" | "outdated";
+type StatusFilter =
+  | "all"
+  | "active"
+  | "organization-paused"
+  | "producer-paused"
+  | "low-stock"
+  | "outdated";
 
 export const Route = createFileRoute("/organizations/products")({
   component: () => (
@@ -35,6 +42,7 @@ function OrganizationProductsPage() {
   const { products, loading, error, refresh } = useOrganizationProducts();
   const [search, setSearch] = useState("");
   const [organizationId, setOrganizationId] = useState("all");
+  const [producerId, setProducerId] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [busy, setBusy] = useState("");
   const [confirmation, setConfirmation] = useState<OrganizationProduct | null>(null);
@@ -50,6 +58,7 @@ function OrganizationProductsPage() {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return products.filter((product) => {
       if (organizationId !== "all" && product.organizationId !== organizationId) return false;
+      if (producerId !== "all" && product.producerId !== producerId) return false;
       if (
         query &&
         ![product.productName, product.producerName, product.propertyName].some((value) =>
@@ -61,10 +70,25 @@ function OrganizationProductsPage() {
       if (status === "active") return product.active && !product.organizationPaused;
       if (status === "organization-paused") return product.organizationPaused;
       if (status === "producer-paused") return !product.active && !product.organizationPaused;
+      if (status === "low-stock") return isOrganizationProductLowStock(product);
       if (status === "outdated") return isOrganizationProductOutdated(product.updatedAt);
       return true;
     });
-  }, [organizationId, products, search, status]);
+  }, [organizationId, producerId, products, search, status]);
+
+  const producers = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          products
+            .filter(
+              (product) => organizationId === "all" || product.organizationId === organizationId,
+            )
+            .map((product) => [product.producerId, product.producerName]),
+        ),
+      ),
+    [organizationId, products],
+  );
 
   const changePause = async () => {
     if (!confirmation) return;
@@ -104,79 +128,113 @@ function OrganizationProductsPage() {
           organização. Estoque e informações do produto continuam sob responsabilidade do produtor.
         </p>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Resumo das publicações">
-          <Summary
-            label="Publicados"
-            value={products.filter((product) => product.active).length}
-            icon={Package}
-          />
-          <Summary
-            label="Pausados pela organização"
-            value={products.filter((product) => product.organizationPaused).length}
-            icon={PauseCircle}
-          />
-          <Summary
-            label="Precisam de atualização"
-            value={
-              products.filter((product) => isOrganizationProductOutdated(product.updatedAt)).length
-            }
-            icon={CalendarClock}
-          />
-        </section>
+        {!error && (
+          <section
+            className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"
+            aria-label="Resumo das publicações"
+          >
+            <Summary
+              label="Publicados"
+              value={products.filter((product) => product.active).length}
+              icon={Package}
+            />
+            <Summary
+              label="Pausados pela organização"
+              value={products.filter((product) => product.organizationPaused).length}
+              icon={PauseCircle}
+            />
+            <Summary
+              label="Estoque baixo"
+              value={products.filter(isOrganizationProductLowStock).length}
+              icon={AlertTriangle}
+            />
+            <Summary
+              label="Precisam de atualização"
+              value={
+                products.filter((product) => isOrganizationProductOutdated(product.updatedAt))
+                  .length
+              }
+              icon={CalendarClock}
+            />
+          </section>
+        )}
 
-        <section className="mt-6 rounded-2xl border border-border bg-white p-4 shadow-xs">
-          <h2 className="font-bold text-brand-900">Filtrar produtos</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_220px_220px]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-              <label htmlFor="organization-product-search" className="sr-only">
-                Buscar produtos
+        {!error && (
+          <section className="mt-6 rounded-2xl border border-border bg-white p-4 shadow-xs">
+            <h2 className="font-bold text-brand-900">Filtrar produtos</h2>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-[1fr_210px_210px_210px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+                <label htmlFor="organization-product-search" className="sr-only">
+                  Buscar produtos
+                </label>
+                <input
+                  id="organization-product-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar produto, produtor ou propriedade"
+                  className="h-12 w-full rounded-xl border border-border pl-10 pr-3 text-base"
+                />
+              </div>
+              <label className="sr-only" htmlFor="organization-product-organization">
+                Organização
               </label>
-              <input
-                id="organization-product-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar produto, produtor ou propriedade"
-                className="h-12 w-full rounded-xl border border-border pl-10 pr-3 text-base"
-              />
+              <select
+                id="organization-product-organization"
+                value={organizationId}
+                onChange={(event) => {
+                  setOrganizationId(event.target.value);
+                  setProducerId("all");
+                }}
+                className="h-12 rounded-xl border border-border bg-white px-3 text-base text-brand-900"
+              >
+                <option value="all">Todas as organizações</option>
+                {organizations.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <label className="sr-only" htmlFor="organization-product-producer">
+                Produtor
+              </label>
+              <select
+                id="organization-product-producer"
+                value={producerId}
+                onChange={(event) => setProducerId(event.target.value)}
+                className="h-12 rounded-xl border border-border bg-white px-3 text-base text-brand-900"
+              >
+                <option value="all">Todos os produtores</option>
+                {producers.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <label className="sr-only" htmlFor="organization-product-status">
+                Situação
+              </label>
+              <select
+                id="organization-product-status"
+                value={status}
+                onChange={(event) => setStatus(event.target.value as StatusFilter)}
+                className="h-12 rounded-xl border border-border bg-white px-3 text-base text-brand-900"
+              >
+                <option value="all">Todas as situações</option>
+                <option value="active">Publicados</option>
+                <option value="organization-paused">Pausados pela organização</option>
+                <option value="producer-paused">Pausados pelo produtor</option>
+                <option value="low-stock">Estoque baixo</option>
+                <option value="outdated">Precisam de atualização</option>
+              </select>
             </div>
-            <label className="sr-only" htmlFor="organization-product-organization">
-              Organização
-            </label>
-            <select
-              id="organization-product-organization"
-              value={organizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
-              className="h-12 rounded-xl border border-border bg-white px-3 text-base text-brand-900"
-            >
-              <option value="all">Todas as organizações</option>
-              {organizations.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <label className="sr-only" htmlFor="organization-product-status">
-              Situação
-            </label>
-            <select
-              id="organization-product-status"
-              value={status}
-              onChange={(event) => setStatus(event.target.value as StatusFilter)}
-              className="h-12 rounded-xl border border-border bg-white px-3 text-base text-brand-900"
-            >
-              <option value="all">Todas as situações</option>
-              <option value="active">Publicados</option>
-              <option value="organization-paused">Pausados pela organização</option>
-              <option value="producer-paused">Pausados pelo produtor</option>
-              <option value="outdated">Precisam de atualização</option>
-            </select>
-          </div>
-        </section>
+          </section>
+        )}
 
         {error && (
           <div className="mt-6 rounded-2xl bg-red-50 p-4 text-sm text-red-800" role="alert">
             <p>Não foi possível carregar os produtos da organização.</p>
+            {import.meta.env.DEV && <p className="mt-1 text-xs">Detalhes técnicos: {error}</p>}
             <button
               type="button"
               onClick={() => void refresh()}
@@ -193,7 +251,7 @@ function OrganizationProductsPage() {
               <div key={item} className="h-56 animate-pulse rounded-2xl bg-white" />
             ))}
           </div>
-        ) : visibleProducts.length === 0 ? (
+        ) : error ? null : visibleProducts.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-border bg-white p-10 text-center">
             <Boxes className="mx-auto h-10 w-10 text-leaf-700" />
             <h2 className="mt-3 text-lg font-bold text-brand-900">Nenhum produto encontrado</h2>
@@ -254,18 +312,34 @@ function ProductCard({
   onChangePause: () => void;
 }) {
   const outdated = isOrganizationProductOutdated(product.updatedAt);
-  const belowMinimum =
-    product.minimumStock > 0 && product.availableQuantity <= product.minimumStock;
+  const belowMinimum = isOrganizationProductLowStock(product);
   return (
     <article className="rounded-2xl border border-border bg-white p-5 shadow-xs">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl bg-leaf-50 text-3xl">
+          {product.imageUrl ? (
+            <img
+              src={product.imageUrl}
+              alt={`Foto de ${product.productName}`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Package className="h-9 w-9 text-leaf-700" aria-hidden="true" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase text-leaf-700">
             {product.organizationName}
           </p>
           <h2 className="mt-1 text-xl font-bold text-brand-900">{product.productName}</h2>
+          <p className="mt-2 text-lg font-bold text-brand-900">
+            {formatCurrency(product.price)}
+            <span className="text-sm font-medium text-muted-foreground">/{product.unit}</span>
+          </p>
         </div>
-        <ProductStatus product={product} />
+        <div className="w-full shrink-0 sm:ml-auto sm:w-auto">
+          <ProductStatus product={product} />
+        </div>
       </div>
       <dl className="mt-5 grid gap-4 sm:grid-cols-2">
         <Info label="Produtor responsável" value={product.producerName} />
@@ -275,10 +349,23 @@ function ProductCard({
           value={`${product.availableQuantity.toLocaleString("pt-BR")} ${product.unit}`}
         />
         <Info
+          label="Estoque mínimo"
+          value={
+            product.minimumStock > 0
+              ? `${product.minimumStock.toLocaleString("pt-BR")} ${product.unit}`
+              : "Não informado"
+          }
+        />
+        <Info label="CNPJ utilizado" value={formatCnpj(product.organizationCnpj)} />
+        <Info
           label="Última atualização"
           value={new Date(product.updatedAt).toLocaleDateString("pt-BR")}
         />
       </dl>
+      <p className="mt-4 rounded-xl bg-leaf-50 p-3 text-xs leading-relaxed text-brand-900">
+        A negociação é conduzida por <strong>{product.producerName}</strong>. A organização apenas
+        supervisiona o uso do seu CNPJ nesta publicação.
+      </p>
       {(outdated || belowMinimum) && (
         <div className="mt-4 space-y-2">
           {outdated && <Warning text="Este produto não é atualizado há mais de 30 dias." />}
@@ -307,6 +394,16 @@ function ProductCard({
       )}
     </article>
   );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function formatCnpj(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+  if (digits.length !== 14) return value || "Não informado";
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
 
 function ProductStatus({ product }: { product: OrganizationProduct }) {

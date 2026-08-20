@@ -8,8 +8,13 @@ import { ProducerMemberships } from "@/components/organizations/ProducerMembersh
 import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { useAuth } from "@/lib/auth";
 import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
-import { type ProducerProfileDetails, useProducerProfileDetails } from "@/lib/producer-profile";
+import {
+  hasMissingProducerProducts,
+  type ProducerProfileDetails,
+  useProducerProfileDetails,
+} from "@/lib/producer-profile";
 import { useProducerStock } from "@/lib/producer-stock";
+import { requestCatalogProduct } from "@/lib/product-catalog";
 import { CepLookupError, lookupAddressByCep } from "@/lib/cep";
 import {
   AlertTriangle,
@@ -45,6 +50,7 @@ const PRODUCER_ID = "produtor";
 const PRODUCER_NAME = "Produtor";
 
 function ProducerProfile() {
+  const [editProductsRequested, setEditProductsRequested] = useState(false);
   const { profile, isSupabaseConfigured } = useAuth();
   const {
     details,
@@ -78,6 +84,12 @@ function ProducerProfile() {
     : 0;
   const topProducts = productSummary(producerOrders);
   const activity = buildActivity(producerOrders, stock);
+
+  useEffect(() => {
+    setEditProductsRequested(
+      new URLSearchParams(window.location.search).get("edit") === "products",
+    );
+  }, []);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -154,7 +166,12 @@ function ProducerProfile() {
 
         {!profileLoading && !profileError && (
           <section className="mt-6">
-            <ProducerDetailsPanel details={details} onSave={saveDetails} saving={saving} />
+            <ProducerDetailsPanel
+              details={details}
+              onSave={saveDetails}
+              saving={saving}
+              focusProductsOnLoad={editProductsRequested}
+            />
           </section>
         )}
 
@@ -349,12 +366,14 @@ function ProducerDetailsPanel({
   details,
   onSave,
   saving,
+  focusProductsOnLoad = false,
 }: {
   details: ProducerProfileDetails;
   onSave: (details: ProducerProfileDetails) => Promise<void>;
   saving: boolean;
+  focusProductsOnLoad?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(focusProductsOnLoad);
   const [draft, setDraft] = useState(details);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -362,14 +381,30 @@ function ProducerDetailsPanel({
   const [searchingCep, setSearchingCep] = useState(false);
   const cepRequestRef = useRef<AbortController | null>(null);
   const addressNumberRef = useRef<HTMLInputElement>(null);
+  const productsSectionRef = useRef<HTMLDivElement>(null);
+  const [focusProductsWhenEditing, setFocusProductsWhenEditing] = useState(focusProductsOnLoad);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(details);
   const missingFields = getMissingProducerProfileFields(details);
+  const productsPending = hasMissingProducerProducts(details);
 
   useEffect(() => {
     setDraft(details);
   }, [details]);
 
   useEffect(() => () => cepRequestRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!focusProductsOnLoad) return;
+    setFocusProductsWhenEditing(true);
+    setEditing(true);
+  }, [focusProductsOnLoad]);
+
+  useEffect(() => {
+    if (!editing || !focusProductsWhenEditing) return;
+    productsSectionRef.current?.focus();
+    productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFocusProductsWhenEditing(false);
+  }, [editing, focusProductsWhenEditing]);
 
   useEffect(() => {
     if (!editing || !isDirty) return;
@@ -437,10 +472,41 @@ function ProducerDetailsPanel({
     }
   };
 
+  const openProductsEditor = () => {
+    setNotice("");
+    setError("");
+    setFocusProductsWhenEditing(true);
+    setEditing(true);
+  };
+
   return (
     <Panel title="Dados da propriedade" icon={Store}>
       {!editing ? (
         <div>
+          {productsPending && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-950"
+            >
+              <div className="flex items-start gap-3">
+                <Package className="mt-0.5 h-5 w-5 shrink-0 text-orange-700" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Informe seus produtos</p>
+                  <p className="mt-1 text-sm">
+                    Cadastre o que você produz ou fornece para aparecer nas buscas e receber
+                    demandas compatíveis.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openProductsEditor}
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg bg-orange-700 px-4 text-sm font-semibold text-white hover:bg-orange-800"
+                  >
+                    Cadastrar produtos
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Mini label="Propriedade" value={details.propertyName || "Não informado"} />
             <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
@@ -668,19 +734,22 @@ function ProducerDetailsPanel({
               </div>
             </FormSection>
           </div>
-          <FormSection
-            title="Produtos atendidos"
-            caption={"Informe o que voc\u00ea produz ou fornece."}
-          >
-            <SupplierProductPicker
-              value={draft.products}
-              onChange={(products) => setDraft({ ...draft, products })}
-            />
-            <span className="mt-1.5 block text-xs text-muted-foreground">
-              Esta lista representa tudo que você fornece. O estoque publicado pode conter apenas os
-              produtos disponíveis no momento.
-            </span>
-          </FormSection>
+          <div ref={productsSectionRef} tabIndex={-1} className="scroll-mt-24 outline-none">
+            <FormSection
+              title="Produtos atendidos"
+              caption={"Informe o que voc\u00ea produz ou fornece."}
+            >
+              <SupplierProductPicker
+                value={draft.products}
+                onChange={(products) => setDraft({ ...draft, products })}
+                onRequestProduct={requestCatalogProduct}
+              />
+              <span className="mt-1.5 block text-xs text-muted-foreground">
+                Esta lista representa tudo que você fornece. O estoque publicado pode conter apenas
+                os produtos disponíveis no momento.
+              </span>
+            </FormSection>
+          </div>
           <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white/95 p-3 shadow-lg backdrop-blur">
             {isDirty && (
               <p className="mr-auto text-sm font-medium text-amber-800">

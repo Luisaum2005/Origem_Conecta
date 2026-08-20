@@ -1,20 +1,32 @@
 import { SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, CirclePlus, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type SupplierProductPickerProps = {
   value: string[];
   onChange: (products: string[]) => void;
   required?: boolean;
+  onRequestProduct?: (input: {
+    name: string;
+    category: string;
+    defaultUnit: string;
+  }) => Promise<{ status: "active" | "pending"; productName: string; alreadyExisted: boolean }>;
 };
 
 export function SupplierProductPicker({
   value,
   onChange,
   required = false,
+  onRequestProduct,
 }: SupplierProductPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestCategory, setRequestCategory] = useState("Outros");
+  const [requestUnit, setRequestUnit] = useState("unidade");
+  const [requesting, setRequesting] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestError, setRequestError] = useState("");
   const labelId = useId();
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -61,6 +73,35 @@ export function SupplierProductPicker({
     onChange(
       value.includes(product) ? value.filter((item) => item !== product) : [...value, product],
     );
+
+  const requestProduct = async () => {
+    const name = query.trim();
+    if (!onRequestProduct || name.length < 2) return;
+    setRequesting(true);
+    setRequestError("");
+    setRequestMessage("");
+    try {
+      const result = await onRequestProduct({
+        name,
+        category: requestCategory,
+        defaultUnit: requestUnit,
+      });
+      setRequestMessage(
+        result.status === "active"
+          ? `${result.productName} já está disponível no catálogo.`
+          : result.alreadyExisted
+            ? `Já existe uma solicitação de ${result.productName} em análise.`
+            : `Solicitação de ${result.productName} enviada para análise.`,
+      );
+      setRequestOpen(false);
+    } catch (error) {
+      setRequestError(
+        error instanceof Error ? error.message : "Não foi possível enviar a solicitação.",
+      );
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   return (
     <div ref={rootRef}>
@@ -140,7 +181,7 @@ export function SupplierProductPicker({
           >
             {filtered.length === 0 && (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Produto não encontrado. Entre em contato com o suporte para solicitar a inclusão.
+                Produto não encontrado no catálogo.
               </p>
             )}
             {filtered.map((group) => (
@@ -192,6 +233,102 @@ export function SupplierProductPicker({
               </div>
             ))}
           </div>
+          {onRequestProduct && filtered.length === 0 && query.trim().length >= 2 && (
+            <div className="border-t border-border p-3">
+              {!requestOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestOpen(true);
+                    setRequestError("");
+                    setRequestMessage("");
+                  }}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 text-sm font-semibold text-orange-900 hover:bg-orange-100"
+                >
+                  <CirclePlus className="h-4 w-4" />
+                  Não encontrou? Solicitar “{query.trim()}”
+                </button>
+              ) : (
+                <div className="grid gap-3 rounded-xl bg-canvas p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-brand-900">
+                      Solicitar inclusão de “{query.trim()}”
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      O produto ficará em análise antes de aparecer no catálogo público.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-sm font-medium text-brand-900">
+                      Categoria
+                      <select
+                        value={requestCategory}
+                        onChange={(event) => setRequestCategory(event.target.value)}
+                        className="h-11 rounded-lg border border-border bg-white px-3 text-base"
+                      >
+                        <option value="Outros">Outros</option>
+                        {SUPPLIER_PRODUCT_GROUPS.map((group) => (
+                          <option key={group.group} value={group.group}>
+                            {group.group}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-sm font-medium text-brand-900">
+                      Unidade mais usada
+                      <select
+                        value={requestUnit}
+                        onChange={(event) => setRequestUnit(event.target.value)}
+                        className="h-11 rounded-lg border border-border bg-white px-3 text-base"
+                      >
+                        <option value="unidade">Unidade</option>
+                        <option value="kg">Quilograma (kg)</option>
+                        <option value="g">Grama (g)</option>
+                        <option value="litro">Litro</option>
+                        <option value="ml">Mililitro (ml)</option>
+                        <option value="maço">Maço</option>
+                        <option value="caixa">Caixa</option>
+                        <option value="dúzia">Dúzia</option>
+                        <option value="bandeja">Bandeja</option>
+                        <option value="saco">Saco</option>
+                      </select>
+                    </label>
+                  </div>
+                  {requestError && (
+                    <p role="alert" className="text-sm font-medium text-[var(--color-error-fg)]">
+                      {requestError}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={requestProduct}
+                      disabled={requesting}
+                      className="inline-flex h-11 items-center rounded-lg bg-leaf-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {requesting ? "Enviando..." : "Enviar para análise"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestOpen(false)}
+                      disabled={requesting}
+                      className="h-11 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+              {requestMessage && (
+                <p
+                  role="status"
+                  className="mt-2 text-sm font-semibold text-[var(--color-success-fg)]"
+                >
+                  {requestMessage}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

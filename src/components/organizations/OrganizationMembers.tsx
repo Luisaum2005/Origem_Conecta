@@ -4,6 +4,7 @@ import {
   inviteProducer,
   reviewMembership,
   setCommercialPermission,
+  updateMemberNumber,
   useMemberships,
   type Membership,
 } from "@/lib/organization-memberships";
@@ -17,7 +18,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { BadgeCheck, Check, MailPlus, MapPin, Search, UserCheck, X } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ClipboardList,
+  Mail,
+  MailPlus,
+  MapPin,
+  Package,
+  Phone,
+  Search,
+  UserCheck,
+  Users,
+  X,
+} from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -29,16 +45,16 @@ type Confirmation = {
 };
 
 const tabs: Array<{ id: MemberTab; label: string }> = [
+  { id: "active", label: "Associados ativos" },
   { id: "requests", label: "Solicitações" },
   { id: "invites", label: "Convites enviados" },
-  { id: "active", label: "Associados ativos" },
   { id: "inactive", label: "Inativos" },
 ];
 
 export function OrganizationMembers({ organizationId }: { organizationId: string }) {
   const { memberships, loading, error, refresh } = useMemberships(organizationId);
   const [busy, setBusy] = useState("");
-  const [activeTab, setActiveTab] = useState<MemberTab>("requests");
+  const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [search, setSearch] = useState("");
   const [memberNumbers, setMemberNumbers] = useState<Record<string, string>>({});
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -63,6 +79,9 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
         member.producerEmail,
         member.propertyName,
         member.location,
+        member.producerPhone,
+        member.memberNumber,
+        commercializationLabel(member.commercializationMode),
         ...member.products,
       ]
         .filter(Boolean)
@@ -153,10 +172,24 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
       </form>
 
       {error && (
-        <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800" role="alert">
-          Não foi possível carregar os associados. Tente recarregar a página.
-        </p>
+        <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800" role="alert">
+          <p>Não foi possível carregar os associados.</p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="mt-2 min-h-10 font-semibold underline"
+          >
+            Tentar novamente
+          </button>
+        </div>
       )}
+
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumo dos vínculos">
+        <MemberSummary label="Ativos" value={groups.active.length} emphasis />
+        <MemberSummary label="Solicitações" value={groups.requests.length} />
+        <MemberSummary label="Convites" value={groups.invites.length} />
+        <MemberSummary label="Inativos" value={groups.inactive.length} />
+      </div>
 
       <div className="mt-5 overflow-x-auto pb-1">
         <div className="flex min-w-max gap-2" role="tablist" aria-label="Situação dos associados">
@@ -216,7 +249,7 @@ export function OrganizationMembers({ organizationId }: { organizationId: string
                 member={member}
                 tab={activeTab}
                 busy={busy === member.id}
-                memberNumber={memberNumbers[member.id] ?? ""}
+                memberNumber={memberNumbers[member.id] ?? member.memberNumber ?? ""}
                 onMemberNumberChange={(value) =>
                   setMemberNumbers((current) => ({ ...current, [member.id]: value }))
                 }
@@ -284,7 +317,6 @@ function MemberCard({
             <UserCheck className="h-5 w-5 shrink-0 text-leaf-700" /> {member.producerName}
           </p>
           <p className="mt-1 text-sm font-medium text-brand-900">{member.propertyName}</p>
-          <p className="mt-1 break-all text-sm text-muted-foreground">{member.producerEmail}</p>
           {member.location && (
             <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" /> {member.location}
@@ -293,6 +325,51 @@ function MemberCard({
         </div>
         <StatusBadge member={member} />
       </div>
+
+      <details className="group mt-4 rounded-xl border border-border bg-canvas/60">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-brand-900 marker:hidden">
+          <span>Ver informações do associado</span>
+          <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
+          <MemberInfo icon={Mail} label="E-mail" value={member.producerEmail || "Não informado"} />
+          <MemberInfo
+            icon={Phone}
+            label="Telefone/WhatsApp"
+            value={member.producerPhone ? formatPhone(member.producerPhone) : "Não informado"}
+          />
+          <MemberInfo
+            icon={UserCheck}
+            label="Número de associado"
+            value={member.memberNumber || "Não informado"}
+          />
+          <MemberInfo
+            icon={CalendarDays}
+            label={member.joinedAt ? "Associado desde" : "Solicitação ou convite criado em"}
+            value={formatDate(member.joinedAt || member.createdAt)}
+          />
+          <MemberInfo
+            icon={BadgeCheck}
+            label="Forma de comercialização"
+            value={commercializationLabel(member.commercializationMode)}
+          />
+          <MemberInfo
+            icon={Package}
+            label="Produtos publicados pela organização"
+            value={String(member.activeProductsCount)}
+          />
+          <MemberInfo
+            icon={ClipboardList}
+            label="Negociações em andamento"
+            value={String(member.openNegotiationsCount)}
+          />
+          <MemberInfo
+            icon={BadgeCheck}
+            label="Uso do CNPJ da organização"
+            value={member.canSell ? "Autorizado" : "Não autorizado"}
+          />
+        </div>
+      </details>
 
       {member.products.length > 0 && (
         <div className="mt-4">
@@ -376,6 +453,38 @@ function MemberCard({
 
       {tab === "active" && (
         <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-4 rounded-xl border border-border p-3">
+            <label
+              htmlFor={`active-member-number-${member.id}`}
+              className="text-sm font-semibold text-brand-900"
+            >
+              Número de associado
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                id={`active-member-number-${member.id}`}
+                value={memberNumber}
+                maxLength={50}
+                onChange={(event) => onMemberNumberChange(event.target.value)}
+                placeholder="Ex.: 0125"
+                className="h-11 min-w-0 flex-1 rounded-xl border border-border px-3 text-base"
+              />
+              <button
+                type="button"
+                disabled={busy || memberNumber.trim() === (member.memberNumber ?? "")}
+                onClick={() =>
+                  void onAct(
+                    member.id,
+                    () => updateMemberNumber(member.id, memberNumber),
+                    "Número de associado atualizado.",
+                  )
+                }
+                className="min-h-11 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
+              >
+                Salvar número
+              </button>
+            </div>
+          </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-canvas p-3">
             <input
               type="checkbox"
@@ -433,6 +542,67 @@ function MemberCard({
       )}
     </li>
   );
+}
+
+function MemberSummary({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: number;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className={`rounded-xl p-4 ${emphasis ? "bg-brand-900 text-white" : "bg-canvas"}`}>
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4" />
+        <span
+          className={`text-xs font-semibold ${emphasis ? "text-white/80" : "text-muted-foreground"}`}
+        >
+          {label}
+        </span>
+      </div>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function MemberInfo({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof UserCheck;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 gap-3">
+      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-leaf-700" />
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
+        <p className="mt-1 break-words text-sm font-semibold text-brand-900">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function commercializationLabel(mode: Membership["commercializationMode"]) {
+  if (mode === "own") return "CNPJ próprio";
+  if (mode === "organization") return "CNPJ de cooperativa ou associação";
+  return "Ainda não definida";
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 11) return digits.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  if (digits.length === 10) return digits.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+  return value;
 }
 
 function StatusBadge({ member }: { member: Membership }) {

@@ -21,11 +21,18 @@ Deno.serve(async (request) => {
     const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
     const { data: notification, error: notificationError } = await supabase
       .from("notifications")
-      .select("id,user_id,type,title,body,data")
+      .select("id,user_id,type,title,body,data,resolved_at")
       .eq("id", notificationId)
       .single();
     if (notificationError || !notification)
       throw notificationError ?? new Error("Notificação não encontrada");
+    if (notification.resolved_at) {
+      await supabase
+        .from("notifications")
+        .update({ push_status: "skipped", push_attempted_at: new Date().toISOString() })
+        .eq("id", notification.id);
+      return new Response(JSON.stringify({ sent: 0, skipped: true, resolved: true }), { headers });
+    }
     const { data: preferences } = await supabase
       .from("notification_preferences")
       .select("*")

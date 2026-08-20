@@ -22,6 +22,10 @@ export type ProducerProfileDetails = {
   state: string;
 };
 
+export function hasMissingProducerProducts(details: Pick<ProducerProfileDetails, "products">) {
+  return details.products.length === 0;
+}
+
 const PRODUCER_PROFILE_STORAGE_KEY = "origem-conecta-producer-profile";
 
 const DEFAULT_PRODUCER_PROFILE: ProducerProfileDetails = {

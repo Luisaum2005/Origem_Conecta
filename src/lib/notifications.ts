@@ -41,6 +41,7 @@ export function useNotifications(userId?: string) {
       const { data, error: loadError } = await supabase
         .from("notifications")
         .select("id,type,title,body,data,read_at,created_at")
+        .is("resolved_at", null)
         .order("created_at", { ascending: false })
         .limit(30);
       throwSupabaseError(loadError);

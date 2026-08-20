@@ -13,6 +13,9 @@ function membership(status: Membership["status"], canSell = false): Membership {
     products: [],
     status,
     canSell,
+    commercializationMode: "undecided",
+    activeProductsCount: 0,
+    openNegotiationsCount: 0,
     createdAt: new Date().toISOString(),
   };
 }

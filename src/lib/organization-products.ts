@@ -5,14 +5,19 @@ export type OrganizationProduct = {
   id: string;
   organizationId: string;
   organizationName: string;
+  organizationCnpj: string;
+  producerId: string;
   productName: string;
   producerName: string;
   propertyName: string;
   unit: string;
   availableQuantity: number;
   minimumStock: number;
+  price: number;
+  imageUrl?: string;
   active: boolean;
   organizationPaused: boolean;
+  organizationPausedAt?: string;
   updatedAt: string;
 };
 
@@ -22,19 +27,32 @@ export function isOrganizationProductOutdated(updatedAt: string, now = new Date(
   return now.getTime() - date.getTime() > 30 * 24 * 60 * 60 * 1000;
 }
 
+export function isOrganizationProductLowStock(
+  product: Pick<OrganizationProduct, "availableQuantity" | "minimumStock">,
+) {
+  return product.minimumStock > 0 && product.availableQuantity <= product.minimumStock;
+}
+
 function mapProduct(row: Record<string, unknown>): OrganizationProduct {
   return {
     id: String(row.id),
     organizationId: String(row.organization_id),
     organizationName: String(row.organization_name),
+    organizationCnpj: String(row.organization_cnpj ?? ""),
+    producerId: String(row.producer_id),
     productName: String(row.product_name),
     producerName: String(row.producer_name),
     propertyName: String(row.property_name),
     unit: String(row.unit),
     availableQuantity: Number(row.available_quantity ?? 0),
     minimumStock: Number(row.minimum_stock ?? 0),
+    price: Number(row.price ?? 0),
+    imageUrl: row.image_url ? String(row.image_url) : undefined,
     active: Boolean(row.is_active),
     organizationPaused: Boolean(row.organization_paused),
+    organizationPausedAt: row.organization_paused_at
+      ? String(row.organization_paused_at)
+      : undefined,
     updatedAt: String(row.updated_at),
   };
 }

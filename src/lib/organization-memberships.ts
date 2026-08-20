@@ -11,13 +11,19 @@ export type Membership = {
   organizationState?: string;
   producerName: string;
   producerEmail: string;
+  producerPhone?: string;
   propertyName: string;
   location?: string;
   products: string[];
   status: MembershipStatus;
   memberNumber?: string;
   canSell: boolean;
+  commercializationMode: "own" | "organization" | "undecided";
+  activeProductsCount: number;
+  openNegotiationsCount: number;
+  joinedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 };
 export type OrganizationSearchResult = {
   id: string;
@@ -48,6 +54,7 @@ export function mapMembership(row: Record<string, unknown>): Membership {
     organizationState: String(row.organization_state ?? organization.state ?? "") || undefined,
     producerName: String(row.producer_name ?? producer.responsavel ?? profile.nome ?? "Produtor"),
     producerEmail: String(row.producer_email ?? profile.email ?? ""),
+    producerPhone: String(row.producer_phone ?? profile.telefone ?? "") || undefined,
     propertyName: String(row.property_name ?? producer.nome_propriedade ?? "Propriedade"),
     location: row.producer_location
       ? String(row.producer_location)
@@ -62,7 +69,14 @@ export function mapMembership(row: Record<string, unknown>): Membership {
     status: row.status as MembershipStatus,
     memberNumber: row.member_number ? String(row.member_number) : undefined,
     canSell: Boolean(row.can_sell ?? row.can_sell_through_organization),
+    commercializationMode: (row.commercialization_mode ??
+      producer.commercialization_mode ??
+      "undecided") as Membership["commercializationMode"],
+    activeProductsCount: Number(row.active_products_count ?? 0),
+    openNegotiationsCount: Number(row.open_negotiations_count ?? 0),
+    joinedAt: row.joined_at ? String(row.joined_at) : undefined,
     createdAt: String(row.created_at),
+    updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   };
 }
 
@@ -77,13 +91,9 @@ export function useMemberships(organizationId?: string) {
     }
     setLoading(true);
     const result = organizationId
-      ? await supabase
-          .from("organization_members")
-          .select(
-            "id,organization_id,status,member_number,can_sell_through_organization,created_at,organizations(trade_name,type,city,state),producers(nome_propriedade,responsavel,localizacao,categorias_atendidas,profiles(nome,email))",
-          )
-          .eq("organization_id", organizationId)
-          .order("created_at", { ascending: false })
+      ? await supabase.rpc("list_managed_organization_members", {
+          p_organization_id: organizationId,
+        })
       : await supabase.rpc("list_my_producer_memberships");
     const { data, error: queryError } = result;
     if (queryError) setError(queryError.message);
@@ -132,6 +142,11 @@ export const respondInvite = (id: string, accept: boolean) =>
   rpc("respond_membership_invite", { p_membership_id: id, p_accept: accept });
 export const setCommercialPermission = (id: string, allowed: boolean) =>
   rpc("set_member_commercial_permission", { p_membership_id: id, p_allowed: allowed });
+export const updateMemberNumber = (id: string, memberNumber: string) =>
+  rpc("update_organization_member_number", {
+    p_membership_id: id,
+    p_member_number: memberNumber,
+  });
 export const deactivateMembership = (id: string) =>
   rpc("deactivate_organization_membership", { p_membership_id: id });
 export const cancelInvitation = (id: string) =>
