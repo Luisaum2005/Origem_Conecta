@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { SupportButton } from "@/components/layout/SupportButton";
+import { ProposalCard } from "@/components/chat/ProposalCard";
+import { ProposalComposer } from "@/components/chat/ProposalComposer";
 import { useAuth } from "@/lib/auth";
 import {
   getOrCreateConversation,
@@ -17,6 +19,19 @@ import {
 import { getBuyerId, getProducerId, formatOrderDate } from "@/lib/orders";
 import { supabase } from "@/lib/supabase";
 import {
+  acceptNegotiationProposal,
+  createNegotiationProposal,
+  effectiveProposalStatus,
+  listNegotiationProposals,
+  listProposalInventory,
+  rejectNegotiationProposal,
+  proposalTotal,
+  subscribeToNegotiationProposals,
+  type NegotiationProposal,
+  type ProposalDraft,
+  type ProposalInventoryItem,
+} from "@/lib/negotiation-proposals";
+import {
   ArrowLeft,
   Send,
   MessageCircle,
@@ -29,9 +44,10 @@ import {
   Mic,
   Square,
   Trash2,
+  Handshake,
 } from "lucide-react";
 import { getProduct } from "@/lib/catalog";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type ChatSearch = {
@@ -80,6 +96,13 @@ function ChatRoom() {
     url: string;
     durationSeconds: number;
   } | null>(null);
+  const [proposals, setProposals] = useState<NegotiationProposal[]>([]);
+  const [proposalInventory, setProposalInventory] = useState<ProposalInventoryItem[]>([]);
+  const [proposalComposerOpen, setProposalComposerOpen] = useState(false);
+  const [counterProposal, setCounterProposal] = useState<NegotiationProposal | undefined>();
+  const [proposalBusy, setProposalBusy] = useState(false);
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [proposalError, setProposalError] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const oldestMessageIdRef = useRef<string | null>(null);
@@ -127,7 +150,14 @@ function ChatRoom() {
         let conversationId = search.id;
 
         // If no direct ID but we have context, resolve or create the conversation
-        if (!conversationId && (search.orderId || search.demandId || search.portfolioProductId)) {
+        if (
+          !conversationId &&
+          (search.orderId ||
+            search.demandId ||
+            search.portfolioProductId ||
+            search.buyerId ||
+            search.producerId)
+        ) {
           let buyerId = search.buyerId;
           let producerId = search.producerId;
 
@@ -249,7 +279,8 @@ function ChatRoom() {
               conversationContext: (chatData.conversation_context || "portfolio") as
                 | "portfolio"
                 | "demand"
-                | "order",
+                | "order"
+                | "direct",
               buyerId: chatData.buyer_id,
               producerId: chatData.producer_id,
               createdAt: chatData.created_at,
@@ -347,6 +378,49 @@ function ChatRoom() {
       unsubscribe();
     };
   }, [conversation?.id, profile?.id]);
+
+  const reloadProposals = useCallback(async () => {
+    if (!conversation?.id || !supabase || !isSupabaseConfigured) return;
+    setProposalLoading(true);
+    try {
+      const [nextProposals, nextInventory] = await Promise.all([
+        listNegotiationProposals(conversation.id),
+        conversation.orderId ? Promise.resolve([]) : listProposalInventory(conversation.id),
+      ]);
+      setProposals(nextProposals);
+      const accepted = [...nextProposals].reverse().find((proposal) => proposal.orderId);
+      if (accepted?.orderId) {
+        setConversation((current) =>
+          current
+            ? {
+                ...current,
+                orderId: accepted.orderId,
+                conversationContext: "order",
+                orderStatus: current.orderStatus ?? "recebido",
+                orderTotal: proposalTotal(accepted),
+              }
+            : current,
+        );
+        setProposalInventory([]);
+      } else {
+        setProposalInventory(nextInventory);
+      }
+      setProposalError("");
+    } catch (error) {
+      console.error("Erro ao carregar propostas:", error);
+      setProposalError(
+        error instanceof Error ? error.message : "Não foi possível carregar as propostas.",
+      );
+    } finally {
+      setProposalLoading(false);
+    }
+  }, [conversation?.id, conversation?.orderId, isSupabaseConfigured]);
+
+  useEffect(() => {
+    if (!conversation?.id) return;
+    void reloadProposals();
+    return subscribeToNegotiationProposals(conversation.id, () => void reloadProposals());
+  }, [conversation?.id, reloadProposals]);
 
   // Scroll to bottom when messages update (if user was already at the bottom)
   useEffect(() => {
@@ -528,7 +602,106 @@ function ChatRoom() {
     }
   };
 
+  const openProposalComposer = (initialProposal?: NegotiationProposal) => {
+    setCounterProposal(initialProposal);
+    setProposalComposerOpen(true);
+  };
+
+  const submitProposal = async (draft: ProposalDraft) => {
+    if (!conversation?.id) return;
+    setProposalBusy(true);
+    setProposalError("");
+    try {
+      await createNegotiationProposal(conversation.id, draft);
+      setProposalComposerOpen(false);
+      setCounterProposal(undefined);
+      await reloadProposals();
+      toast.success(counterProposal ? "Contraproposta enviada." : "Proposta enviada.");
+      isAtBottomRef.current = true;
+      setTimeout(scrollToBottom, 50);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível enviar a proposta.";
+      setProposalError(message);
+      toast.error(message);
+      throw error;
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
+  const acceptProposal = async (proposal: NegotiationProposal) => {
+    if (
+      !window.confirm(
+        "Ao aceitar, um pedido será criado com estes valores e o estoque será reservado. Deseja continuar?",
+      )
+    )
+      return;
+    setProposalBusy(true);
+    setProposalError("");
+    try {
+      const result = await acceptNegotiationProposal(proposal.id);
+      setConversation((current) =>
+        current
+          ? {
+              ...current,
+              orderId: result.orderId,
+              conversationContext: "order",
+              orderStatus: "recebido",
+              orderTotal: proposal.items.reduce((total, item) => total + item.lineTotal, 0),
+            }
+          : current,
+      );
+      await reloadProposals();
+      toast.success("Proposta aceita e pedido criado.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível aceitar a proposta.";
+      setProposalError(message);
+      toast.error(message);
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
+  const rejectProposal = async (proposal: NegotiationProposal) => {
+    if (!window.confirm("Deseja recusar esta proposta? A conversa continuará disponível.")) return;
+    setProposalBusy(true);
+    setProposalError("");
+    try {
+      await rejectNegotiationProposal(proposal.id);
+      await reloadProposals();
+      toast.success("Proposta recusada.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível recusar a proposta.";
+      setProposalError(message);
+      toast.error(message);
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
   const isBuyer = profile?.tipo === "comprador";
+  const activeProposal = [...proposals]
+    .reverse()
+    .find((proposal) => effectiveProposalStatus(proposal) === "pending");
+  const timeline = useMemo(
+    () =>
+      [
+        ...messages.map((message) => ({
+          type: "message" as const,
+          createdAt: message.createdAt,
+          message,
+        })),
+        ...proposals.map((proposal) => ({
+          type: "proposal" as const,
+          createdAt: proposal.createdAt,
+          proposal,
+        })),
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [messages, proposals],
+  );
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-canvas">
@@ -566,11 +739,18 @@ function ChatRoom() {
                         Negociação da Demanda #{conversation.demandId.substring(0, 8)}
                       </span>
                     </>
-                  ) : (
+                  ) : conversation.portfolioProductId ? (
                     <>
                       <MessageSquare className="h-3 w-3 text-leaf-600 shrink-0" />
                       <span className="text-xs text-muted-foreground truncate">
                         Negociação de Anúncio
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="h-3 w-3 text-leaf-600 shrink-0" />
+                      <span className="text-xs text-muted-foreground truncate">
+                        Negociação direta
                       </span>
                     </>
                   )}
@@ -673,6 +853,54 @@ function ChatRoom() {
             );
           })()}
 
+        {conversation && !loading && (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-white px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-brand-900">Proposta comercial</p>
+              <p className="text-xs text-muted-foreground">
+                {conversation.orderId
+                  ? "Esta conversa já possui um pedido vinculado."
+                  : "Registre quantidade, preço, pagamento e entrega combinados."}
+              </p>
+            </div>
+            {conversation.orderId ? (
+              <Link
+                to={isBuyer ? "/orders" : "/producer/orders"}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900"
+              >
+                <ShoppingBag className="h-4 w-4" /> Ver pedido
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openProposalComposer(activeProposal)}
+                disabled={proposalBusy || proposalLoading || proposalInventory.length === 0}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
+              >
+                <Handshake className="h-4 w-4" />
+                {proposalLoading
+                  ? "Carregando..."
+                  : proposalInventory.length === 0
+                    ? "Sem produto disponível"
+                    : activeProposal
+                      ? activeProposal.createdBy === profile?.id
+                        ? "Substituir proposta"
+                        : "Fazer contraproposta"
+                      : "Fazer proposta"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {proposalError && (
+          <div
+            role="alert"
+            className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800"
+          >
+            {proposalError}
+          </div>
+        )}
+
         {/* Message bubble flow */}
         <div
           ref={scrollRef}
@@ -692,7 +920,7 @@ function ChatRoom() {
                 </div>
               )}
 
-              {messages.length === 0 && (
+              {timeline.length === 0 && (
                 <div className="text-center py-10">
                   <p className="text-sm text-muted-foreground">
                     Inicie a negociação enviando uma mensagem abaixo.
@@ -700,7 +928,22 @@ function ChatRoom() {
                 </div>
               )}
 
-              {messages.map((msg) => {
+              {timeline.map((event) => {
+                if (event.type === "proposal") {
+                  return (
+                    <ProposalCard
+                      key={`proposal-${event.proposal.id}`}
+                      proposal={event.proposal}
+                      currentProfileId={profile?.id}
+                      otherPartyName={conversation?.otherPartyName}
+                      busy={proposalBusy}
+                      onAccept={() => void acceptProposal(event.proposal)}
+                      onReject={() => void rejectProposal(event.proposal)}
+                      onCounter={() => openProposalComposer(event.proposal)}
+                    />
+                  );
+                }
+                const msg = event.message;
                 const isMine = msg.senderId === profile?.id;
                 const isRead = !!msg.readAt;
 
@@ -853,6 +1096,18 @@ function ChatRoom() {
           )}
         </footer>
       </div>
+      <ProposalComposer
+        open={proposalComposerOpen}
+        onOpenChange={(open) => {
+          setProposalComposerOpen(open);
+          if (!open) setCounterProposal(undefined);
+        }}
+        inventory={proposalInventory}
+        initialProposal={counterProposal}
+        preferredInventoryId={conversation?.portfolioProductId}
+        submitting={proposalBusy}
+        onSubmit={submitProposal}
+      />
     </div>
   );
 }

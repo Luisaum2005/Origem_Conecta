@@ -350,10 +350,15 @@ function BuyerOrderCard({
             </p>
           )}
           <p className="mt-1 text-sm font-semibold text-brand-900">
-            Condições comerciais: a combinar diretamente entre as partes
+            Forma de pagamento escolhida: {order.paymentMethod ?? "A combinar"}
           </p>
           {order.paymentNotes && (
             <p className="mt-1 text-xs text-muted-foreground">{order.paymentNotes}</p>
+          )}
+          {order.deliveryNotes && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              <strong>Entrega/retirada:</strong> {order.deliveryNotes}
+            </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link

@@ -8,6 +8,7 @@ import { useCart } from "@/lib/cart";
 import { preferredProducer } from "@/lib/catalog";
 import { getOperationWindow } from "@/lib/operation";
 import { useOrders } from "@/lib/orders";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/orders";
 import { useRecurringOrders } from "@/lib/recurring-orders";
 import {
   AlertCircle,
@@ -72,6 +73,7 @@ function Order() {
   const [confirmError, setConfirmError] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [maturityPreference, setMaturityPreference] = useState(maturityOptions[0]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("A combinar");
   const [copyNotice, setCopyNotice] = useState("");
   const orderRequestIdRef = useRef<string | null>(null);
   const items = products.filter((product) => cart[product.id]);
@@ -111,6 +113,7 @@ function Order() {
       `Solicitação enviada até: ${operation.cutoffLabel}`,
       `Preferência de entrega: ${operation.deliveryLabel}`,
       `Maturação: ${maturityPreference}`,
+      `Forma de pagamento sugerida: ${paymentMethod}`,
       "",
       ...orderItems.flatMap((item) => [
         `- ${item.productName}`,
@@ -127,6 +130,7 @@ function Order() {
     buyerDetails.companyName,
     buyerDetails.responsibleName,
     maturityPreference,
+    paymentMethod,
     operation.cutoffLabel,
     operation.deliveryLabel,
     orderItems,
@@ -199,7 +203,7 @@ function Order() {
           delivery,
           total,
           deliveryEta: operation.deliveryLabel,
-          paymentMethod: "A combinar",
+          paymentMethod,
           deliveryAddress: {
             postalCode: buyerDetails.postalCode.replace(/\D/g, ""),
             addressLine: buyerDetails.addressLine.trim(),
@@ -443,9 +447,37 @@ function Order() {
                   </div>
                 </div>
 
+                <fieldset className="mt-5 rounded-xl border border-border bg-canvas p-4">
+                  <legend className="px-1 text-sm font-semibold text-brand-900">
+                    Forma de pagamento
+                  </legend>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Escolha sua preferência. O produtor verá esta informação para combinar os
+                    detalhes com você.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {PAYMENT_METHODS.map((method) => (
+                      <label
+                        key={method}
+                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-medium text-brand-900 has-[:checked]:border-leaf-600 has-[:checked]:bg-leaf-50"
+                      >
+                        <input
+                          type="radio"
+                          name="payment-method"
+                          value={method}
+                          checked={paymentMethod === method}
+                          onChange={() => setPaymentMethod(method)}
+                          className="h-4 w-4 accent-[var(--color-brand-900)]"
+                        />
+                        {method}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
                 <div className="mt-5 rounded-xl border border-leaf-200 bg-leaf-100 p-4 text-sm text-brand-900">
-                  Esta solicitação não confirma uma compra. Preço final, logística, pagamento e
-                  documentação serão combinados diretamente com o produtor ou organização.
+                  Esta solicitação não confirma uma compra. A forma de pagamento é uma preferência e
+                  os detalhes serão combinados diretamente com o produtor.
                 </div>
 
                 {!hasCompleteDeliveryAddress(buyerDetails) && (

@@ -429,10 +429,15 @@ function ProducerOrderCard({
             </div>
           )}
           <p className="mt-1 text-sm font-semibold text-brand-900">
-            Pagamento e condições: definidos diretamente entre as partes
+            Forma de pagamento sugerida pelo comprador: {order.paymentMethod ?? "A combinar"}
           </p>
           {order.paymentNotes && (
             <p className="mt-1 text-xs text-muted-foreground">{order.paymentNotes}</p>
+          )}
+          {order.deliveryNotes && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              <strong>Entrega/retirada:</strong> {order.deliveryNotes}
+            </p>
           )}
         </div>
 

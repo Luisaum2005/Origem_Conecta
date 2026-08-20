@@ -4,9 +4,9 @@ import { runDeduplicatedMutation } from "@/lib/mutation-guard";
 import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type PaymentMethod = "Pix" | "Dinheiro na entrega" | "A combinar";
+export type PaymentMethod = "Pix" | "Cartão" | "Dinheiro" | "A combinar";
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["Pix", "Dinheiro na entrega", "A combinar"];
+export const PAYMENT_METHODS: PaymentMethod[] = ["Pix", "Cartão", "Dinheiro", "A combinar"];
 
 export type OrderStatus = "Recebido" | "Em separação" | "Em entrega" | "Entregue" | "Cancelado";
 
@@ -56,6 +56,7 @@ export type SavedOrder = {
   originQuoteId?: string;
   paymentMethod?: PaymentMethod;
   paymentNotes?: string;
+  deliveryNotes?: string;
   deliveryAddress?: DeliveryAddress;
 };
 
@@ -115,6 +116,7 @@ type RemoteOrder = {
   origem_solicitacao_id?: string | null;
   payment_method?: string | null;
   payment_notes?: string | null;
+  delivery_notes?: string | null;
   order_items?: RemoteOrderItem[] | null;
 };
 
@@ -269,6 +271,7 @@ function mapRemoteOrder(
     originQuoteId: order.origem_solicitacao_id ?? undefined,
     paymentMethod: normalizePaymentMethod(order.payment_method),
     paymentNotes: order.payment_notes ?? undefined,
+    deliveryNotes: order.delivery_notes ?? undefined,
     deliveryAddress,
     items,
   };
@@ -355,13 +358,13 @@ async function loadRemoteOrders(
   if (!supabase) return null;
   if (profileType === "organizacao") return [];
   let select =
-    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
+    "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,delivery_notes,order_items(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
 
   if (profileType === "produtor") {
     const producerId = await getProducerId(profileId);
     if (!producerId) return [];
     select =
-      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
+      "id,buyer_id,criado_em,buyer_name,status,subtotal,delivery,total,entrega_label,entrega_prevista,confirmado_em,saiu_entrega_em,entregue_em,cancelamento_limite_em,cancelado_em,cancelado_por,motivo_cancelamento,codigo_recibo,reclamacao_texto,reclamacao_status,reclamacao_criada_em,origem_solicitacao_id,payment_method,payment_notes,delivery_notes,order_items!inner(product_ref,product_name,quantidade,unidade,preco_unitario,producer_id,producer_ref,producer_name,escolha_manual_produtor,line_total,observacoes,seller_organization_id,seller_organization_name,seller_organization_cnpj,producer_confirmed_at,producer_shipped_at,producer_delivered_at)";
     const { data, error } = await supabase
       .from("orders")
       .select(select)

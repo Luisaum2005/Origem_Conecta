@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { canCancelOrder, type SavedOrder } from "./orders";
+import { canCancelOrder, PAYMENT_METHODS, type SavedOrder } from "./orders";
+
+describe("formas de pagamento", () => {
+  it("oferece todas as formas combinadas no fluxo de pedido", () => {
+    expect(PAYMENT_METHODS).toEqual(["Pix", "Cartão", "Dinheiro", "A combinar"]);
+  });
+});
 
 function makeOrder(overrides: Partial<SavedOrder> = {}): SavedOrder {
   return {

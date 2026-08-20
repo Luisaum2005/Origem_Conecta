@@ -8,7 +8,7 @@ export type SavedConversation = {
   orderId?: string;
   demandId?: string;
   portfolioProductId?: string;
-  conversationContext?: "portfolio" | "demand" | "order";
+  conversationContext?: "portfolio" | "demand" | "order" | "direct";
   buyerId: string;
   producerId: string;
   createdAt: string;
@@ -146,15 +146,23 @@ export async function getOrCreateConversation(params: {
   senderId?: string;
 }): Promise<SavedConversation> {
   if (supabase) {
-    const { data, error } = await supabase.rpc("get_or_create_conversation", {
-      p_buyer_id: params.buyerId,
-      p_producer_id: params.producerId,
-      p_order_id: params.orderId ?? null,
-      p_demand_id: params.demandId ?? null,
-      p_portfolio_product_id: params.portfolioProductId ?? null,
-      p_initial_message:
-        params.systemMessageOnCreate && params.senderId ? params.systemMessageOnCreate : null,
-    });
+    const hasContext = Boolean(params.orderId || params.demandId || params.portfolioProductId);
+    const { data, error } = hasContext
+      ? await supabase.rpc("get_or_create_conversation", {
+          p_buyer_id: params.buyerId,
+          p_producer_id: params.producerId,
+          p_order_id: params.orderId ?? null,
+          p_demand_id: params.demandId ?? null,
+          p_portfolio_product_id: params.portfolioProductId ?? null,
+          p_initial_message:
+            params.systemMessageOnCreate && params.senderId ? params.systemMessageOnCreate : null,
+        })
+      : await supabase.rpc("get_or_create_direct_conversation", {
+          p_buyer_id: params.buyerId,
+          p_producer_id: params.producerId,
+          p_initial_message:
+            params.systemMessageOnCreate && params.senderId ? params.systemMessageOnCreate : null,
+        });
 
     if (error) throw error;
 
@@ -181,7 +189,8 @@ export async function getOrCreateConversation(params: {
       conversationContext: (created.conversation_context || "portfolio") as
         | "portfolio"
         | "demand"
-        | "order",
+        | "order"
+        | "direct",
       buyerId: created.buyer_id,
       producerId: created.producer_id,
       createdAt: created.created_at,
@@ -197,7 +206,9 @@ export async function getOrCreateConversation(params: {
           ? c.orderId === params.orderId
           : params.demandId
             ? c.demandId === params.demandId
-            : c.portfolioProductId === params.portfolioProductId) &&
+            : params.portfolioProductId
+              ? c.portfolioProductId === params.portfolioProductId
+              : c.conversationContext === "direct") &&
         c.buyerId === params.buyerId &&
         c.producerId === params.producerId,
     );
@@ -209,7 +220,13 @@ export async function getOrCreateConversation(params: {
       orderId: params.orderId,
       demandId: params.demandId,
       portfolioProductId: params.portfolioProductId,
-      conversationContext: params.orderId ? "order" : params.demandId ? "demand" : "portfolio",
+      conversationContext: params.orderId
+        ? "order"
+        : params.demandId
+          ? "demand"
+          : params.portfolioProductId
+            ? "portfolio"
+            : "direct",
       buyerId: params.buyerId,
       producerId: params.producerId,
       createdAt: new Date().toISOString(),
@@ -442,7 +459,8 @@ export async function getUserConversations(
         conversationContext: (row.conversation_context || "portfolio") as
           | "portfolio"
           | "demand"
-          | "order",
+          | "order"
+          | "direct",
         buyerId: row.buyer_id,
         producerId: row.producer_id,
         createdAt: row.created_at,
