@@ -202,7 +202,8 @@ async function loadInventory(producerId?: string | null) {
     )
     .order("atualizado_em", { ascending: false })
     .limit(100)
-    .eq("producer_id", producerId);
+    .eq("producer_id", producerId)
+    .is("deleted_at", null);
 
   const { data, error } = await query;
   if (error) {
@@ -213,7 +214,8 @@ async function loadInventory(producerId?: string | null) {
       )
       .order("atualizado_em", { ascending: false })
       .limit(100)
-      .eq("producer_id", producerId);
+      .eq("producer_id", producerId)
+      .is("deleted_at", null);
 
     const { data: fallbackData, error: fallbackError } = await fallbackQuery;
     if (fallbackError) throw fallbackError;
@@ -306,12 +308,22 @@ async function syncProducerInventory(producerId: string, items: ProducerStockIte
 
 async function deleteRemoteInventory(producerId: string, itemId: string) {
   if (!supabase) return;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("producer_inventory")
-    .delete()
+    .update({
+      ativo: false,
+      deleted_at: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    })
     .eq("id", itemId)
-    .eq("producer_id", producerId);
+    .eq("producer_id", producerId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    throw new Error("Produto não encontrado ou você não tem permissão para excluí-lo.");
+  }
 }
 
 function extensionFromFile(file: File) {
@@ -490,10 +502,11 @@ export function useProducerStock() {
       }
 
       const folder = mediaType === "image" ? "photos" : "videos";
-      const path = `${producerId}/${folder}/${itemId}-${Date.now()}.${extensionFromFile(file)}`;
+      const uniqueFileId = crypto.randomUUID();
+      const path = `${producerId}/${folder}/${itemId}-${uniqueFileId}.${extensionFromFile(file)}`;
       const { error } = await supabase.storage.from("product-photos").upload(path, file, {
         cacheControl: "3600",
-        upsert: true,
+        upsert: false,
       });
       if (error) throw error;
 

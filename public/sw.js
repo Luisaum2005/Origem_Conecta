@@ -1,4 +1,4 @@
-const CACHE_NAME = "origem-conecta-v2";
+const CACHE_NAME = "origem-conecta-v3";
 const APP_SHELL = ["/", "/login", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -20,13 +20,25 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin)
     return;
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok)
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+    (async () => {
+      try {
+        const response = await fetch(event.request);
+
+        if (response.ok) {
+          // Faça a cópia antes de devolver a resposta ao navegador, que pode
+          // começar a consumir o corpo imediatamente.
+          const responseToCache = response.clone();
+          await caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, responseToCache))
+            .catch(() => undefined);
+        }
+
         return response;
-      })
-      .catch(async () => (await caches.match(event.request)) || (await caches.match("/"))),
+      } catch {
+        return (await caches.match(event.request)) || (await caches.match("/"));
+      }
+    })(),
   );
 });
 self.addEventListener("push", (event) => {

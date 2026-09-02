@@ -122,11 +122,12 @@ export function BottomNav() {
           const Icon = item.icon;
           const isActive = isItemActive(item);
           return (
-            <li key={item.to} className="flex-1">
+            <li key={item.to} className="min-w-0 flex-1">
               <Link
                 to={item.to}
+                title={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className="relative flex h-full min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95"
+                className="relative flex h-full min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-0.5 transition-all active:scale-95"
               >
                 <span
                   className={`flex h-9 w-12 items-center justify-center rounded-full transition-all ${
@@ -141,7 +142,7 @@ export function BottomNav() {
                   />
                 </span>
                 <span
-                  className={`text-[11px] leading-none transition-colors ${
+                  className={`block w-full truncate px-0.5 text-center text-[10px] leading-tight transition-colors sm:text-[11px] ${
                     isActive ? "font-semibold text-brand-900" : "font-medium text-muted-foreground"
                   }`}
                 >
@@ -152,7 +153,7 @@ export function BottomNav() {
           );
         })}
         {hasOverflow && (
-          <li className="relative flex-1">
+          <li className="relative min-w-0 flex-1">
             <button
               ref={moreButtonRef}
               type="button"
@@ -160,7 +161,7 @@ export function BottomNav() {
               aria-expanded={moreOpen}
               aria-haspopup="menu"
               aria-controls="bottom-nav-more-menu"
-              className="relative flex h-full min-h-[56px] w-full flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95"
+              className="relative flex h-full min-h-[56px] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-0.5 transition-all active:scale-95"
             >
               <span
                 className={`flex h-9 w-12 items-center justify-center rounded-full transition-all ${
@@ -174,7 +175,7 @@ export function BottomNav() {
                 />
               </span>
               <span
-                className={`text-[11px] leading-none ${
+                className={`block w-full truncate px-0.5 text-center text-[10px] leading-tight sm:text-[11px] ${
                   overflowActive || moreOpen
                     ? "font-semibold text-brand-900"
                     : "font-medium text-muted-foreground"
