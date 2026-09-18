@@ -15,14 +15,27 @@ if (!renderedHtml.includes("Apresentação do pitch Origem Conecta")) {
 
 const bodyStart = renderedHtml.indexOf("<body>") + "<body>".length;
 const scriptStart = renderedHtml.indexOf("<script", bodyStart);
-const bodyMarkup = renderedHtml
+const pitchAssetNames = [
+  "slide-1-farm.png",
+  "slide-2-urgency.png",
+  "slide-3-persona.png",
+  "slide-4-problem.png",
+  "slide-5-solution.png",
+  "slide-6-validation.png",
+  "slide-7-partnership.png",
+];
+
+let bodyMarkup = renderedHtml
   .slice(bodyStart, scriptStart)
-  .replaceAll("/output/imagegen/agricultor-horizontal-panfleto.png", "/assets/farmer.png")
   .replaceAll("/src/assets/logo.png", "/assets/logo.png")
   .replace(
     'href="/" aria-label="Sair da apresentação"',
     'href="https://origem-conecta.vercel.app" aria-label="Visitar o Origem Conecta"',
   );
+
+for (const assetName of pitchAssetNames) {
+  bodyMarkup = bodyMarkup.replaceAll(`/src/assets/pitch/${assetName}`, `/assets/${assetName}`);
+}
 
 const pitchCss = await readFile(resolve(root, "src", "features", "pitch", "pitch.css"), "utf8");
 const pitchScript = `
@@ -103,10 +116,12 @@ await mkdir(pitchOutput, { recursive: true });
 await mkdir(resolve(output, "assets"), { recursive: true });
 await mkdir(resolve(output, ".openai"), { recursive: true });
 await cp(resolve(root, "src", "assets", "logo.png"), resolve(output, "assets", "logo.png"));
-await cp(
-  resolve(root, "output", "imagegen", "agricultor-horizontal-panfleto.png"),
-  resolve(output, "assets", "farmer.png"),
-);
+for (const assetName of pitchAssetNames) {
+  await cp(
+    resolve(root, "src", "assets", "pitch", assetName),
+    resolve(output, "assets", assetName),
+  );
+}
 
 const rootHtml = `<!doctype html>
 <html lang="pt-BR">

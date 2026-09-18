@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Expand, Leaf, Link2, Network, Quote, Store, X } from "lucide-react";
 import logoImg from "@/assets/logo.png";
-import farmerImg from "../../../output/imagegen/agricultor-horizontal-panfleto.png";
+import farmImg from "@/assets/pitch/slide-1-farm.png";
+import urgencyImg from "@/assets/pitch/slide-2-urgency.png";
+import personaImg from "@/assets/pitch/slide-3-persona.png";
+import problemImg from "@/assets/pitch/slide-4-problem.png";
+import solutionImg from "@/assets/pitch/slide-5-solution.png";
+import validationImg from "@/assets/pitch/slide-6-validation.png";
+import partnershipImg from "@/assets/pitch/slide-7-partnership.png";
 import {
   audienceTypes,
   painPoints,
@@ -74,8 +80,8 @@ export function PitchPresentation() {
       >
         <img
           className="pitch-hero-image"
-          src={farmerImg}
-          alt="Produtor rural em uma plantação com uma caixa de alimentos frescos"
+          src={farmImg}
+          alt="Vista aérea de uma fazenda brasileira cercada por lavouras"
         />
         <div className="pitch-hero-shade" />
         <div className="pitch-hero-content">
@@ -104,9 +110,15 @@ export function PitchPresentation() {
             <p className="pitch-kicker">Uma situação conhecida</p>
             <h2>Você já precisou repor o estoque com urgência...</h2>
           </div>
-          <div className="pitch-question-card">
-            <Quote aria-hidden="true" />
-            <p>...sem saber quem tinha o produto perto de você?</p>
+          <div className="pitch-question-visual">
+            <img
+              src={urgencyImg}
+              alt="Compradora de restaurante verificando no celular a reposição de alimentos"
+            />
+            <div className="pitch-question-card">
+              <Quote aria-hidden="true" />
+              <p>...sem saber quem tinha o produto perto de você?</p>
+            </div>
           </div>
         </div>
         <p className="pitch-footline">
@@ -119,6 +131,12 @@ export function PitchPresentation() {
         aria-hidden={current !== 2}
       >
         <div className="pitch-persona-profile">
+          <img
+            className="pitch-persona-image"
+            src={personaImg}
+            alt="Comerciante pensando em preço, produtos e entrega enquanto fala ao telefone"
+          />
+          <div className="pitch-persona-shade" />
           <div className="pitch-persona-monogram" aria-hidden="true">
             M
           </div>
@@ -148,6 +166,11 @@ export function PitchPresentation() {
         className={`pitch-slide pitch-problem ${current === 3 ? "is-active" : ""}`}
         aria-hidden={current !== 3}
       >
+        <img
+          className="pitch-problem-image"
+          src={problemImg}
+          alt="Cadeia desconectada entre produtor, transporte e cliente"
+        />
         <header className="pitch-heading-row">
           <div>
             <p className="pitch-kicker">O vilão</p>
@@ -180,6 +203,12 @@ export function PitchPresentation() {
         className={`pitch-slide pitch-solution ${current === 4 ? "is-active" : ""}`}
         aria-hidden={current !== 4}
       >
+        <img
+          className="pitch-solution-image"
+          src={solutionImg}
+          alt="Produtor e compradora conferindo juntos um pedido digital de alimentos frescos"
+        />
+        <div className="pitch-solution-shade" />
         <div className="pitch-solution-title">
           <p className="pitch-kicker">A solução</p>
           <h2>Uma ponte digital entre as duas pontas.</h2>
@@ -225,6 +254,12 @@ export function PitchPresentation() {
         className={`pitch-slide pitch-validation ${current === 5 ? "is-active" : ""}`}
         aria-hidden={current !== 5}
       >
+        <img
+          className="pitch-validation-image"
+          src={validationImg}
+          alt="Compradora, produtor e facilitadora testando o protótipo da plataforma"
+        />
+        <div className="pitch-validation-shade" />
         <header className="pitch-heading-row">
           <div>
             <p className="pitch-kicker">Validação e próximo passo</p>
@@ -258,6 +293,12 @@ export function PitchPresentation() {
         className={`pitch-slide pitch-cta ${current === 6 ? "is-active" : ""}`}
         aria-hidden={current !== 6}
       >
+        <img
+          className="pitch-cta-image"
+          src={partnershipImg}
+          alt="Produtor e chef apertando as mãos durante a entrega de alimentos frescos"
+        />
+        <div className="pitch-cta-shade" />
         <div className="pitch-cta-orbit pitch-cta-orbit-one" />
         <div className="pitch-cta-orbit pitch-cta-orbit-two" />
         <div className="pitch-cta-content">
