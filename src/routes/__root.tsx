@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -146,6 +147,9 @@ import { AuthProvider } from "@/lib/auth";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const location = useLocation();
+
+  if (location.pathname === "/pitch") return <Outlet />;
 
   if (isBackendUnavailable) return <BackendUnavailable />;
 

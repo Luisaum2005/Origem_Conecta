@@ -15,6 +15,7 @@ import { Route as ResetRouteImport } from './routes/reset'
 import { Route as RatingRouteImport } from './routes/rating'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
+import { Route as PitchRouteImport } from './routes/pitch'
 import { Route as OrganizationsRouteImport } from './routes/organizations'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderRouteImport } from './routes/order'
@@ -66,6 +67,11 @@ const ProductionRoute = ProductionRouteImport.update({
 const PortfolioRoute = PortfolioRouteImport.update({
   id: '/portfolio',
   path: '/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PitchRoute = PitchRouteImport.update({
+  id: '/pitch',
+  path: '/pitch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationsRoute = OrganizationsRouteImport.update({
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
+  '/pitch': typeof PitchRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
+  '/pitch': typeof PitchRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/order': typeof OrderRoute
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
+  '/pitch': typeof PitchRoute
   '/portfolio': typeof PortfolioRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
@@ -283,6 +292,7 @@ export interface FileRouteTypes {
     | '/order'
     | '/orders'
     | '/organizations'
+    | '/pitch'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/order'
     | '/orders'
     | '/organizations'
+    | '/pitch'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/order'
     | '/orders'
     | '/organizations'
+    | '/pitch'
     | '/portfolio'
     | '/production'
     | '/rating'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   OrderRoute: typeof OrderRoute
   OrdersRoute: typeof OrdersRoute
   OrganizationsRoute: typeof OrganizationsRouteWithChildren
+  PitchRoute: typeof PitchRoute
   PortfolioRoute: typeof PortfolioRoute
   ProductionRoute: typeof ProductionRoute
   RatingRoute: typeof RatingRoute
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       path: '/portfolio'
       fullPath: '/portfolio'
       preLoaderRoute: typeof PortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pitch': {
+      id: '/pitch'
+      path: '/pitch'
+      fullPath: '/pitch'
+      preLoaderRoute: typeof PitchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizations': {
@@ -620,6 +640,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrderRoute: OrderRoute,
   OrdersRoute: OrdersRoute,
   OrganizationsRoute: OrganizationsRouteWithChildren,
+  PitchRoute: PitchRoute,
   PortfolioRoute: PortfolioRoute,
   ProductionRoute: ProductionRoute,
   RatingRoute: RatingRoute,
