@@ -16,28 +16,41 @@ export function AuthLayout({
   footer?: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-canvas">
-      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-5 sm:px-8 sm:py-6">
-        <Logo />
-        <div className="flex items-center gap-2">
-          <AccessibilityControls />
-          <Link
-            to="/"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-muted-foreground hover:text-brand-900"
-          >
-            <ArrowLeft className="h-4 w-4" /> Início
-          </Link>
-        </div>
-      </header>
-      <main className="mx-auto flex max-w-[620px] flex-col px-4 pb-16 pt-4 sm:px-6 sm:pt-8">
-        <div className="rounded-2xl border border-border bg-white/70 p-5 shadow-xs sm:p-8">
-          <h1 className="text-2xl font-bold tracking-tight text-brand-900 sm:text-3xl">{title}</h1>
+    <div className="min-h-screen">
+      <section className="relative overflow-hidden bg-brand-900 pb-16 text-white">
+        <span
+          className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-brand-800"
+          aria-hidden
+        />
+        <header className="relative mx-auto flex max-w-[1200px] items-center justify-between px-4 py-5 sm:px-8 sm:py-6">
+          <span className="rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-sm">
+            <Logo />
+          </span>
+          <div className="flex items-center gap-2">
+            <AccessibilityControls />
+            <Link
+              to="/"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-white/85 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" /> Início
+            </Link>
+          </div>
+        </header>
+        <p className="relative mx-auto max-w-[620px] px-5 pt-6 text-[22px] font-normal italic leading-snug text-white/95 sm:px-6 sm:pt-10 sm:text-2xl">
+          “A alface que chega de manhã foi colhida de madrugada.”
+        </p>
+      </section>
+      <main className="relative mx-auto -mt-11 flex max-w-[620px] flex-col px-4 pb-16 sm:px-6">
+        <div className="surface-card rounded-[28px] p-5 sm:p-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-brand-900 sm:text-3xl">
+            {title}
+          </h1>
           {subtitle && (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
               {subtitle}
             </p>
           )}
-          <div className="mt-7">{children}</div>
+          <div className="mt-6">{children}</div>
           {footer && <div className="mt-6 text-sm text-muted-foreground">{footer}</div>}
         </div>
       </main>
@@ -119,13 +132,13 @@ export function Field({
               ? "numeric"
               : undefined)
           }
-          className={`h-[52px] w-full rounded-xl border border-border bg-white px-4 text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100 ${isPassword ? "pr-14" : ""}`}
+          className={`h-[52px] w-full rounded-2xl border border-[var(--hairline)] bg-white px-4 text-base text-brand-900 shadow-xs placeholder:text-[var(--text-tertiary)] focus:border-2 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-leaf-100 ${isPassword ? "pr-14" : ""}`}
         />
         {isPassword && (
           <button
             type="button"
             onClick={() => setShowPassword((current) => !current)}
-            className="absolute inset-y-1 right-1 grid w-11 place-items-center rounded-lg text-brand-700 hover:bg-secondary"
+            className="absolute inset-y-1 right-1 grid w-11 place-items-center rounded-full text-brand-700 hover:bg-secondary"
             aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
           >
             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -154,7 +167,7 @@ export function PrimaryButton({
       type={rest.type ?? "submit"}
       disabled={!hydrated || loading || rest.disabled}
       aria-busy={loading || undefined}
-      className="inline-flex h-[52px] w-full items-center justify-center rounded-xl bg-brand-900 px-6 text-base font-semibold text-white shadow-xs transition-colors hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
+      className="cta-primary inline-flex h-[52px] w-full items-center justify-center rounded-full px-6 text-base font-semibold transition-[filter] hover:brightness-110 disabled:bg-none disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)] disabled:shadow-none"
     >
       {!hydrated ? "Carregando..." : loading ? "Enviando..." : children}
     </button>
@@ -172,7 +185,7 @@ export function FormError({ children }: { children?: string }) {
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)] outline-none focus:ring-2 focus:ring-red-300"
+      className="rounded-2xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)] outline-none focus:ring-2 focus:ring-red-300"
     >
       {children}
       <span className="mt-1 block text-xs">Revise os campos acima e tente novamente.</span>

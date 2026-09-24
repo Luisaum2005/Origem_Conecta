@@ -14,6 +14,7 @@ import { Route as TrackingRouteImport } from './routes/tracking'
 import { Route as ResetRouteImport } from './routes/reset'
 import { Route as RatingRouteImport } from './routes/rating'
 import { Route as ProductionRouteImport } from './routes/production'
+import { Route as ProductRouteImport } from './routes/product'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as OrganizationsRouteImport } from './routes/organizations'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -61,6 +62,11 @@ const RatingRoute = RatingRouteImport.update({
 const ProductionRoute = ProductionRouteImport.update({
   id: '/production',
   path: '/production',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductRoute = ProductRouteImport.update({
+  id: '/product',
+  path: '/product',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioRoute = PortfolioRouteImport.update({
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
+  '/product': typeof ProductRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
+  '/product': typeof ProductRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/organizations': typeof OrganizationsRouteWithChildren
   '/portfolio': typeof PortfolioRoute
+  '/product': typeof ProductRoute
   '/production': typeof ProductionRoute
   '/rating': typeof RatingRoute
   '/reset': typeof ResetRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/organizations'
     | '/portfolio'
+    | '/product'
     | '/production'
     | '/rating'
     | '/reset'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/organizations'
     | '/portfolio'
+    | '/product'
     | '/production'
     | '/rating'
     | '/reset'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/organizations'
     | '/portfolio'
+    | '/product'
     | '/production'
     | '/rating'
     | '/reset'
@@ -375,6 +387,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   OrganizationsRoute: typeof OrganizationsRouteWithChildren
   PortfolioRoute: typeof PortfolioRoute
+  ProductRoute: typeof ProductRoute
   ProductionRoute: typeof ProductionRoute
   RatingRoute: typeof RatingRoute
   ResetRoute: typeof ResetRoute
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/production'
       fullPath: '/production'
       preLoaderRoute: typeof ProductionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product': {
+      id: '/product'
+      path: '/product'
+      fullPath: '/product'
+      preLoaderRoute: typeof ProductRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio': {
@@ -621,6 +641,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   OrganizationsRoute: OrganizationsRouteWithChildren,
   PortfolioRoute: PortfolioRoute,
+  ProductRoute: ProductRoute,
   ProductionRoute: ProductionRoute,
   RatingRoute: RatingRoute,
   ResetRoute: ResetRoute,

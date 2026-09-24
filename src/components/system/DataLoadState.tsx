@@ -24,7 +24,7 @@ export function DataLoadError({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-orange-300 bg-white px-4 text-sm font-semibold text-orange-900 hover:bg-orange-100"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-orange-300 bg-white px-4 text-sm font-semibold text-orange-900 hover:bg-orange-100"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Tentar novamente

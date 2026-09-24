@@ -173,7 +173,7 @@ function BackendUnavailable() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
         >
           Tentar novamente
         </button>

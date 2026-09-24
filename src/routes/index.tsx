@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/Logo";
 import { InstallButton } from "@/components/pwa/InstallButton";
-import { ArrowRight, Building2, LogIn, ShieldCheck, Sprout, Store, Truck } from "lucide-react";
+import { ArrowRight, Building2, LogIn, Sprout, Store } from "lucide-react";
 import { getProfileHome, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -14,123 +14,95 @@ function Splash() {
   if (profile) return <Navigate to={getProfileHome(profile.tipo, profile.roles)} replace />;
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-5 sm:px-8 sm:py-6">
-        <Logo />
-        <Link
-          to="/login"
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-        >
-          <LogIn className="h-4 w-4" />
-          Entrar
-        </Link>
-      </header>
+    <div className="min-h-screen">
+      <section className="relative overflow-hidden text-white sm:mx-auto sm:mt-6 sm:max-w-[1200px] sm:rounded-[28px]">
+        <img src="/img/campo.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,61,34,.55),rgba(20,61,34,.25)_40%,rgba(20,61,34,.95))]" />
+        <header className="relative flex items-center justify-between px-4 py-5 sm:px-8">
+          <span className="rounded-2xl bg-white/95 px-2.5 py-1.5 shadow-sm">
+            <Logo />
+          </span>
+          <Link
+            to="/login"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/25"
+          >
+            <LogIn className="h-4 w-4" />
+            Entrar
+          </Link>
+        </header>
+        <div className="relative px-5 pb-16 pt-24 sm:px-10 sm:pb-20 sm:pt-32">
+          <h1 className="text-[30px] font-normal leading-tight tracking-tight text-white sm:text-5xl">
+            Da roça
+            <span className="block text-[34px] font-semibold sm:text-6xl">para a sua cozinha.</span>
+          </h1>
+          <p className="mt-3 max-w-md text-sm text-white/85 sm:text-base">
+            Produtores da região vendendo direto para restaurantes, mercados e cozinhas.
+          </p>
+        </div>
+      </section>
 
-      <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-6 sm:px-8 sm:pb-24 sm:pt-12">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-16">
-          <section>
-            <span className="inline-flex items-center gap-2 rounded-full bg-leaf-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-leaf-600" />
-              Plataforma B2B agrícola
-            </span>
-            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight text-brand-900 sm:text-5xl md:text-6xl">
-              Abastecimento{" "}
-              <span className="relative inline-block">
-                inteligente
-                <span className="absolute inset-x-0 -bottom-1 -z-0 h-3 bg-orange-100" />
-              </span>
-              <br />
-              <span className="text-brand-700">entre produção local e demanda real.</span>
-            </h1>
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
-              Portfólio curado semanalmente, distribuição automática entre produtores próximos e
-              rastreamento simplificado da entrega, com previsibilidade do pedido à cozinha.
-            </p>
+      <main className="relative mx-auto -mt-7 max-w-[1200px] rounded-t-[28px] bg-canvas px-5 pb-16 pt-6 sm:mt-8 sm:rounded-none sm:bg-transparent sm:px-8">
+        <h2 className="text-lg font-semibold text-brand-900">Como você vai usar?</h2>
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-3 sm:gap-4">
+          <RoleCard
+            to="/signup/buyer"
+            icon={<Store className="h-5 w-5" />}
+            title="Vou comprar"
+            body="Restaurante, mercado, hotel ou cozinha"
+          />
+          <RoleCard
+            to="/signup/producer"
+            icon={<Sprout className="h-5 w-5" />}
+            title="Vou vender"
+            body="Produtor rural, com ou sem cooperativa"
+          />
+          <RoleCard
+            to="/signup/organization"
+            icon={<Building2 className="h-5 w-5" />}
+            title="Represento um grupo"
+            body="Cooperativa ou associação de produtores"
+          />
+        </div>
 
-            <div className="mt-8 grid gap-4 sm:mt-10">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-leaf-700">
-                  Cadastrar como
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Link
-                    to="/signup/buyer"
-                    className="group inline-flex h-[52px] items-center justify-between gap-3 rounded-xl bg-brand-900 pl-5 pr-3 text-base font-semibold text-white shadow-sm transition-all hover:bg-brand-800 hover:shadow-md"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Store className="h-5 w-5" />
-                      Comprador
-                    </span>
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                  <Link
-                    to="/signup/organization"
-                    className="group inline-flex h-[52px] items-center justify-between gap-3 rounded-xl border border-border bg-white pl-5 pr-3 text-base font-semibold text-brand-900 shadow-xs transition-all hover:border-leaf-500 hover:shadow-sm sm:col-span-2"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-leaf-600" />
-                      Cooperativa ou associação
-                    </span>
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                  <Link
-                    to="/signup/producer"
-                    className="group inline-flex h-[52px] items-center justify-between gap-3 rounded-xl border border-border bg-white pl-5 pr-3 text-base font-semibold text-brand-900 shadow-xs transition-all hover:border-leaf-500 hover:shadow-sm"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Sprout className="h-5 w-5 text-leaf-600" />
-                      Produtor
-                    </span>
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-leaf-700">
-                  Login
-                </p>
-                <Link
-                  to="/login"
-                  className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-5 text-base font-semibold text-brand-900 shadow-xs transition-all hover:border-leaf-500 hover:bg-secondary sm:w-auto sm:min-w-[220px]"
-                >
-                  <LogIn className="h-5 w-5 text-leaf-600" />
-                  Entrar
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-6 max-w-md">
-              <InstallButton />
-            </div>
-          </section>
-
-          <section className="relative">
-            <div className="absolute inset-0 -z-10 rounded-[24px] bg-surface-brand-soft sm:rounded-[32px]" />
-            <div className="grid gap-3 p-4 sm:gap-4 sm:p-8">
-              <FeatureCard
-                icon={<Store className="h-5 w-5" />}
-                title="Portfólio semanal"
-                body="Catálogo curado e atualizado a cada ciclo, com origem e produtor visíveis."
-                tone="brand"
-              />
-              <FeatureCard
-                icon={<Truck className="h-5 w-5" />}
-                title="Distribuição inteligente"
-                body="Seu pedido é alocado automaticamente entre produtores próximos."
-                tone="leaf"
-              />
-              <FeatureCard
-                icon={<ShieldCheck className="h-5 w-5" />}
-                title="Rastreabilidade"
-                body="Acompanhe faturamento, envio e entrega em uma única linha do tempo."
-                tone="orange"
-              />
-            </div>
-          </section>
+        <p className="mt-6 text-center text-sm text-muted-foreground sm:text-left">
+          Já tem conta?{" "}
+          <Link to="/login" className="font-semibold text-brand-700 hover:underline">
+            Entrar
+          </Link>
+        </p>
+        <div className="mx-auto mt-4 max-w-md sm:mx-0">
+          <InstallButton />
         </div>
       </main>
     </div>
+  );
+}
+
+function RoleCard({
+  to,
+  icon,
+  title,
+  body,
+}: {
+  to: "/signup/buyer" | "/signup/producer" | "/signup/organization";
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="surface-card group flex items-center gap-3 p-3 transition-transform hover:-translate-y-0.5"
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-leaf-100 text-brand-700">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold text-brand-900">{title}</span>
+        <span className="block text-xs text-muted-foreground">{body}</span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
   );
 }
 
@@ -139,37 +111,6 @@ function AuthRestoring() {
     <div className="grid min-h-screen place-items-center bg-canvas px-4">
       <div className="rounded-2xl border border-border bg-white px-5 py-4 text-sm font-semibold text-brand-900 shadow-xs">
         Restaurando sua sessão...
-      </div>
-    </div>
-  );
-}
-
-function FeatureCard({
-  icon,
-  title,
-  body,
-  tone,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-  tone: "brand" | "leaf" | "orange";
-}) {
-  const toneMap = {
-    brand: "bg-brand-900 text-white",
-    leaf: "bg-leaf-600 text-white",
-    orange: "bg-orange-600 text-white",
-  };
-  return (
-    <div className="group flex items-start gap-4 rounded-2xl border border-border bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-md">
-      <span
-        className={`grid h-11 w-11 place-items-center rounded-xl transition-transform group-hover:scale-105 ${toneMap[tone]}`}
-      >
-        {icon}
-      </span>
-      <div>
-        <h3 className="text-base font-semibold text-brand-900">{title}</h3>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
       </div>
     </div>
   );

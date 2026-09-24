@@ -1,18 +1,21 @@
 import {
-  Check,
+  Apple,
+  Carrot,
   ChevronLeft,
   ChevronRight,
-  MapPin,
-  PlayCircle,
+  Egg,
+  Leaf,
   MessageSquare,
-  ShoppingCart,
+  Minus,
+  Package,
+  PlayCircle,
+  Plus,
+  Sprout,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { preferredProducer, type Product } from "@/lib/catalog";
-import { useAuth } from "@/lib/auth";
-import { useNavigate } from "@tanstack/react-router";
-import { getOrCreateConversation } from "@/lib/chats";
-import { getBuyerId } from "@/lib/orders";
+import { useStartNegotiation } from "@/lib/negotiation";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 function formatQuantity(value: number) {
@@ -28,13 +31,25 @@ function clampQuantity(value: number, max: number) {
   return Math.max(0, Math.min(max, Number(value.toFixed(2))));
 }
 
-function StockBadge({ product }: { product: Product }) {
-  const stock = product.producers.reduce((sum, producer) => sum + producer.stock, 0);
-  return (
-    <span className="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-3 py-1 text-[12px] font-semibold tracking-wide text-[var(--color-success-fg)]">
-      Disponível: {formatQuantity(stock)} {product.unit}
-    </span>
-  );
+function formatPrice(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Ícone da categoria usado quando o produtor ainda não enviou foto. */
+export function CategoryIcon({ category, name: productName }: { category: string; name: string }) {
+  const name = `${category} ${productName}`.toLowerCase();
+  const Icon = /folh|verdura|alface|cheiro|couve|rúcula|salsa/.test(name)
+    ? Leaf
+    : /legum|hortali|cenoura|abóbora|tomate|pepino/.test(name)
+      ? Carrot
+      : /frut|banana|laranja|manga|mamão/.test(name)
+        ? Apple
+        : /raiz|raíz|tubér|mandioca|macaxeira|batata/.test(name)
+          ? Sprout
+          : /ovo/.test(name)
+            ? Egg
+            : Package;
+  return <Icon className="h-10 w-10 text-brand-600" strokeWidth={1.4} aria-hidden />;
 }
 
 export function ProductCard({
@@ -46,15 +61,10 @@ export function ProductCard({
   qty: number;
   onChange: (qty: number) => void;
 }) {
-  const [hover, setHover] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
-  const { profile } = useAuth();
-  const navigate = useNavigate();
-  const [negotiating, setNegotiating] = useState(false);
-  const [added, setAdded] = useState(false);
-
   const selectedProducer = preferredProducer(product);
   const availableStock = Math.max(0, selectedProducer.stock);
+  const step = Math.min(1, availableStock);
 
   const media = [
     product.imageUrl ? { type: "image" as const, url: product.imageUrl } : null,
@@ -73,42 +83,35 @@ export function ProductCard({
     setInputValue(qty > 0 ? qty.toString().replace(".", ",") : "");
   }, [qty]);
 
-  const handleInputChange = (valueStr: string) => {
-    setInputValue(valueStr);
-    setAdded(false);
+  const commit = (next: number) => {
+    const confirmedQuantity = clampQuantity(next, availableStock);
+    onChange(confirmedQuantity);
+    return confirmedQuantity;
   };
 
-  const handleAdd = () => {
+  const handleFirstAdd = () => {
+    const added = commit(step);
+    toast.success(`${formatQuantity(added)} ${product.unit} de ${product.name} na lista`, {
+      action: { label: "Desfazer", onClick: () => onChange(0) },
+    });
+  };
+
+  const handleInputCommit = () => {
     const requestedQuantity = parseQuantity(inputValue);
-    if (requestedQuantity <= 0) {
-      toast.error("Informe uma quantidade maior que zero.");
-      return;
-    }
     if (requestedQuantity > availableStock) {
       toast.error(
         `A quantidade máxima disponível é ${formatQuantity(availableStock)} ${product.unit}.`,
       );
-      return;
     }
-    const confirmedQuantity = clampQuantity(requestedQuantity, availableStock);
-    onChange(confirmedQuantity);
-    setInputValue(String(confirmedQuantity).replace(".", ","));
-    setAdded(true);
-    toast.success(`${product.name} adicionado à lista de interesse.`);
+    commit(requestedQuantity);
   };
 
+  const { negotiating, startNegotiation } = useStartNegotiation();
+  const handleNegotiate = () => startNegotiation(product, selectedProducer);
+
   return (
-    <article
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className={`group flex flex-col rounded-2xl border bg-white p-4 transition-all sm:p-6 ${
-        hover ? "border-border-strong shadow-md -translate-y-0.5" : "border-border shadow-xs"
-      }`}
-      style={{
-        borderColor: hover ? "var(--border-strong)" : undefined,
-      }}
-    >
-      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-[var(--color-surface-brand-soft)] text-7xl">
+    <article className="surface-card group flex flex-col p-1.5 transition-transform hover:-translate-y-0.5">
+      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[15px] [background:linear-gradient(160deg,#eef8e2_0%,#d9eec4_100%)]">
         {currentMedia?.type === "image" ? (
           <img src={currentMedia.url} alt={product.name} className="h-full w-full object-cover" />
         ) : currentMedia?.type === "video" ? (
@@ -120,7 +123,7 @@ export function ProductCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          product.emoji
+          <CategoryIcon category={product.category} name={product.name} />
         )}
         {media.length > 1 && (
           <>
@@ -140,166 +143,90 @@ export function ProductCard({
             >
               <ChevronRight className="h-4 w-4" />
             </button>
-            <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-              {media.map((item, index) => (
-                <span
-                  key={`${item.type}-${item.url}`}
-                  className={`h-1.5 w-5 rounded-full ${
-                    index === mediaIndex ? "bg-white" : "bg-white/45"
-                  }`}
-                />
-              ))}
-            </div>
           </>
         )}
         {product.videoUrl && (
-          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-900">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-900">
             <PlayCircle className="h-3.5 w-3.5 text-leaf-700" />
             vídeo
           </span>
         )}
+
+        {availableStock <= 0 ? (
+          <span className="absolute inset-x-2 bottom-2 rounded-full bg-white/95 py-2 text-center text-xs font-semibold text-muted-foreground">
+            Indisponível no momento
+          </span>
+        ) : qty > 0 ? (
+          <div className="absolute inset-x-1.5 bottom-1.5 flex h-10 items-center justify-between rounded-full bg-white/95 p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => commit(qty - step)}
+              className="grid h-8 w-8 place-items-center rounded-full bg-surface-brand-soft text-brand-900"
+              aria-label={`Diminuir ${product.name}`}
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              onBlur={handleInputCommit}
+              onKeyDown={(event) => event.key === "Enter" && handleInputCommit()}
+              inputMode="decimal"
+              className="w-12 min-w-0 bg-transparent text-center text-sm font-semibold text-brand-900 focus:outline-none"
+              aria-label={`Quantidade de ${product.name} em ${product.unit}`}
+            />
+            <button
+              type="button"
+              onClick={() => commit(qty + step)}
+              className="cta-primary grid h-8 w-8 place-items-center rounded-full"
+              aria-label={`Aumentar ${product.name}`}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleFirstAdd}
+            className="cta-primary absolute bottom-2 right-2 grid h-10 w-10 place-items-center rounded-full"
+            aria-label={`Adicionar ${product.name} à lista`}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
-      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
-            {product.category} · vendido por {product.unit}
-          </p>
-          <h3 className="mt-1 text-lg font-semibold leading-snug text-brand-900">{product.name}</h3>
-        </div>
-        <StockBadge product={product} />
-      </div>
-
-      <div className="mt-2.5 space-y-1 text-sm text-muted-foreground">
+      <div className="flex flex-1 flex-col px-2 pb-2 pt-3">
+        <h3 className="text-[15px] font-semibold leading-snug text-brand-900">
+          <Link to="/product" search={{ id: product.id }} className="hover:underline">
+            {product.name}
+          </Link>
+        </h3>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {selectedProducer.property} · {selectedProducer.origin}
+        </p>
         {selectedProducer.sellerOrganizationName && (
-          <p className="rounded-lg bg-leaf-100 px-3 py-2 text-xs font-semibold text-brand-900">
-            Comercialização por {selectedProducer.sellerOrganizationName}
-          </p>
+          <span className="mt-1.5 inline-flex w-fit rounded-full bg-leaf-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
+            Pela {selectedProducer.sellerOrganizationName}
+          </span>
         )}
-        {!selectedProducer.sellerOrganizationName && (
-          <p className="rounded-lg bg-canvas px-3 py-2 text-xs font-semibold text-brand-900">
-            {selectedProducer.commercializationMode === "own"
-              ? "Negociação em nome próprio"
-              : selectedProducer.commercializationMode === "organization"
-                ? "Vínculo comercial com organização ainda não confirmado"
-                : "Forma de comercialização ainda não informada"}
-          </p>
-        )}
-        <p className="flex items-center gap-1.5">
-          <span className="font-semibold text-brand-900">Produtor:</span> {selectedProducer.name}
+        <p className="mt-auto pt-2 text-base font-bold tracking-tight text-brand-900">
+          {formatPrice(selectedProducer.price)}
+          <span className="ml-1 text-xs font-medium text-muted-foreground">/{product.unit}</span>
         </p>
-        <p className="flex items-center gap-1.5">
-          <span className="font-semibold text-brand-900">Propriedade:</span>{" "}
-          {selectedProducer.property}
+        <p className="text-[11px] text-muted-foreground">
+          {formatQuantity(availableStock)} {product.unit} disponíveis
         </p>
-        <p className="flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 shrink-0 text-leaf-700" />
-          <span className="font-semibold text-brand-900">Localização:</span>{" "}
-          {selectedProducer.origin}
-        </p>
-      </div>
-
-      <div className="mt-4 space-y-3">
         <button
           type="button"
           disabled={negotiating}
-          onClick={() => {
-            const handleNegotiate = async () => {
-              if (!profile) {
-                toast.error("Você precisa estar logado para negociar.");
-                void navigate({ to: "/login" });
-                return;
-              }
-              if (profile.tipo !== "comprador") {
-                toast.error("Apenas compradores podem negociar produtos do portfólio.");
-                return;
-              }
-
-              setNegotiating(true);
-              try {
-                const buyerId = await getBuyerId(profile.id);
-                if (!buyerId) {
-                  throw new Error("Cadastro de comprador não encontrado.");
-                }
-
-                const conv = await getOrCreateConversation({
-                  portfolioProductId: product.id,
-                  buyerId,
-                  producerId: selectedProducer.id,
-                  systemMessageOnCreate: `Você iniciou uma negociação sobre o anúncio ${product.name}.`,
-                  senderId: profile.id,
-                });
-
-                void navigate({
-                  to: "/chat",
-                  search: { id: conv.id },
-                });
-              } catch (err) {
-                console.error("Erro ao iniciar negociação:", err);
-                toast.error(err instanceof Error ? err.message : "Erro ao iniciar negociação.");
-              } finally {
-                setNegotiating(false);
-              }
-            };
-            void handleNegotiate();
-          }}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 hover:bg-leaf-100 transition-colors cursor-pointer disabled:opacity-50"
+          onClick={() => void handleNegotiate()}
+          className="mt-2 inline-flex h-9 items-center gap-1.5 self-start rounded-full px-1 text-xs font-semibold text-brand-700 hover:underline disabled:opacity-50"
         >
-          <MessageSquare className="h-4 w-4 text-leaf-700" />
+          <MessageSquare className="h-4 w-4" />
           {negotiating ? "Iniciando..." : "Negociar"}
         </button>
-      </div>
-
-      <div className="mt-5 flex flex-col gap-3">
-        <div className="min-w-0">
-          <p className="text-2xl font-bold tracking-tight text-brand-900">
-            R$ {selectedProducer.price.toFixed(2)}
-            <span className="ml-1 text-sm font-medium text-muted-foreground">/{product.unit}</span>
-          </p>
-        </div>
-
-        {availableStock <= 0 ? (
-          <div className="text-center py-2.5 rounded-xl bg-secondary text-sm font-semibold text-muted-foreground">
-            Indisponível no momento
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex w-full items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(event) => handleInputChange(event.target.value)}
-                  placeholder="Quantidade"
-                  inputMode="decimal"
-                  className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-                  aria-label={`Quantidade de ${product.name}`}
-                />
-              </div>
-              <span className="inline-flex h-11 w-28 items-center justify-center rounded-xl border border-border bg-canvas px-2 text-center text-sm font-semibold text-brand-900">
-                {product.unit}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 focus:outline-none focus:ring-2 focus:ring-leaf-300 focus:ring-offset-2"
-            >
-              {added ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-              {added ? "Adicionado" : qty > 0 ? "Atualizar interesse" : "Adicionar à lista"}
-            </button>
-
-            {qty > 0 && (
-              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800">
-                  <span className="inline-block h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  {formatQuantity(qty)} {product.unit} na lista de interesse
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </article>
   );

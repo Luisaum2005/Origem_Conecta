@@ -304,7 +304,7 @@ export function SupplierProductPicker({
                       type="button"
                       onClick={requestProduct}
                       disabled={requesting}
-                      className="inline-flex h-11 items-center rounded-lg bg-leaf-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                      className="inline-flex h-11 items-center rounded-full bg-leaf-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
                     >
                       {requesting ? "Enviando..." : "Enviar para análise"}
                     </button>

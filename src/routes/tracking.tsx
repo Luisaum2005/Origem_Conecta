@@ -15,6 +15,14 @@ export const Route = createFileRoute("/tracking")({
 
 type TrackingStatus = Exclude<OrderStatus, "Cancelado">;
 
+const statusTone: Record<OrderStatus, string> = {
+  Recebido: "bg-[var(--color-status-neutral-bg)] text-[var(--color-status-neutral-fg)]",
+  "Em separação": "bg-orange-100 text-orange-700",
+  "Em entrega": "bg-[var(--color-status-info-bg)] text-[var(--color-status-info-fg)]",
+  Entregue: "bg-leaf-100 text-brand-700",
+  Cancelado: "bg-[var(--color-status-danger-bg)] text-[var(--color-status-danger-fg)]",
+};
+
 const statusFlow: TrackingStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
 
 const stepConfig: Record<
@@ -108,10 +116,37 @@ function Tracking() {
           <EmptyState />
         ) : (
           <>
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--color-info-bg)] px-3 py-1.5 text-xs font-medium text-[var(--color-info-fg)]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Status atual: {selectedOrder.status} - entrega {selectedOrder.deliveryEta}
-            </div>
+            <section className="surface-card mt-6 p-5">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone[selectedOrder.status]}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {selectedOrder.status}
+              </span>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-900">
+                {selectedOrder.status === "Entregue"
+                  ? "Pedido entregue"
+                  : `Entrega ${selectedOrder.deliveryEta}`}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {producers.map((producer) => producer.name).join(", ")}
+              </p>
+              {selectedOrder.status !== "Cancelado" && (
+                <div className="mt-4 flex items-center gap-4 rounded-2xl bg-brand-900 px-4 py-3 text-white">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.06em] text-white/75">
+                      Código de entrega
+                    </p>
+                    <p className="text-[28px] font-bold tracking-[0.18em]">
+                      {selectedOrder.deliveryCode ?? "····"}
+                    </p>
+                  </div>
+                  <p className="text-xs leading-snug text-white/85">
+                    Informe ao produtor só quando receber e conferir os produtos.
+                  </p>
+                </div>
+              )}
+            </section>
 
             {selectedOrder.status === "Cancelado" && (
               <div className="mt-6 rounded-2xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-5 text-sm text-[var(--color-error-fg)]">
@@ -124,8 +159,8 @@ function Tracking() {
             )}
 
             {selectedOrder.status !== "Cancelado" && (
-              <section className="mt-8 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
-                <ol className="relative grid grid-cols-1 gap-8 md:grid-cols-4">
+              <section className="mt-4 rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-8">
+                <ol className="relative grid grid-cols-1 gap-5 md:grid-cols-4 md:gap-8">
                   {statusFlow.map((status, index) => {
                     const config = stepConfig[status];
                     const done = index < currentIndex || selectedOrder.status === "Entregue";
@@ -136,17 +171,17 @@ function Tracking() {
                       <li key={status} className="relative flex items-start gap-4">
                         {index < statusFlow.length - 1 && (
                           <span
-                            className={`absolute left-6 top-12 h-full w-0.5 md:left-12 md:right-0 md:top-6 md:h-0.5 md:w-auto ${
+                            className={`absolute left-5 top-10 h-full w-0.5 md:top-12 md:left-12 md:right-0 md:top-6 md:h-0.5 md:w-auto ${
                               index < currentIndex ? "bg-leaf-600" : "bg-surface-muted"
                             }`}
                           />
                         )}
                         <span
-                          className={`relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-all ${
+                          className={`relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all md:h-12 md:w-12 ${
                             done
-                              ? "bg-leaf-600 text-white"
+                              ? "bg-leaf-100 text-brand-700"
                               : current
-                                ? "scale-105 bg-brand-900 text-white ring-4 ring-leaf-100"
+                                ? "bg-[var(--color-status-info-fg)] text-white ring-4 ring-[var(--color-status-info-bg)]"
                                 : "bg-surface-muted text-muted-foreground"
                           }`}
                         >
@@ -232,10 +267,8 @@ function Tracking() {
                 <div className="rounded-2xl border border-border bg-white p-6">
                   <h3 className="font-semibold text-brand-900">Segurança da entrega</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Informe o código ao produtor somente quando receber e conferir os produtos.
-                  </p>
-                  <p className="mt-3 inline-flex rounded-lg bg-canvas px-3 py-2 text-lg font-bold tracking-widest text-brand-900">
-                    Código: {selectedOrder.deliveryCode ?? "gerando"}
+                    O código acima confirma o recebimento. Não compartilhe antes de conferir a
+                    carga.
                   </p>
                   {selectedOrder.receiptCode && (
                     <p className="mt-2 text-sm font-semibold text-brand-900">
@@ -266,7 +299,7 @@ function EmptyState() {
       </p>
       <Link
         to="/portfolio"
-        className="mt-6 inline-flex h-11 items-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+        className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
       >
         Ver portfólio
       </Link>

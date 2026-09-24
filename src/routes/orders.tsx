@@ -35,6 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/orders")({
   component: () => (
@@ -123,7 +124,7 @@ function Orders() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             to="/portfolio"
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar ao portfólio
@@ -145,14 +146,14 @@ function Orders() {
           </div>
           <Link
             to="/portfolio"
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
           >
             <ShoppingBag className="h-4 w-4" />
             Nova solicitação
           </Link>
         </div>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3">
+        <section className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
           <Metric icon={ClipboardList} label="Solicitações totais" value={`${orders.length}`} />
           <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
           <Metric icon={PackageCheck} label="Entregues" value={`${deliveredOrders.length}`} />
@@ -218,7 +219,7 @@ function Orders() {
                     <button
                       type="button"
                       onClick={() => loadRecurringOrder(recurringOrder)}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+                      className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
                     >
                       <Repeat className="h-4 w-4 text-leaf-700" />
                       Carregar
@@ -226,14 +227,14 @@ function Orders() {
                     <button
                       type="button"
                       onClick={() => toggleRecurringOrder(recurringOrder.id)}
-                      className="inline-flex h-9 items-center rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+                      className="inline-flex h-9 items-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
                     >
                       {recurringOrder.active ? "Pausar" : "Ativar"}
                     </button>
                     <button
                       type="button"
                       onClick={() => removeRecurringOrder(recurringOrder.id)}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
+                      className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
                     >
                       <Trash2 className="h-4 w-4" />
                       Excluir
@@ -257,7 +258,7 @@ function Orders() {
             </p>
             <Link
               to="/portfolio"
-              className="mt-6 inline-flex h-11 items-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+              className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
             >
               Ver portfólio
             </Link>
@@ -338,8 +339,8 @@ function BuyerOrderCard({
             Solicitação #{order.id}
           </p>
           <h2 className="mt-1 text-xl font-bold text-brand-900">
-            {order.items.length} item{order.items.length > 1 ? "s" : ""} · R${" "}
-            {order.total.toFixed(2)}
+            {order.items.length} {order.items.length > 1 ? "itens" : "item"} ·{" "}
+            {formatBRL(order.total)}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Criado em {formatOrderDate(order.createdAt)} · entrega {order.deliveryEta}
@@ -363,7 +364,7 @@ function BuyerOrderCard({
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/tracking"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
             >
               <Truck className="h-4 w-4 text-leaf-700" />
               Rastrear pedido
@@ -371,7 +372,7 @@ function BuyerOrderCard({
             <button
               type="button"
               onClick={() => repeatOrder(order.id)}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
             >
               <Repeat className="h-4 w-4 text-leaf-700" />
               Repetir pedido
@@ -419,7 +420,7 @@ function BuyerOrderCard({
               )}
             </div>
             <p className="text-sm font-semibold text-brand-900">
-              {item.quantity.toLocaleString("pt-BR")} {item.unit} · R$ {item.lineTotal.toFixed(2)}
+              {item.quantity.toLocaleString("pt-BR")} {item.unit} · {formatBRL(item.lineTotal)}
             </p>
           </li>
         ))}
@@ -443,8 +444,8 @@ function BuyerOrderCard({
               <li key={`${order.id}-summary-${item.productId}`}>
                 {item.productName}: {item.quantity.toLocaleString("pt-BR")} {item.unit} ·{" "}
                 {item.producerName}
-                {item.sellerOrganizationName ? ` · ${item.sellerOrganizationName}` : ""} · R${" "}
-                {item.lineTotal.toFixed(2)}
+                {item.sellerOrganizationName ? ` · ${item.sellerOrganizationName}` : ""} ·{" "}
+                {formatBRL(item.lineTotal)}
               </li>
             ))}
           </ul>
@@ -480,7 +481,7 @@ function BuyerOrderCard({
               type="button"
               onClick={() => setIsCancelModalOpen(true)}
               disabled={pending}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
             >
               Cancelar solicitação
             </button>
@@ -516,7 +517,7 @@ function BuyerOrderCard({
                   type="button"
                   onClick={() => setIsCancelModalOpen(false)}
                   disabled={pending}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
                 >
                   Voltar
                 </button>
@@ -525,7 +526,7 @@ function BuyerOrderCard({
                   onClick={() => void cancel()}
                   disabled={!cancelReason.trim() || pending}
                   aria-busy={pending || undefined}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                 >
                   {pending ? "Cancelando..." : "Confirmar cancelamento"}
                 </button>
@@ -555,7 +556,7 @@ function BuyerOrderCard({
             onClick={() => void complain()}
             disabled={pending}
             aria-busy={pending || undefined}
-            className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
+            className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
           >
             Enviar reclamação
           </button>
@@ -591,14 +592,14 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
+      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
         <Icon className="h-5 w-5" />
       </span>
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
         {label}
       </p>
-      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
     </div>
   );
 }

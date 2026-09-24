@@ -51,14 +51,14 @@ function OrganizationProfile() {
           <div className="mt-5 flex flex-wrap gap-3 border-t border-border pt-5">
             <Link
               to="/organizations/members"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
             >
               <Users className="h-4 w-4" /> Gerenciar associados
             </Link>
             {profile?.roles.includes("produtor") && (
               <Link
                 to="/profile/producer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
               >
                 <Repeat2 className="h-4 w-4" /> Acessar perfil de produtor
               </Link>
