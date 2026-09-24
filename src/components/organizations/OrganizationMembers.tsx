@@ -33,7 +33,7 @@ import {
   UserCheck,
   Users,
   X,
-} from "lucide-react";
+} from "@/components/mobile/icons";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 

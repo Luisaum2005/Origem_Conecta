@@ -1,29 +1,40 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  BadgeCheck,
+  Bell,
+  LifeBuoy,
+  LogOut,
+  MapPin,
+  Pause,
+  Play,
+  Repeat,
+  Settings,
+  Store,
+  Trash2,
+  Wallet,
+} from "@/components/mobile/icons";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { supportHref } from "@/lib/support";
+import { ListRow, TextSizeOptions } from "@/components/mobile/ProfileParts";
+import { Sheet } from "@/components/mobile/Sheet";
 import { PushSettings } from "@/components/notifications/PushSettings";
-import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
+import { DataLoadError } from "@/components/system/DataLoadState";
+import { useAuth } from "@/lib/auth";
+import { useAvailableProducts } from "@/lib/available-products";
 import { type BuyerProfileDetails, useBuyerProfileDetails } from "@/lib/buyer-profile";
-import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
+import { useCart } from "@/lib/cart";
 import {
-  Building2,
-  CalendarClock,
-  History,
-  MapPin,
-  Pencil,
-  Phone,
-  Repeat,
-  Save,
-  ShieldCheck,
-  ShoppingBasket,
-  TrendingDown,
-  User,
-  X,
-  Star,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+  formatCompactBRL,
+  initials,
+  readPaymentPreference,
+  writePaymentPreference,
+} from "@/lib/format";
+import { PAYMENT_METHODS, useOrders } from "@/lib/orders";
 import { useBuyerRatings } from "@/lib/ratings";
-import { formatBRL } from "@/lib/format";
+import { type RecurringOrder, useRecurringOrders } from "@/lib/recurring-orders";
 
 export const Route = createFileRoute("/profile/buyer")({
   component: () => (
@@ -33,541 +44,405 @@ export const Route = createFileRoute("/profile/buyer")({
   ),
 });
 
-function BuyerProfile() {
-  const {
-    details,
-    saveDetails,
-    saving,
-    loading: profileLoading,
-    error: profileError,
-    reload: reloadProfile,
-  } = useBuyerProfileDetails();
-  const { orders, loading: ordersLoading, error: ordersError, reload: reloadOrders } = useOrders();
-  const location = [details.city, details.state].filter(Boolean).join(", ");
-  const activeOrders = orders.filter((order) => order.status !== "Cancelado");
-  const deliveredOrders = activeOrders.filter((order) => order.status === "Entregue");
-  const openOrders = activeOrders.filter((order) => order.status !== "Entregue");
-  const recentTotal = activeOrders.reduce((sum, order) => sum + order.total, 0);
-  const onTimeRate = activeOrders.length
-    ? Math.round((deliveredOrders.length / activeOrders.length) * 100)
-    : 0;
-  const nextDelivery = openOrders[0]?.deliveryEta || "Sem pedidos abertos";
-  const productSummary = useMemo(() => summarizeProducts(orders), [orders]);
+const BUSINESS_TYPES = ["Restaurante", "Mercado", "Hotel", "Hortifruti", "Cozinha industrial"];
+type SheetName = "address" | "company" | "payment" | "recurring" | "notifications" | "settings";
 
-  const { ratings } = useBuyerRatings();
-
-  const avgRating = useMemo(() => {
-    if (!ratings.length) return "0.0";
-    const sum = ratings.reduce((acc, r) => acc + r.rating, 0);
-    return (sum / ratings.length).toFixed(1);
-  }, [ratings]);
-
-  const totalRatings = ratings.length;
-
+function hasAddress(details: BuyerProfileDetails) {
   return (
-    <div className="min-h-screen bg-canvas">
-      <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-6 pb-24 sm:px-8 sm:py-10 md:pb-10">
-        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Painel do comprador
-        </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              {details.companyName}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {details.businessType || "Comprador"} verificado -{" "}
-              {location || "localização pendente"}
-            </p>
-          </div>
-          <Link
-            to="/portfolio"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
-          >
-            <ShoppingBasket className="h-3.5 w-3.5 text-leaf-600" />
-            Novo pedido
-          </Link>
-        </div>
-
-        {(profileLoading || ordersLoading) && !profileError && !ordersError && (
-          <div className="mt-6">
-            <DataLoading label="Atualizando seu painel..." />
-          </div>
-        )}
-        {profileError && (
-          <div className="mt-6">
-            <DataLoadError message={profileError} onRetry={reloadProfile} />
-          </div>
-        )}
-        {ordersError && (
-          <div className="mt-6">
-            <DataLoadError message={ordersError} onRetry={reloadOrders} />
-          </div>
-        )}
-
-        <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
-          <Metric icon={ShieldCheck} label="Pedidos entregues" value={`${onTimeRate}%`} />
-          <Metric
-            icon={ShoppingBasket}
-            label="Compras registradas"
-            value={`${formatBRL(recentTotal)}`}
-          />
-          <Metric icon={CalendarClock} label="Próxima entrega" value={nextDelivery} />
-        </section>
-
-        <section className="mt-6">
-          <BuyerDetailsPanel details={details} onSave={saveDetails} saving={saving} />
-        </section>
-
-        <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Histórico de compras" icon={History}>
-            {orders.length ? (
-              <ul className="divide-y divide-border">
-                {orders.map((order) => (
-                  <li key={order.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-brand-900">Pedido #{order.id}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatOrderDate(order.createdAt)} -{" "}
-                          {producerNames(order) || "Produtor a definir"}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-surface-brand-soft px-3 py-1 text-xs font-medium text-brand-700">
-                        {order.status}
-                      </span>
-                    </div>
-                    <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <Mini label="Total" value={`${formatBRL(order.total)}`} />
-                      <Mini label="Entrega" value={order.deliveryEta || "A combinar"} />
-                    </dl>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-xl bg-canvas p-4 text-sm text-muted-foreground">
-                Nenhum pedido registrado ainda.
-              </p>
-            )}
-          </Panel>
-
-          <Panel title="Sua reputação" icon={Star}>
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center gap-4">
-                <div className="text-center bg-canvas rounded-2xl p-4 min-w-[100px] border border-border shadow-xs">
-                  <p className="text-4xl font-black text-brand-900">{avgRating}</p>
-                  <p className="mt-1 text-[10px] uppercase font-semibold text-muted-foreground">
-                    {totalRatings} avaliações
-                  </p>
-                </div>
-                <div className="flex-1">
-                  <div className="flex gap-1 text-amber-500 mb-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className="h-5 w-5"
-                        fill={star <= Math.round(Number(avgRating)) ? "currentColor" : "none"}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sua pontuação média baseada nas avaliações enviadas pelos produtores após a
-                    entrega.
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4">
-                <h3 className="text-sm font-semibold text-brand-900 mb-3">
-                  Últimas avaliações dos produtores
-                </h3>
-                {ratings.length ? (
-                  <ul className="space-y-3">
-                    {ratings.slice(0, 3).map((r) => (
-                      <li
-                        key={r.id}
-                        className="rounded-xl bg-canvas p-3 border border-border shadow-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-xs text-brand-900">
-                            {r.producerName || "Produtor"}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {formatOrderDate(r.createdAt)}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex gap-0.5 text-amber-500">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className="h-3.5 w-3.5"
-                              fill={star <= r.rating ? "currentColor" : "none"}
-                            />
-                          ))}
-                        </div>
-                        {r.comment && (
-                          <p className="mt-1.5 text-xs text-brand-800 italic">"{r.comment}"</p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">
-                    Você ainda não recebeu avaliações.
-                  </p>
-                )}
-              </div>
-            </div>
-          </Panel>
-        </section>
-
-        <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Produtos mais comprados" icon={TrendingDown}>
-            {productSummary.length ? (
-              <ul className="space-y-3">
-                {productSummary.map((item) => (
-                  <li
-                    key={item.name}
-                    className="flex items-center justify-between rounded-xl bg-canvas px-4 py-3"
-                  >
-                    <span className="font-medium text-brand-900">{item.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.quantity.toLocaleString("pt-BR")} {item.unit}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-xl bg-canvas p-4 text-sm text-muted-foreground">
-                Os produtos mais comprados aparecem depois do primeiro pedido.
-              </p>
-            )}
-          </Panel>
-
-          <div className="space-y-6">
-            <Panel title="Pedido recorrente" icon={Repeat}>
-              <div className="rounded-xl border border-[var(--border-strong)] bg-surface-brand-soft p-4">
-                <p className="text-sm font-semibold text-brand-900">Pedidos recorrentes</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Acompanhe modelos salvos e pedidos frequentes na área de pedidos.
-                </p>
-                <Link
-                  to="/orders"
-                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-                >
-                  Ver recorrentes
-                </Link>
-              </div>
-            </Panel>
-
-            <Panel title="Contato principal" icon={Phone}>
-              <p className="text-sm text-muted-foreground">
-                Confirmações de pedido e entrega serão enviadas para{" "}
-                {details.phone || "o telefone cadastrado"}.
-              </p>
-            </Panel>
-          </div>
-        </section>
-        <PushSettings />
-      </main>
-    </div>
+    details.postalCode.replace(/\D/g, "").length === 8 &&
+    Boolean(details.addressLine.trim()) &&
+    Boolean(details.neighborhood.trim()) &&
+    Boolean(details.city.trim()) &&
+    /^[A-Za-z]{2}$/.test(details.state.trim())
   );
 }
 
-function BuyerDetailsPanel({
-  details,
-  onSave,
-  saving,
-}: {
-  details: BuyerProfileDetails;
-  onSave: (details: BuyerProfileDetails) => Promise<void>;
-  saving: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(details);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+function BuyerProfile() {
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { details, saveDetails, saving, error, reload } = useBuyerProfileDetails();
+  const { orders } = useOrders();
+  const { ratings } = useBuyerRatings();
+  const { recurringOrders, toggleRecurringOrder, removeRecurringOrder } = useRecurringOrders();
+  const products = useAvailableProducts();
+  const { replaceCart } = useCart();
+  const [sheet, setSheet] = useState<SheetName | null>(null);
+  const [payment, setPayment] = useState("A combinar");
 
   useEffect(() => {
-    setDraft(details);
-  }, [details]);
+    setPayment(readPaymentPreference() ?? "A combinar");
+    if (window.location.hash === "#endereco") setSheet("address");
+  }, []);
+
+  const active = orders.filter((order) => order.status !== "Cancelado");
+  const bought = active.reduce((sum, order) => sum + order.total, 0);
+  const average = ratings.length
+    ? (ratings.reduce((sum, rating) => sum + rating.rating, 0) / ratings.length).toLocaleString(
+        "pt-BR",
+        { maximumFractionDigits: 1 },
+      )
+    : "—";
+  const addressReady = hasAddress(details);
+  const location = [details.city, details.state].filter(Boolean).join(", ");
+  const activeRecurring = recurringOrders.filter((order) => order.active);
+
+  const loadRecurring = (order: RecurringOrder) => {
+    const available = new Set(products.map((product) => product.id));
+    const cart: Record<string, number> = {};
+    for (const item of order.items)
+      if (available.has(item.productId)) cart[item.productId] = item.quantity;
+    if (!Object.keys(cart).length) {
+      toast.error("Nenhum item desta lista está disponível no estoque atual.");
+      return;
+    }
+    replaceCart(cart, {});
+    toast.success("Lista recorrente carregada para revisão.");
+    void navigate({ to: "/order" });
+  };
+
+  return (
+    <>
+      <Navbar />
+      <div className="m-screen m-s-11-perfil">
+        <div className="m-status" />
+        <div className="m-hd m-big">
+          <h1>Perfil</h1>
+          <button
+            type="button"
+            className="m-round"
+            aria-label="Ajustes"
+            onClick={() => setSheet("settings")}
+          >
+            <Settings className="lucide" aria-hidden />
+          </button>
+        </div>
+
+        {error && (
+          <div className="m-pad">
+            <DataLoadError message={error} onRetry={reload} />
+          </div>
+        )}
+
+        <div className="m-me m-card">
+          <span className="m-avatar m-big">
+            {initials(details.companyName || profile?.nome) || "?"}
+          </span>
+          <div>
+            <b>{details.companyName || profile?.nome || "Seu estabelecimento"}</b>
+            <span>
+              {[details.responsibleName || profile?.nome, location].filter(Boolean).join(" · ")}
+            </span>
+            <span className="m-chip m-leaf" style={{ marginTop: "8px" }}>
+              <BadgeCheck className="lucide" aria-hidden />
+              Comprador verificado
+            </span>
+          </div>
+        </div>
+
+        <div className="m-kp">
+          <div className="m-card">
+            <b>{active.length}</b>
+            <span>solicitações</span>
+          </div>
+          <div className="m-card">
+            <b>{formatCompactBRL(bought)}</b>
+            <span>comprados</span>
+          </div>
+          <div className="m-card">
+            <b>{average}</b>
+            <span>nota média</span>
+          </div>
+        </div>
+
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<MapPin className="lucide" aria-hidden />}
+            title="Endereço de entrega"
+            subtitle={
+              addressReady
+                ? `${details.addressLine}${details.addressNumber ? `, ${details.addressNumber}` : ""} · ${details.neighborhood}`
+                : "Pendente — complete para enviar pedidos"
+            }
+            warn={!addressReady}
+            onClick={() => setSheet("address")}
+          />
+          <ListRow
+            icon={<Store className="lucide" aria-hidden />}
+            title="Dados do estabelecimento"
+            subtitle="CNPJ, tipo e responsável"
+            onClick={() => setSheet("company")}
+          />
+          <ListRow
+            icon={<Wallet className="lucide" aria-hidden />}
+            title="Pagamento preferido"
+            subtitle={payment}
+            onClick={() => setSheet("payment")}
+          />
+          <ListRow
+            icon={<Repeat className="lucide" aria-hidden />}
+            title="Pedidos recorrentes"
+            subtitle={
+              recurringOrders.length
+                ? `${recurringOrders.length} ${recurringOrders.length === 1 ? "lista salva" : "listas salvas"}${activeRecurring[0]?.preferredDeliveryDay ? ` · ${activeRecurring[0].preferredDeliveryDay}` : ""}`
+                : "Nenhuma lista salva"
+            }
+            onClick={() => setSheet("recurring")}
+          />
+        </div>
+
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<Bell className="lucide" aria-hidden />}
+            title="Notificações"
+            subtitle="Pedidos, mensagens e prazos"
+            onClick={() => setSheet("notifications")}
+          />
+          <ListRow
+            icon={<LifeBuoy className="lucide" aria-hidden />}
+            title="Suporte"
+            subtitle="WhatsApp da equipe Origem"
+            href={supportHref}
+          />
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: "6px" }}>
+          <button
+            type="button"
+            className="m-btn m-text"
+            style={{ color: "var(--m-danger-700)" }}
+            onClick={() => void signOut()}
+          >
+            <LogOut className="lucide" aria-hidden />
+            Sair da conta
+          </button>
+        </div>
+      </div>
+
+      <DetailsSheet
+        open={sheet === "address" || sheet === "company"}
+        mode={sheet === "address" ? "address" : "company"}
+        details={details}
+        saving={saving}
+        onClose={() => setSheet(null)}
+        onSave={async (next) => {
+          await saveDetails(next);
+          toast.success(sheet === "address" ? "Endereço salvo" : "Dados atualizados");
+          setSheet(null);
+        }}
+      />
+
+      <Sheet open={sheet === "payment"} title="Pagamento preferido" onClose={() => setSheet(null)}>
+        <p className="m-note" style={{ marginTop: 0, marginBottom: 14 }}>
+          Vem marcado nas suas próximas listas. O pagamento é sempre combinado com o produtor.
+        </p>
+        <div className="m-opts" role="radiogroup" aria-label="Pagamento preferido">
+          {PAYMENT_METHODS.map((method) => (
+            <button
+              key={method}
+              type="button"
+              role="radio"
+              aria-checked={payment === method}
+              className={`m-pill${payment === method ? " m-sel" : ""}`}
+              onClick={() => {
+                setPayment(method);
+                writePaymentPreference(method);
+              }}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={sheet === "recurring"}
+        title="Pedidos recorrentes"
+        onClose={() => setSheet(null)}
+      >
+        {recurringOrders.length === 0 ? (
+          <p className="m-note">
+            Salve uma lista de interesse como recorrente (menu “…” da lista) para repetir com um
+            toque.
+          </p>
+        ) : (
+          recurringOrders.map((order) => (
+            <div key={order.id} className="m-subcard">
+              <div className="m-subcard-hd">
+                <span>
+                  {order.name}
+                  <small className="m-sub2">
+                    {order.items.length} {order.items.length === 1 ? "item" : "itens"} ·{" "}
+                    {order.frequency} · {order.active ? "ativo" : "pausado"}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeRecurringOrder(order.id)}
+                  aria-label={`Excluir ${order.name}`}
+                >
+                  <Trash2 className="lucide" aria-hidden />
+                </button>
+              </div>
+              <div className="m-opts" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="m-btn m-primary m-sm"
+                  onClick={() => loadRecurring(order)}
+                >
+                  <Repeat className="lucide" aria-hidden />
+                  Carregar
+                </button>
+                <button
+                  type="button"
+                  className="m-btn m-secondary m-sm"
+                  onClick={() => toggleRecurringOrder(order.id)}
+                >
+                  {order.active ? (
+                    <Pause className="lucide" aria-hidden />
+                  ) : (
+                    <Play className="lucide" aria-hidden />
+                  )}
+                  {order.active ? "Pausar" : "Ativar"}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </Sheet>
+
+      <Sheet open={sheet === "notifications"} title="Notificações" onClose={() => setSheet(null)}>
+        <PushSettings />
+      </Sheet>
+
+      <Sheet open={sheet === "settings"} title="Ajustes" onClose={() => setSheet(null)}>
+        <span className="m-lbl">Tamanho do texto</span>
+        <TextSizeOptions />
+      </Sheet>
+    </>
+  );
+}
+
+function DetailsSheet({
+  open,
+  mode,
+  details,
+  saving,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  mode: "address" | "company";
+  details: BuyerProfileDetails;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (details: BuyerProfileDetails) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(details);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (open) {
+      setDraft(details);
+      setError("");
+    }
+  }, [details, open]);
+  const set = (patch: Partial<BuyerProfileDetails>) =>
+    setDraft((current) => ({ ...current, ...patch }));
+  const field = (
+    label: string,
+    key: keyof BuyerProfileDetails,
+    extra: React.InputHTMLAttributes<HTMLInputElement> = {},
+  ) => (
+    <label className="m-field">
+      <span>{label}</span>
+      <div className="m-in">
+        <input
+          value={draft[key]}
+          onChange={(event) => set({ [key]: event.target.value })}
+          {...extra}
+        />
+      </div>
+    </label>
+  );
+  const types = useMemo(
+    () =>
+      draft.businessType && !BUSINESS_TYPES.includes(draft.businessType)
+        ? [...BUSINESS_TYPES, draft.businessType]
+        : BUSINESS_TYPES,
+    [draft.businessType],
+  );
 
   const save = async () => {
     setError("");
     try {
       await onSave(draft);
-      setEditing(false);
-      setNotice("Dados da empresa atualizados.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível salvar os dados.");
+      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
     }
   };
 
   return (
-    <Panel title="Dados do estabelecimento" icon={Building2}>
-      {!editing ? (
-        <div>
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Mini label="Nome fantasia" value={details.companyName || "Não informado"} />
-            <Mini label="Tipo" value={details.businessType || "Não informado"} />
-            <Mini label="CNPJ" value={details.cnpj || "Não informado"} />
-            <Mini label="Responsável" value={details.responsibleName || "Não informado"} />
-            <Mini label="Telefone" value={details.phone || "Não informado"} />
-            <Mini
-              label="Endereço de entrega"
-              value={formatBuyerAddress(details) || "Não informado"}
-            />
-            <Mini label="Cidade" value={details.city || "Não informado"} />
-            <Mini label="Estado" value={details.state || "Não informado"} />
-          </dl>
-          {notice && (
-            <p className="mt-4 text-sm font-semibold text-[var(--color-success-fg)]">{notice}</p>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setNotice("");
-              setError("");
-              setEditing(true);
-            }}
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-          >
-            <Pencil className="h-4 w-4 text-leaf-700" />
-            Editar dados
-          </button>
-        </div>
+    <Sheet
+      open={open}
+      title={mode === "address" ? "Endereço de entrega" : "Dados do estabelecimento"}
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          className="m-btn m-primary"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+      }
+    >
+      {mode === "address" ? (
+        <>
+          {field("CEP", "postalCode", { inputMode: "numeric", placeholder: "00000-000" })}
+          {field("Rua ou avenida", "addressLine")}
+          <div className="m-row2">
+            {field("Número", "addressNumber", { inputMode: "numeric" })}
+            {field("Complemento", "addressComplement", { placeholder: "Opcional" })}
+          </div>
+          {field("Bairro", "neighborhood")}
+          <div className="m-row2">
+            {field("Cidade", "city")}
+            {field("UF", "state", { maxLength: 2, placeholder: "PI" })}
+          </div>
+          <p className="m-note">Só os produtores do seu pedido veem este endereço.</p>
+        </>
       ) : (
-        <div className="grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              icon={Building2}
-              label="Nome fantasia"
-              value={draft.companyName}
-              onChange={(companyName) => setDraft({ ...draft, companyName })}
-            />
-            <TextField
-              icon={ShoppingBasket}
-              label="Tipo de empresa"
-              value={draft.businessType}
-              onChange={(businessType) => setDraft({ ...draft, businessType })}
-            />
-            <TextField
-              icon={Building2}
-              label="CNPJ"
-              value={draft.cnpj}
-              onChange={(cnpj) => setDraft({ ...draft, cnpj })}
-              placeholder="Digite o CNPJ"
-            />
-            <TextField
-              icon={User}
-              label="Responsável"
-              value={draft.responsibleName}
-              onChange={(responsibleName) => setDraft({ ...draft, responsibleName })}
-            />
-            <TextField
-              icon={Phone}
-              label="Telefone/WhatsApp"
-              value={draft.phone}
-              onChange={(phone) => setDraft({ ...draft, phone })}
-            />
-            <TextField
-              icon={MapPin}
-              label="CEP"
-              value={draft.postalCode}
-              onChange={(postalCode) => setDraft({ ...draft, postalCode })}
-              placeholder="00000-000"
-            />
-            <TextField
-              icon={MapPin}
-              label="Logradouro"
-              value={draft.addressLine}
-              onChange={(addressLine) => setDraft({ ...draft, addressLine })}
-              placeholder="Rua, avenida..."
-            />
-            <TextField
-              icon={MapPin}
-              label="Número"
-              value={draft.addressNumber}
-              onChange={(addressNumber) => setDraft({ ...draft, addressNumber })}
-              placeholder="123"
-            />
-            <TextField
-              icon={MapPin}
-              label="Complemento"
-              value={draft.addressComplement}
-              onChange={(addressComplement) => setDraft({ ...draft, addressComplement })}
-              placeholder="Sala, bloco..."
-            />
-            <TextField
-              icon={MapPin}
-              label="Bairro"
-              value={draft.neighborhood}
-              onChange={(neighborhood) => setDraft({ ...draft, neighborhood })}
-            />
-            <TextField
-              icon={MapPin}
-              label="Cidade"
-              value={draft.city}
-              onChange={(city) => setDraft({ ...draft, city })}
-            />
-            <TextField
-              icon={MapPin}
-              label="Estado"
-              value={draft.state}
-              onChange={(state) => setDraft({ ...draft, state })}
-              placeholder="SP"
-            />
+        <>
+          {field("Nome do estabelecimento", "companyName")}
+          <div className="m-field">
+            <span>Tipo</span>
+            <div className="m-pills">
+              {types.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  aria-pressed={draft.businessType === type}
+                  className={`m-pill${draft.businessType === type ? " m-on" : ""}`}
+                  onClick={() => set({ businessType: type })}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </div>
-          {error && (
-            <p className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Salvando..." : "Salvar dados"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDraft(details);
-                setError("");
-                setEditing(false);
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-            >
-              <X className="h-4 w-4" />
-              Cancelar
-            </button>
-          </div>
-        </div>
+          {field("CNPJ", "cnpj", { inputMode: "numeric", placeholder: "00.000.000/0000-00" })}
+          {field("Responsável pelas compras", "responsibleName", { placeholder: "Nome completo" })}
+          {field("Telefone / WhatsApp", "phone", {
+            inputMode: "tel",
+            placeholder: "(86) 90000-0000",
+          })}
+        </>
       )}
-    </Panel>
-  );
-}
-
-function formatBuyerAddress(details: BuyerProfileDetails) {
-  const street = [details.addressLine, details.addressNumber].filter(Boolean).join(", ");
-  return [street, details.addressComplement, details.neighborhood, details.city, details.state]
-    .filter(Boolean)
-    .join(" - ");
-}
-
-function summarizeProducts(orders: SavedOrder[]) {
-  const totals = new Map<string, { name: string; quantity: number; unit: string }>();
-
-  for (const order of orders) {
-    for (const item of order.items) {
-      const key = `${item.productName}-${item.unit}`;
-      const current = totals.get(key) ?? {
-        name: item.productName,
-        quantity: 0,
-        unit: item.unit,
-      };
-      current.quantity += Number(item.quantity || 0);
-      totals.set(key, current);
-    }
-  }
-
-  return Array.from(totals.values())
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 4);
-}
-
-function producerNames(order: SavedOrder) {
-  return Array.from(new Set(order.items.map((item) => item.producerName).filter(Boolean))).join(
-    ", ",
-  );
-}
-
-function TextField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-brand-900">{label}</span>
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-white px-3 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-100">
-        <Icon className="h-4 w-4 text-leaf-700" />
-        <input
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className="h-11 w-full bg-transparent text-sm text-brand-900 focus:outline-none"
-        />
-      </div>
-    </label>
-  );
-}
-
-function Panel({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-white p-5 shadow-xs sm:p-6">
-      <h2 className="inline-flex items-center gap-2 text-base font-semibold text-brand-900">
-        <Icon className="h-4 w-4 text-leaf-700" />
-        {title}
-      </h2>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
-      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
-    </div>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm font-semibold text-brand-900">{value}</dd>
-    </div>
+      {error && (
+        <p className="m-field">
+          <small className="m-err">{error}</small>
+        </p>
+      )}
+    </Sheet>
   );
 }

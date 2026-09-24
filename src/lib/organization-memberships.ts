@@ -1,3 +1,4 @@
+import { readDemoList } from "@/lib/demo-store";
 import { assertSupabaseConfigured, supabase, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
@@ -86,6 +87,11 @@ export function useMemberships(organizationId?: string) {
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     if (!supabase) {
+      setMemberships(
+        (readDemoList<Membership>("memberships") ?? []).filter(
+          (membership) => !organizationId || membership.organizationId === organizationId,
+        ),
+      );
       setLoading(false);
       return;
     }

@@ -1,43 +1,51 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { FormSection } from "@/components/forms/FormSection";
 import { PushSettings } from "@/components/notifications/PushSettings";
 import { ProducerMemberships } from "@/components/organizations/ProducerMemberships";
-import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
+import { DataLoadError } from "@/components/system/DataLoadState";
+import { supportHref } from "@/lib/support";
+import { ListRow, TextSizeOptions } from "@/components/mobile/ProfileParts";
+import { Sheet } from "@/components/mobile/Sheet";
+import { InstallButton } from "@/components/pwa/InstallButton";
+import { getProducerId } from "@/lib/orders";
+import { readLocalRatings } from "@/lib/ratings";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { formatOrderDate, type SavedOrder, useOrders } from "@/lib/orders";
+import { type SavedOrder, useOrders } from "@/lib/orders";
 import {
   hasMissingProducerProducts,
   type ProducerProfileDetails,
   useProducerProfileDetails,
 } from "@/lib/producer-profile";
-import { useProducerStock } from "@/lib/producer-stock";
 import { requestCatalogProduct } from "@/lib/product-catalog";
 import { CepLookupError, lookupAddressByCep } from "@/lib/cep";
 import {
-  AlertTriangle,
-  CalendarClock,
-  CircleDollarSign,
+  ArrowLeft,
+  BadgeCheck,
+  Bell,
+  Home,
+  LifeBuoy,
+  LogOut,
+  Settings,
+  Share2,
+  Sparkles,
+  Users,
   MapPin,
   Package,
-  PackageCheck,
   Pencil,
   Phone,
-  RefreshCw,
   Save,
   Search,
-  ShieldCheck,
-  Sprout,
   Store,
-  TrendingUp,
-  Truck,
   User,
   X,
-} from "lucide-react";
+} from "@/components/mobile/icons";
 import { useEffect, useRef, useState } from "react";
-import { formatBRL } from "@/lib/format";
+import { initials } from "@/lib/format";
 
 export const Route = createFileRoute("/profile/producer")({
   component: () => (
@@ -48,11 +56,10 @@ export const Route = createFileRoute("/profile/producer")({
 });
 
 const PRODUCER_ID = "produtor";
-const PRODUCER_NAME = "Produtor";
 
 function ProducerProfile() {
-  const [editProductsRequested, setEditProductsRequested] = useState(false);
-  const { profile, isSupabaseConfigured } = useAuth();
+  const { profile, isSupabaseConfigured, signOut } = useAuth();
+  const router = useRouter();
   const {
     details,
     saveDetails,
@@ -61,254 +68,252 @@ function ProducerProfile() {
     error: profileError,
     reload: reloadProfile,
   } = useProducerProfileDetails();
-  const [stock, , stockResource] = useProducerStock();
-  const { orders, loading: ordersLoading, error: ordersError, reload: reloadOrders } = useOrders();
-  const producerName =
-    details.propertyName || (profile?.tipo === "produtor" ? profile.nome : PRODUCER_NAME);
+  const { orders } = useOrders();
+  const [sheet, setSheet] = useState<
+    "details" | "memberships" | "notifications" | "settings" | null
+  >(null);
+  const [ratingAverage, setRatingAverage] = useState<string>("—");
+  const [editProductsRequested, setEditProductsRequested] = useState(false);
 
-  const activeStock = stock.filter((item) => item.status === "ativo");
-  const pausedStock = stock.filter((item) => item.status === "pausado");
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("edit") === "products";
+    setEditProductsRequested(requested);
+    if (requested) setSheet("details");
+  }, []);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let active = true;
+    void (async () => {
+      const producerId = await getProducerId(profile.id);
+      if (!producerId) return;
+      let values: number[] = [];
+      if (supabase && isSupabaseConfigured) {
+        const { data } = await supabase
+          .from("buyer_ratings")
+          .select("rating")
+          .eq("producer_id", producerId);
+        values = (data ?? []).map((row: { rating: number }) => row.rating);
+      } else {
+        values = readLocalRatings()
+          .filter((rating) => rating.producerId === producerId)
+          .map((rating) => rating.rating);
+      }
+      if (active && values.length)
+        setRatingAverage(
+          (values.reduce((sum, value) => sum + value, 0) / values.length).toLocaleString("pt-BR", {
+            maximumFractionDigits: 1,
+          }),
+        );
+    })().catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [profile, isSupabaseConfigured]);
+
   const producerOrders = getProducerOrders(
     orders,
     Boolean(isSupabaseConfigured && profile?.tipo === "produtor"),
   );
-  const activeOrders = producerOrders.filter((order) => order.status !== "Cancelado");
-  const openOrders = activeOrders.filter((order) => order.status !== "Entregue");
-  const deliveredOrders = activeOrders.filter((order) => order.status === "Entregue");
-  const stockPotential = activeStock.reduce(
-    (sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0),
-    0,
+  const finished = producerOrders.filter((order) => order.status !== "Cancelado");
+  const delivered = finished.filter((order) => order.status === "Entregue");
+  const onTime = delivered.filter(
+    (order) =>
+      !order.deliveryAt ||
+      !order.deliveredAt ||
+      new Date(order.deliveredAt).getTime() <= new Date(order.deliveryAt).getTime() + 2 * 36e5,
   );
-  const orderRevenue = activeOrders.reduce((sum, order) => sum + producerOrderTotal(order), 0);
-  const deliveryRate = activeOrders.length
-    ? Math.round((deliveredOrders.length / activeOrders.length) * 100)
-    : 0;
-  const topProducts = productSummary(producerOrders);
-  const activity = buildActivity(producerOrders, stock);
+  const onTimeRate = delivered.length
+    ? `${Math.round((onTime.length / delivered.length) * 100)}%`
+    : "—";
+  const missing = getMissingProducerProfileFields(details);
+  const address = formatProducerAddress(details);
+  const name = details.propertyName || profile?.nome || "Sua propriedade";
 
-  useEffect(() => {
-    setEditProductsRequested(
-      new URLSearchParams(window.location.search).get("edit") === "products",
-    );
-  }, []);
+  const back = () => {
+    if (window.history.length > 1) router.history.back();
+    else void router.navigate({ to: "/producer/orders" });
+  };
+  const share = async () => {
+    const text = `${name} — ${details.location || ""} no Origem Conecta`;
+    try {
+      if (navigator.share)
+        await navigator.share({ title: name, text, url: window.location.origin });
+      else {
+        await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
+        toast.success("Link copiado");
+      }
+    } catch {
+      /* compartilhamento cancelado */
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-6 pb-24 sm:px-8 sm:py-10 md:pb-10">
-        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Painel do produtor
-        </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              {producerName}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Produtor verificado - {details.location || "localização pendente"}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/producer/orders"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
+      <div className="m-screen m-s-p5-perfil">
+        <div className="m-cover">
+          <img src="/img/campo.jpg" alt="" />
+          <div className="m-veil" />
+          <div className="m-status" />
+          <div className="m-cb">
+            <button type="button" className="m-round m-glass" onClick={back} aria-label="Voltar">
+              <ArrowLeft className="lucide" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="m-round m-glass"
+              onClick={() => void share()}
+              aria-label="Compartilhar perfil"
             >
-              <Store className="h-3.5 w-3.5 text-leaf-600" />
-              Ver negociações recebidas
-            </Link>
-            <Link
-              to="/production"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-leaf-500 hover:text-brand-900"
-            >
-              <Sprout className="h-3.5 w-3.5 text-leaf-600" />
-              Gerenciar estoque
-            </Link>
+              <Share2 className="lucide" aria-hidden />
+            </button>
           </div>
         </div>
 
-        {(profileLoading || stockResource.loading || ordersLoading) &&
-          !profileError &&
-          !stockResource.error &&
-          !ordersError && (
-            <div className="mt-6">
-              <DataLoading label="Atualizando seu painel..." />
+        <div className="m-me m-card">
+          <div className="m-top">
+            <span className="m-avatar m-big" style={{ border: "3px solid #fff" }}>
+              {initials(name) || "?"}
+            </span>
+            {details.commercialVerificationStatus === "verified" && (
+              <span className="m-chip m-leaf">
+                <BadgeCheck className="lucide" aria-hidden />
+                Verificado
+              </span>
+            )}
+          </div>
+          <b>{name}</b>
+          <span>
+            {[details.responsibleName, details.location].filter(Boolean).join(" · ") ||
+              "Complete os dados da propriedade"}
+          </span>
+          <div className="m-kp">
+            <div>
+              <strong>{onTimeRate}</strong>
+              <em>no prazo</em>
             </div>
-          )}
+            <div>
+              <strong>{ratingAverage}</strong>
+              <em>nota</em>
+            </div>
+            <div>
+              <strong>{delivered.length}</strong>
+              <em>entregas</em>
+            </div>
+          </div>
+        </div>
+
         {profileError && (
-          <div className="mt-6">
+          <div className="m-pad">
             <DataLoadError message={profileError} onRetry={reloadProfile} />
           </div>
         )}
-        {stockResource.error && (
-          <div className="mt-6">
-            <DataLoadError message={stockResource.error} onRetry={stockResource.reload} />
-          </div>
-        )}
-        {ordersError && (
-          <div className="mt-6">
-            <DataLoadError message={ordersError} onRetry={reloadOrders} />
-          </div>
-        )}
 
-        <section className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
-          <Metric icon={Truck} label="Negociações em andamento" value={`${openOrders.length}`} />
-          <Metric
-            icon={CircleDollarSign}
-            label="Valor anunciado nas solicitações"
-            value={`${formatBRL(orderRevenue)}`}
-          />
-          <Metric
-            icon={ShieldCheck}
-            label="Negociações concluídas"
-            value={producerOrders.length ? `${deliveryRate}%` : "Sem dados"}
-          />
-        </section>
-
-        {!profileLoading && !profileError && (
-          <section className="mt-6">
-            <ProducerDetailsPanel
-              details={details}
-              onSave={saveDetails}
-              saving={saving}
-              focusProductsOnLoad={editProductsRequested}
-            />
-          </section>
-        )}
-
-        <ProducerMemberships />
-
-        <section className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Panel title="Estoque publicado" icon={Package}>
-            {stock.length === 0 ? (
-              <EmptyMessage text="Nenhum produto cadastrado no estoque." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {stock.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
-                  >
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-brand-900">{item.product}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            item.status === "ativo"
-                              ? "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]"
-                              : "bg-surface-muted text-muted-foreground"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.notes || "Sem observações adicionais"}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-brand-900">
-                        {item.quantity || "0"} {item.unit}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatBRL(Number(item.price || 0))}/{item.unit}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link
-              to="/production"
-              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-leaf-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 active:scale-[0.99] sm:w-auto"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Atualizar disponibilidade
-            </Link>
-          </Panel>
-
-          <Panel title="Produtos mais vendidos" icon={TrendingUp}>
-            {topProducts.length === 0 ? (
-              <EmptyMessage text="Os produtos mais vendidos aparecem depois do primeiro pedido." />
-            ) : (
-              <ul className="space-y-3">
-                {topProducts.map((product) => (
-                  <li key={product.name} className="rounded-xl border border-border bg-canvas p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-brand-900">{product.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {product.quantity} {product.unit} vendidos
-                        </p>
-                      </div>
-                      <p className="text-sm font-bold text-brand-900">{formatBRL(product.total)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        </section>
-
-        <section className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Panel title="Resumo operacional" icon={PackageCheck}>
-            <dl className="grid gap-4">
-              <Mini label="Potencial do estoque ativo" value={`${formatBRL(stockPotential)}`} />
-              <Mini label="Pedidos recebidos" value={`${producerOrders.length}`} />
-              <Mini label="Produtos pausados" value={`${pausedStock.length}`} />
-              <Mini label="Próxima entrega" value={nextDeliveryLabel(openOrders)} />
-            </dl>
-          </Panel>
-
-          <Panel title="Alertas de operação" icon={AlertTriangle}>
-            <div className="space-y-3">
-              {openOrders.length > 0 && (
-                <Alert
-                  title="Pedidos aguardando ação"
-                  text={`${openOrders.length} pedido(s) ainda em andamento.`}
-                />
-              )}
-              {pausedStock.length > 0 && (
-                <Alert
-                  title="Produtos pausados"
-                  text={`${pausedStock.length} produto(s) fora do portfólio.`}
-                />
-              )}
-              {activeStock.length === 0 && (
-                <Alert
-                  title="Sem estoque ativo"
-                  text="Publique ao menos um produto para aparecer ao comprador."
-                />
-              )}
-              {openOrders.length === 0 && pausedStock.length === 0 && activeStock.length > 0 && (
-                <Alert
-                  title="Operação em dia"
-                  text="Estoque ativo e nenhum pedido pendente no momento."
-                />
-              )}
+        {!profileLoading && missing.length > 0 && (
+          <button type="button" className="m-alert" onClick={() => setSheet("details")}>
+            <Sparkles className="lucide" aria-hidden />
+            <div>
+              <b>Complete seu perfil</b>
+              <span>
+                Falta {missing.slice(0, 2).join(" e ")}
+                {missing.length > 2 ? ` e mais ${missing.length - 2}` : ""} para aparecer em
+                destaque.
+              </span>
             </div>
-          </Panel>
+          </button>
+        )}
 
-          <Panel title="Histórico operacional" icon={CalendarClock}>
-            {activity.length === 0 ? (
-              <EmptyMessage text="As movimentacoes aparecem quando houver estoque ou pedidos." />
-            ) : (
-              <ul className="space-y-3">
-                {activity.map((event) => (
-                  <li
-                    key={event}
-                    className="rounded-xl bg-canvas px-4 py-3 text-sm font-medium text-brand-900"
-                  >
-                    {event}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        </section>
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<Home className="lucide" aria-hidden />}
+            title="Dados da propriedade"
+            subtitle="Área, responsável, CAEPF"
+            warn={missing.length > 0}
+            onClick={() => setSheet("details")}
+          />
+          <ListRow
+            icon={<Store className="lucide" aria-hidden />}
+            title="Como você vende"
+            subtitle={commercializationLabel(details.commercializationMode)}
+            onClick={() => setSheet("details")}
+          />
+          <ListRow
+            icon={<Users className="lucide" aria-hidden />}
+            title="Cooperativas"
+            subtitle="Vínculos e convites"
+            onClick={() => setSheet("memberships")}
+          />
+          <ListRow
+            icon={<MapPin className="lucide" aria-hidden />}
+            title="Local de coleta"
+            subtitle={address || "Informe o endereço de coleta"}
+            onClick={() => setSheet("details")}
+          />
+          <ListRow
+            icon={<Bell className="lucide" aria-hidden />}
+            title="Notificações"
+            subtitle="Pedidos, demandas e mensagens"
+            onClick={() => setSheet("notifications")}
+          />
+        </div>
+
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<Settings className="lucide" aria-hidden />}
+            title="Ajustes"
+            subtitle="Tamanho do texto e instalar o app"
+            onClick={() => setSheet("settings")}
+          />
+          <ListRow
+            icon={<LifeBuoy className="lucide" aria-hidden />}
+            title="Suporte"
+            subtitle="WhatsApp da equipe Origem"
+            href={supportHref}
+          />
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: "6px" }}>
+          <button
+            type="button"
+            className="m-btn m-text"
+            style={{ color: "var(--m-danger-700)" }}
+            onClick={() => void signOut()}
+          >
+            <LogOut className="lucide" aria-hidden />
+            Sair da conta
+          </button>
+        </div>
+      </div>
+
+      <Sheet open={sheet === "details"} title="Dados da propriedade" onClose={() => setSheet(null)}>
+        <div className="m-legacy">
+          <ProducerDetailsPanel
+            details={details}
+            onSave={async (next) => {
+              await saveDetails(next);
+              toast.success("Dados da propriedade salvos");
+            }}
+            saving={saving}
+            focusProductsOnLoad={editProductsRequested}
+          />
+        </div>
+      </Sheet>
+      <Sheet open={sheet === "memberships"} title="Cooperativas" onClose={() => setSheet(null)}>
+        <div className="m-legacy">
+          <ProducerMemberships />
+        </div>
+      </Sheet>
+      <Sheet open={sheet === "notifications"} title="Notificações" onClose={() => setSheet(null)}>
         <PushSettings />
-      </main>
-    </div>
+      </Sheet>
+      <Sheet open={sheet === "settings"} title="Ajustes" onClose={() => setSheet(null)}>
+        <span className="m-lbl">Tamanho do texto</span>
+        <TextSizeOptions />
+        <span className="m-lbl">Aplicativo</span>
+        <InstallButton variant="compact" />
+      </Sheet>
+    </>
   );
 }
 
@@ -320,45 +325,6 @@ function getProducerOrders(orders: SavedOrder[], alreadyScoped: boolean) {
       items: order.items.filter((item) => item.producerId === PRODUCER_ID),
     }))
     .filter((order) => order.items.length > 0);
-}
-
-function producerOrderTotal(order: SavedOrder) {
-  return order.items.reduce((sum, item) => sum + item.lineTotal, 0);
-}
-
-function productSummary(orders: SavedOrder[]) {
-  const map = new Map<string, { name: string; quantity: number; unit: string; total: number }>();
-  for (const order of orders) {
-    for (const item of order.items) {
-      const current = map.get(item.productName) ?? {
-        name: item.productName,
-        quantity: 0,
-        unit: item.unit,
-        total: 0,
-      };
-      current.quantity += item.quantity;
-      current.total += item.lineTotal;
-      map.set(item.productName, current);
-    }
-  }
-  return Array.from(map.values())
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-}
-
-function nextDeliveryLabel(orders: SavedOrder[]) {
-  if (!orders.length) return "Sem pedidos abertos";
-  return orders[0].deliveryEta;
-}
-
-function buildActivity(orders: SavedOrder[], stock: { product: string; status: string }[]) {
-  const orderEvents = orders.slice(0, 3).map((order) => {
-    return `Pedido #${order.id} - ${order.status} - ${formatOrderDate(order.createdAt)}`;
-  });
-  const stockEvents = stock.slice(0, 2).map((item) => {
-    return `${item.product} ${item.status === "ativo" ? "publicado" : "pausado"} no estoque`;
-  });
-  return [...orderEvents, ...stockEvents].slice(0, 5);
 }
 
 function ProducerDetailsPanel({
@@ -938,28 +904,6 @@ function Panel({
   );
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
-      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
-    </div>
-  );
-}
-
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -969,17 +913,4 @@ function Mini({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-sm font-semibold text-brand-900">{value}</dd>
     </div>
   );
-}
-
-function Alert({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-canvas p-4">
-      <p className="text-sm font-semibold text-brand-900">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{text}</p>
-    </div>
-  );
-}
-
-function EmptyMessage({ text }: { text: string }) {
-  return <p className="rounded-xl bg-canvas p-4 text-sm text-muted-foreground">{text}</p>;
 }

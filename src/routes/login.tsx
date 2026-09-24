@@ -22,8 +22,11 @@ function Login() {
 
   if (restoringSession) {
     return (
-      <AuthLayout title="Restaurando sua sessão" subtitle="Aguarde um instante...">
-        <p className="text-sm text-muted-foreground">Validando o acesso salvo neste dispositivo.</p>
+      <AuthLayout
+        title="Restaurando sua sessão"
+        subtitle="Validando o acesso salvo neste aparelho."
+      >
+        <span />
       </AuthLayout>
     );
   }
@@ -50,44 +53,26 @@ function Login() {
 
   return (
     <AuthLayout
-      title="Entrar na Origem Conecta"
-      subtitle="Acesse sua conta para acompanhar portfólio, pedidos, solicitações e estoque."
+      title="Entrar"
+      subtitle="Use o e-mail do seu cadastro."
       footer={
-        <div className="space-y-3">
-          <p className="font-medium text-brand-900">Ainda não possui uma conta?</p>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-            <Link to="/signup/buyer" className="font-semibold text-brand-900 hover:underline">
-              Sou comprador
-            </Link>
-            <Link to="/signup/producer" className="font-semibold text-brand-900 hover:underline">
-              Sou produtor
-            </Link>
-            <Link
-              to="/signup/organization"
-              className="font-semibold text-brand-900 hover:underline"
-            >
-              Represento uma cooperativa ou associação
-            </Link>
-          </div>
-        </div>
+        <>
+          Novo por aqui? <Link to="/">Criar conta</Link>
+        </>
       }
     >
       {isDemoMode && (
-        <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-          Ambiente de demonstração ativo. Os dados ficam somente neste navegador e não representam
-          operações reais. E-mails com "produtor" entram como produtor; os demais entram como
-          comprador.
-        </div>
+        <p className="m-notice m-warn">
+          Ambiente de demonstração: os dados ficam só neste navegador. E-mails com "produtor" entram
+          como produtor; os demais, como comprador.
+        </p>
       )}
       {notice && (
-        <p
-          role="status"
-          className="mb-5 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-brand-900"
-        >
+        <p role="status" className="m-notice">
           {notice}
         </p>
       )}
-      <form className="space-y-5" onSubmit={onSubmit}>
+      <form onSubmit={onSubmit}>
         <Field
           name="email"
           label="E-mail"
@@ -104,13 +89,15 @@ function Login() {
           autoComplete="current-password"
           required
         />
-        <div className="flex justify-end">
-          <Link to="/reset" className="text-sm font-medium text-brand-700 hover:underline">
+        <div className="m-forgot">
+          <Link to="/reset" className="m-btn m-text m-sm" style={{ padding: "0 4px" }}>
             Esqueci a senha
           </Link>
         </div>
         <FormError>{error}</FormError>
-        <PrimaryButton loading={loading}>Entrar</PrimaryButton>
+        <PrimaryButton loading={loading} style={{ marginTop: "6px" }}>
+          Entrar
+        </PrimaryButton>
       </form>
     </AuthLayout>
   );

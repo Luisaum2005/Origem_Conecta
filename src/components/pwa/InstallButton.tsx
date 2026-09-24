@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, Smartphone } from "lucide-react";
+import { Download, Smartphone } from "@/components/mobile/icons";
 
 type BIPEvent = Event & {
   prompt: () => Promise<void>;

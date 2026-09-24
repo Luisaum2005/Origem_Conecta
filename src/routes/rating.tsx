@@ -1,10 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Check, CircleCheck, Star, X } from "@/components/mobile/icons";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { ArrowLeft, Check, Star } from "lucide-react";
-import { useState } from "react";
+import { ProductFallback } from "@/components/marketplace/ProductCard";
+import { orderItemsLabel, orderProducersLabel } from "@/lib/order-status";
+import { DataLoading } from "@/components/system/DataLoadState";
+import { useAuth } from "@/lib/auth";
+import { useAvailableProducts } from "@/lib/available-products";
+import { getBuyerId, useOrders } from "@/lib/orders";
+import { createProducerRating, getProducerRatingForOrder } from "@/lib/producer-ratings";
 
 export const Route = createFileRoute("/rating")({
+  validateSearch: (search: Record<string, unknown>): { id?: string } => ({
+    id: typeof search.id === "string" ? search.id : undefined,
+  }),
   component: () => (
     <RequireProfile allowed={["comprador"]}>
       <Rating />
@@ -12,6 +23,7 @@ export const Route = createFileRoute("/rating")({
   ),
 });
 
+const CRITERIA = ["Qualidade dos produtos", "Pontualidade", "Embalagem"] as const;
 const HIGHLIGHTS = [
   "Produto fresco",
   "Bem embalado",
@@ -21,139 +33,219 @@ const HIGHLIGHTS = [
 ];
 
 function Rating() {
+  const { id } = Route.useSearch();
   const navigate = useNavigate();
-  const [quality, setQuality] = useState(0);
-  const [punctuality, setPunctuality] = useState(0);
-  const [done, setDone] = useState(false);
+  const { profile } = useAuth();
+  const { orders, loading } = useOrders();
+  const products = useAvailableProducts();
+  const [scores, setScores] = useState<Record<string, number>>({});
   const [highlights, setHighlights] = useState<string[]>([]);
+  const [comment, setComment] = useState("");
+  const [sending, setSending] = useState(false);
+  const [alreadyRated, setAlreadyRated] = useState(false);
+
+  const order = useMemo(
+    () =>
+      orders.find((item) => item.id === id) ?? orders.find((item) => item.status === "Entregue"),
+    [id, orders],
+  );
+
+  useEffect(() => {
+    const producerId = order?.items[0]?.producerId;
+    if (!order || !producerId) return;
+    let active = true;
+    getProducerRatingForOrder(order.id, producerId)
+      .then((rating) => active && setAlreadyRated(Boolean(rating)))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [order]);
+
+  const close = () => void navigate({ to: "/orders" });
+  const complete = CRITERIA.every((criterion) => (scores[criterion] ?? 0) > 0);
+
+  const submit = async () => {
+    if (!order || !profile || !complete || !order.items[0]?.producerId) return;
+    setSending(true);
+    try {
+      const buyerId = (await getBuyerId(profile.id)) ?? profile.id;
+      const average = Math.round(
+        CRITERIA.reduce((sum, criterion) => sum + scores[criterion], 0) / CRITERIA.length,
+      );
+      const details = [
+        comment.trim(),
+        highlights.length ? `Destaques: ${highlights.join(", ")}.` : "",
+        CRITERIA.map((criterion) => `${criterion}: ${scores[criterion]}/5`).join(" · "),
+      ]
+        .filter(Boolean)
+        .join("\n");
+      await createProducerRating({
+        orderId: order.id,
+        buyerId,
+        producerId: order.items[0].producerId,
+        rating: average,
+        comment: details,
+      });
+      toast.success("Avaliação enviada. Obrigado!");
+      close();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar a avaliação.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const product = order
+    ? products.find((item) => item.id === order.items[0]?.productId)
+    : undefined;
+  const deliveredOn = order?.deliveredAt
+    ? new Date(order.deliveredAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+    : null;
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[640px] px-4 py-8 pb-20 sm:px-6 sm:py-10 md:pb-10">
-        <button
-          onClick={() => navigate({ to: "/tracking" })}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-brand-900"
-        >
-          <ArrowLeft className="h-4 w-4" /> Voltar
-        </button>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-brand-900">
-          Como foi sua entrega?
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Sua avaliação ajuda a calibrar a distribuição automática.
-        </p>
+      <div className="m-screen m-s-06-avaliacao">
+        <div className="m-status" />
+        <div className="m-hd">
+          <button type="button" className="m-round" onClick={close} aria-label="Fechar">
+            <X className="lucide" aria-hidden />
+          </button>
+          <h1>Avaliar entrega</h1>
+          <span style={{ width: "44px" }} />
+        </div>
 
-        {done ? (
-          <div className="mt-8 rounded-2xl border border-[var(--border-strong)] bg-[var(--color-success-bg)] p-6">
-            <h2 className="font-semibold text-[var(--color-success-fg)]">Obrigado pelo retorno.</h2>
-            <p className="mt-1 text-sm text-[var(--color-success-fg)]/80">
-              Sua avaliação foi enviada aos produtores.
-            </p>
+        {!order ? (
+          <div className="m-pad">
+            {loading ? (
+              <DataLoading label="Carregando pedido..." />
+            ) : (
+              <div className="m-card m-empty">
+                <b>Nenhuma entrega para avaliar</b>
+                <span>Quando um pedido for entregue, você avalia por aqui.</span>
+              </div>
+            )}
           </div>
         ) : (
-          <form
-            className="mt-6 space-y-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (quality && punctuality) setDone(true);
-            }}
-          >
-            <div className="surface-card divide-y divide-[var(--hairline)] px-4">
-              <Stars label="Qualidade" value={quality} onChange={setQuality} />
-              <Stars
-                label="Pontualidade na entrega"
-                value={punctuality}
-                onChange={setPunctuality}
-              />
-            </div>
-            <fieldset>
-              <legend className="text-sm font-semibold text-brand-900">
-                O que se destacou?{" "}
-                <span className="font-normal text-muted-foreground">(opcional)</span>
-              </legend>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {HIGHLIGHTS.map((tag) => {
-                  const on = highlights.includes(tag);
-                  return (
-                    <button
-                      type="button"
-                      key={tag}
-                      aria-pressed={on}
-                      onClick={() =>
-                        setHighlights((current) =>
-                          on ? current.filter((item) => item !== tag) : [...current, tag],
-                        )
-                      }
-                      className={`inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors ${
-                        on
-                          ? "border border-leaf-300 bg-leaf-100 text-brand-900"
-                          : "border border-[var(--hairline)] bg-white text-brand-900 shadow-xs"
-                      }`}
-                    >
-                      {on && <Check className="h-4 w-4" />}
-                      {tag}
-                    </button>
-                  );
-                })}
+          <>
+            <div className="m-who m-card">
+              {product?.imageUrl ? (
+                <img src={product.imageUrl} alt="" />
+              ) : (
+                <ProductFallback
+                  category={product?.category ?? ""}
+                  name={order.items[0]?.productName ?? ""}
+                  className="m-whof"
+                  label={false}
+                />
+              )}
+              <div>
+                <span className="m-muted">
+                  #{order.id}
+                  {deliveredOn ? ` · entregue ${deliveredOn}` : ` · ${order.status.toLowerCase()}`}
+                </span>
+                <b>{orderProducersLabel(order)}</b>
+                <span className="m-muted">{orderItemsLabel(order, true)}</span>
               </div>
-            </fieldset>
-            <label className="block">
-              <span className="block text-sm font-medium text-brand-900">
-                Comentário (opcional)
-              </span>
-              <textarea
-                rows={4}
-                placeholder="Conte um pouco sobre sua experiência…"
-                className="surface-card mt-2 w-full rounded-2xl p-4 text-base placeholder:text-[var(--text-tertiary)] focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={!quality || !punctuality}
-              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-brand-900 px-6 text-sm font-semibold text-white hover:bg-brand-800 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
-            >
-              Enviar avaliação
-            </button>
-          </form>
-        )}
-      </main>
-    </div>
-  );
-}
+            </div>
 
-function Stars({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-}) {
-  const [hover, setHover] = useState(0);
-  return (
-    <div className="flex items-center justify-between gap-3 py-3.5">
-      <span className="text-sm font-medium text-brand-900">{label}</span>
-      <div className="flex gap-0.5" onMouseLeave={() => setHover(0)}>
-        {[1, 2, 3, 4, 5].map((n) => {
-          const filled = n <= (hover || value);
-          return (
-            <button
-              type="button"
-              key={n}
-              onMouseEnter={() => setHover(n)}
-              onClick={() => onChange(n)}
-              aria-label={`${n} de 5 estrelas em ${label}`}
-              className="grid h-10 w-9 place-items-center rounded-lg transition active:scale-90"
-            >
-              <Star
-                className={`h-7 w-7 ${filled ? "fill-orange-600 text-orange-600" : "text-[#cfd5cb]"}`}
-              />
-            </button>
-          );
-        })}
+            {alreadyRated ? (
+              <div className="m-pad">
+                <div className="m-card m-empty">
+                  <CircleCheck className="lucide m-ok" aria-hidden />
+                  <b>Entrega já avaliada</b>
+                  <span>Obrigado! Sua avaliação ajuda os produtores a melhorar.</span>
+                </div>
+              </div>
+            ) : order.status !== "Entregue" ? (
+              <div className="m-pad">
+                <div className="m-card m-empty">
+                  <b>A avaliação libera após a entrega</b>
+                  <span>Confirme o recebimento no acompanhamento do pedido.</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className="m-q">Como foi sua entrega?</h2>
+                <div className="m-rates m-card">
+                  {CRITERIA.map((criterion) => (
+                    <div key={criterion} className="m-rt">
+                      <span>{criterion}</span>
+                      <div className="m-stars" role="radiogroup" aria-label={criterion}>
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={scores[criterion] === value}
+                            aria-label={`${value} de 5 em ${criterion}`}
+                            onClick={() =>
+                              setScores((current) => ({ ...current, [criterion]: value }))
+                            }
+                          >
+                            <Star
+                              className={`lucide${value <= (scores[criterion] ?? 0) ? " m-on" : ""}`}
+                              aria-hidden
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <h3 className="m-lb">O que se destacou?</h3>
+                <div className="m-tags">
+                  {HIGHLIGHTS.map((tag) => {
+                    const on = highlights.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        aria-pressed={on}
+                        className={`m-pill${on ? " m-sel" : ""}`}
+                        onClick={() =>
+                          setHighlights((current) =>
+                            on ? current.filter((item) => item !== tag) : [...current, tag],
+                          )
+                        }
+                      >
+                        {on && <Check className="lucide" aria-hidden />}
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <textarea
+                  className="m-ta m-card"
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Conte como foi a entrega (opcional)"
+                  aria-label="Comentário sobre a entrega"
+                />
+
+                <div className="m-footer">
+                  <button
+                    type="button"
+                    className="m-btn m-primary"
+                    disabled={!complete || sending}
+                    onClick={() => void submit()}
+                  >
+                    {sending ? "Enviando..." : "Enviar avaliação"}
+                  </button>
+                  <div style={{ textAlign: "center" }}>
+                    <button type="button" className="m-btn m-text" onClick={close}>
+                      Avaliar depois
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }

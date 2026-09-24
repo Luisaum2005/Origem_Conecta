@@ -1,20 +1,25 @@
-import { CategoryIcon } from "@/components/marketplace/ProductCard";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  EllipsisVertical,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  Pencil,
+  PlayCircle,
+  Plus,
+  Search,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "@/components/mobile/icons";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { InstallButton } from "@/components/pwa/InstallButton";
+import { ProductFallback } from "@/components/marketplace/ProductCard";
+import { MoreMenu, Sheet } from "@/components/mobile/Sheet";
 import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { formatBRL, formatCompactBRL, unitLabel } from "@/lib/format";
 import { ALL_SUPPLIER_PRODUCTS } from "@/lib/hortifruti";
 import {
   EMPTY_STOCK_ITEM,
@@ -22,25 +27,7 @@ import {
   type SalesOrganization,
   useProducerStock,
 } from "@/lib/producer-stock";
-import {
-  BellRing,
-  Building2,
-  CalendarDays,
-  Check,
-  CircleDollarSign,
-  Eye,
-  EyeOff,
-  ImagePlus,
-  Package,
-  Pencil,
-  PlayCircle,
-  Plus,
-  Sprout,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-import { formatBRL } from "@/lib/format";
+import { productGroup } from "@/lib/product-group";
 
 export const Route = createFileRoute("/production")({
   component: () => (
@@ -50,7 +37,12 @@ export const Route = createFileRoute("/production")({
   ),
 });
 
-const UNITS = ["kg", "unidade", "caixa", "pacote", "pote", "litro", "maço"];
+const UNITS = ["kg", "unidade", "caixa", "pacote", "pote", "litro", "maço", "dúzia", "bandeja"];
+type Filter = "all" | "active" | "paused" | "low";
+const CHIP_STYLE = { height: "22px", fontSize: "11px", padding: "0 8px" };
+
+const isLow = (item: ProducerStockItem) =>
+  Number(item.minimumStock || 0) > 0 && Number(item.quantity || 0) <= Number(item.minimumStock);
 
 function organizationOptionLabel(organization: SalesOrganization) {
   if (organization.membershipStatus === "invited") return "convite aguardando aceite";
@@ -75,745 +67,577 @@ function Production() {
       deletingItemIds,
     },
   ] = useProducerStock();
+  const [filter, setFilter] = useState<Filter>("all");
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<ProducerStockItem | null>(null);
+  const [removing, setRemoving] = useState<ProducerStockItem | null>(null);
+
+  const active = items.filter((item) => item.status === "ativo");
+  const paused = items.filter((item) => item.status === "pausado");
+  const low = items.filter(isLow);
+  const potential = items.reduce(
+    (sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0),
+    0,
+  );
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return items.filter((item) => {
+      if (term && !item.product.toLowerCase().includes(term)) return false;
+      if (filter === "active") return item.status === "ativo";
+      if (filter === "paused") return item.status === "pausado";
+      if (filter === "low") return isLow(item);
+      return true;
+    });
+  }, [filter, items, query]);
+
+  const toggleStatus = (item: ProducerStockItem) => {
+    const next = item.status === "ativo" ? "pausado" : "ativo";
+    setItems((current) =>
+      current.map((row) => (row.id === item.id ? { ...row, status: next } : row)),
+    );
+    toast.success(
+      next === "ativo" ? `${item.product} voltou ao portfólio` : `${item.product} pausado`,
+    );
+  };
+
+  const confirmRemove = async () => {
+    if (!removing) return;
+    try {
+      await deleteItem(removing.id);
+      toast.success(`${removing.product} excluído`);
+      setRemoving(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível excluir o produto.");
+    }
+  };
+
+  const pills: { key: Filter; label: string; count?: number }[] = [
+    { key: "all", label: "Todos" },
+    { key: "active", label: "Ativos" },
+    { key: "paused", label: "Pausados", count: paused.length },
+    { key: "low", label: "Acabando", count: low.length },
+  ];
+
+  return (
+    <>
+      <Navbar />
+      <div className="m-screen m-s-p2-estoque">
+        <div className="m-status" />
+        <div className="m-hd m-big">
+          <h1>Estoque</h1>
+          <button
+            type="button"
+            className="m-round"
+            aria-label={searching ? "Fechar busca" : "Buscar no estoque"}
+            onClick={() => {
+              setSearching((current) => !current);
+              setQuery("");
+            }}
+          >
+            {searching ? (
+              <X className="lucide" aria-hidden />
+            ) : (
+              <Search className="lucide" aria-hidden />
+            )}
+          </button>
+        </div>
+        {searching && (
+          <div style={{ padding: "14px 20px 0" }}>
+            <label className="m-search">
+              <Search className="lucide" aria-hidden />
+              <input
+                type="search"
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar produto"
+                aria-label="Buscar produto no estoque"
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="m-kpi">
+          <div className="m-card">
+            <span>Ativos no portfólio</span>
+            <b>
+              {active.length} de {items.length}
+            </b>
+          </div>
+          <div className="m-card">
+            <span>Potencial em estoque</span>
+            <b>{formatCompactBRL(potential)}</b>
+          </div>
+        </div>
+
+        <div className="m-cats" role="tablist">
+          {pills.map((pill) => (
+            <button
+              key={pill.key}
+              type="button"
+              role="tab"
+              aria-selected={filter === pill.key}
+              className={`m-pill${filter === pill.key ? " m-on" : ""}`}
+              onClick={() => setFilter(pill.key)}
+            >
+              {pill.label}
+              {pill.count ? <span className="m-n">{pill.count}</span> : null}
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div className="m-pad">
+            <DataLoadError message={error} onRetry={reload} />
+          </div>
+        )}
+
+        {loading && items.length === 0 ? (
+          <div className="m-pad">
+            <DataLoading label="Carregando seu estoque..." />
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>{items.length ? "Nada neste filtro" : "Nenhum produto cadastrado"}</b>
+              <span>
+                {items.length
+                  ? "Escolha outro filtro ou busca."
+                  : "Toque em “Novo produto” para aparecer no portfólio dos compradores."}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="m-list">
+            {visible.map((item) => {
+              const quantity = Number(item.quantity || 0);
+              return (
+                <div
+                  key={item.id}
+                  className={`m-sk m-card${item.status === "pausado" ? " m-paused" : ""}`}
+                  aria-busy={deletingItemIds.has(item.id) || undefined}
+                >
+                  {item.imageUrl ? (
+                    <div className="m-ph">
+                      <img src={item.imageUrl} alt={item.product} />
+                    </div>
+                  ) : (
+                    <div className="m-ph">
+                      <ProductFallback
+                        category={productGroup(item.product)}
+                        name={item.product}
+                        label={false}
+                        className="m-fill"
+                      />
+                    </div>
+                  )}
+                  <div className="m-tx">
+                    <div className="m-r1">
+                      <b>{item.product}</b>
+                      <span
+                        className={`m-chip ${item.status === "ativo" ? "m-st-entregue" : "m-st-recebido"}`}
+                        style={CHIP_STYLE}
+                      >
+                        {item.status === "ativo" ? "Ativo" : "Pausado"}
+                      </span>
+                    </div>
+                    <span className="m-muted">
+                      {quantity.toLocaleString("pt-BR")} {unitLabel(item.unit, quantity)}{" "}
+                      disponíveis
+                      {item.sellerOrganizationName ? ` · pela ${item.sellerOrganizationName}` : ""}
+                    </span>
+                    <div className="m-r2">
+                      <span className="m-price">
+                        {formatBRL(Number(item.price || 0))} <small>/{item.unit}</small>
+                      </span>
+                      {isLow(item) && (
+                        <span className="m-warn">
+                          <TriangleAlert className="lucide" aria-hidden />
+                          Abaixo do mínimo
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <MoreMenu
+                    label={`Opções de ${item.product}`}
+                    buttonClassName="m-more"
+                    icon={<EllipsisVertical className="lucide" aria-hidden />}
+                    items={[
+                      {
+                        label: "Editar",
+                        icon: <Pencil className="lucide" aria-hidden />,
+                        onSelect: () => setEditing(item),
+                      },
+                      {
+                        label: item.status === "ativo" ? "Pausar" : "Ativar",
+                        icon:
+                          item.status === "ativo" ? (
+                            <EyeOff className="lucide" aria-hidden />
+                          ) : (
+                            <Eye className="lucide" aria-hidden />
+                          ),
+                        onSelect: () => toggleStatus(item),
+                      },
+                      {
+                        label: "Excluir",
+                        icon: <Trash2 className="lucide" aria-hidden />,
+                        danger: true,
+                        onSelect: () => setRemoving(item),
+                      },
+                    ]}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <button type="button" className="m-fab" onClick={() => setEditing(EMPTY_STOCK_ITEM)}>
+          <Plus className="lucide" aria-hidden />
+          Novo produto
+        </button>
+      </div>
+
+      <StockSheet
+        item={editing}
+        onClose={() => setEditing(null)}
+        salesOrganizations={salesOrganizations}
+        uploadImage={uploadImage}
+        uploadVideo={uploadVideo}
+        onSave={(draft) => {
+          const exists = items.some((item) => item.id === draft.id);
+          setItems((current) =>
+            exists
+              ? current.map((item) => (item.id === draft.id ? draft : item))
+              : [{ ...draft, id: draft.id || crypto.randomUUID() }, ...current],
+          );
+          toast.success(exists ? "Produto atualizado" : "Produto adicionado ao estoque");
+          setEditing(null);
+        }}
+      />
+
+      <Sheet
+        open={Boolean(removing)}
+        title={`Excluir ${removing?.product ?? ""}?`}
+        onClose={() => setRemoving(null)}
+        footer={
+          <button
+            type="button"
+            className="m-btn m-primary m-danger-btn"
+            disabled={removing ? deletingItemIds.has(removing.id) : false}
+            onClick={() => void confirmRemove()}
+          >
+            <Trash2 className="lucide" aria-hidden />
+            Excluir produto
+          </button>
+        }
+      >
+        <p className="m-note">
+          O produto sai do portfólio e não dá para desfazer. Se for só uma pausa, use “Pausar”.
+        </p>
+      </Sheet>
+    </>
+  );
+}
+
+function StockSheet({
+  item,
+  onClose,
+  onSave,
+  salesOrganizations,
+  uploadImage,
+  uploadVideo,
+}: {
+  item: ProducerStockItem | null;
+  onClose: () => void;
+  onSave: (item: ProducerStockItem) => void;
+  salesOrganizations: SalesOrganization[];
+  uploadImage: (file: File, itemId: string) => Promise<string>;
+  uploadVideo: (file: File, itemId: string) => Promise<string>;
+}) {
   const [draft, setDraft] = useState<ProducerStockItem>(EMPTY_STOCK_ITEM);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-  const [imageError, setImageError] = useState("");
-  const [videoError, setVideoError] = useState("");
-  const authorizedOrganizations = salesOrganizations.filter(
+  const [uploading, setUploading] = useState<"image" | "video" | null>(null);
+  const [error, setError] = useState("");
+  const [lastItem, setLastItem] = useState<ProducerStockItem | null>(null);
+  if (item !== lastItem) {
+    setLastItem(item);
+    setDraft(item ?? EMPTY_STOCK_ITEM);
+    setError("");
+  }
+  const authorized = salesOrganizations.filter(
     (organization) =>
       organization.membershipStatus === "active" &&
       organization.canSell &&
       organization.organizationStatus === "active",
   );
+  const set = (patch: Partial<ProducerStockItem>) =>
+    setDraft((current) => ({ ...current, ...patch }));
+  const valid = draft.product && draft.quantity && draft.unit && draft.price;
 
-  const isValid = draft.product && draft.quantity && draft.unit && draft.price;
-  const activeItems = items.filter((item) => item.status === "ativo");
-  const totalPotential = items.reduce(
-    (sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0),
-    0,
-  );
-
-  const save = () => {
-    if (!isValid) return;
-    if (editingId) {
-      setItems((current) =>
-        current.map((item) => (item.id === editingId ? { ...draft, id: editingId } : item)),
-      );
-      setEditingId(null);
-    } else {
-      setItems((current) => [{ ...draft, id: draft.id || crypto.randomUUID() }, ...current]);
-    }
-    setDraft(EMPTY_STOCK_ITEM);
-    setImageError("");
-    setVideoError("");
-  };
-
-  const edit = (item: ProducerStockItem) => {
-    setDraft(item);
-    setEditingId(item.id);
-  };
-
-  const cancelEdit = () => {
-    setDraft(EMPTY_STOCK_ITEM);
-    setEditingId(null);
-    setImageError("");
-    setVideoError("");
-  };
-
-  const remove = async (item: ProducerStockItem) => {
-    try {
-      await deleteItem(item.id);
-      if (editingId === item.id) cancelEdit();
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Não foi possível excluir o produto.");
-    }
-  };
-
-  const handleVideoChange = async (file?: File) => {
+  const upload = async (kind: "image" | "video", file?: File) => {
     if (!file) return;
-    setVideoError("");
-    setUploadingVideo(true);
+    setError("");
+    setUploading(kind);
     try {
-      const itemId = draft.id || editingId || crypto.randomUUID();
-      const videoUrl = await uploadVideo(file, itemId);
-      setDraft((current) => ({ ...current, id: itemId, videoUrl }));
-    } catch (error) {
-      setVideoError(error instanceof Error ? error.message : "Não foi possível carregar o vídeo.");
+      const itemId = draft.id || crypto.randomUUID();
+      const url =
+        kind === "image" ? await uploadImage(file, itemId) : await uploadVideo(file, itemId);
+      set(kind === "image" ? { id: itemId, imageUrl: url } : { id: itemId, videoUrl: url });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível carregar o arquivo.");
     } finally {
-      setUploadingVideo(false);
-    }
-  };
-
-  const toggleStatus = (id: string) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: item.status === "ativo" ? "pausado" : "ativo" } : item,
-      ),
-    );
-  };
-
-  const handleImageChange = async (file?: File) => {
-    if (!file) return;
-    setImageError("");
-    setUploadingImage(true);
-    try {
-      const itemId = draft.id || editingId || crypto.randomUUID();
-      const imageUrl = await uploadImage(file, itemId);
-      setDraft((current) => ({ ...current, id: itemId, imageUrl }));
-    } catch (error) {
-      setImageError(error instanceof Error ? error.message : "Não foi possível carregar a foto.");
-    } finally {
-      setUploadingImage(false);
+      setUploading(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-8 pb-20 sm:px-8 sm:py-10 md:pb-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-              Painel do produtor
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-brand-900">
-              Estoque e disponibilidade
-            </h1>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
-              Cadastre, edite, pause ou remova produtos que você pode fornecer no próximo ciclo.
-            </p>
-          </div>
-          <div className="w-full max-w-xs">
-            <InstallButton variant="compact" />
-          </div>
-        </div>
-
-        <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
-          <Metric icon={Package} label="Produtos cadastrados" value={`${items.length}`} />
-          <Metric icon={Sprout} label="Ativos no portfólio" value={`${activeItems.length}`} />
-          <Metric
-            icon={CircleDollarSign}
-            label="Potencial do estoque"
-            value={`${formatBRL(totalPotential)}`}
+    <Sheet
+      open={Boolean(item)}
+      title={item?.id ? "Editar produto" : "Novo produto"}
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          className="m-btn m-primary"
+          disabled={!valid}
+          onClick={() => onSave(draft)}
+        >
+          {item?.id ? "Salvar alterações" : "Adicionar ao estoque"}
+        </button>
+      }
+    >
+      <label className="m-field">
+        <span>Produto</span>
+        <div className="m-in">
+          <input
+            list="supplier-products"
+            value={draft.product}
+            onChange={(event) => set({ product: event.target.value })}
+            placeholder="Digite ou escolha"
           />
-        </section>
-
-        {error && (
-          <div className="mt-6">
-            <DataLoadError message={error} onRetry={reload} />
-          </div>
-        )}
-
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
-          <section>
-            {loading && items.length === 0 ? (
-              <DataLoading label="Carregando seu estoque..." />
-            ) : !error && items.length === 0 ? (
-              <div className="rounded-2xl border border-border bg-canvas p-10 text-center">
-                <Sprout className="mx-auto h-10 w-10 text-leaf-600" />
-                <h3 className="mt-4 text-lg font-semibold text-brand-900">
-                  Nenhum produto cadastrado
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Adicione o primeiro produto usando o formulário ao lado.
-                </p>
-              </div>
-            ) : (
-              <ul className="grid gap-3">
-                {items.map((item) => (
-                  <StockRow
-                    key={item.id}
-                    item={item}
-                    onEdit={() => edit(item)}
-                    onDelete={() => void remove(item)}
-                    onToggleStatus={() => toggleStatus(item.id)}
-                    editing={editingId === item.id}
-                    deleting={deletingItemIds.has(item.id)}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-white p-6 shadow-sm lg:sticky lg:top-[88px] lg:h-fit">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-brand-900">
-                {editingId ? "Editar produto" : "Adicionar produto"}
-              </h2>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-brand-900"
-                >
-                  <X className="h-4 w-4" /> Cancelar
-                </button>
-              )}
-            </div>
-
-            <div className="mt-5 space-y-5">
-              <ProductSelect
-                value={draft.product}
-                onChange={(value) => setDraft({ ...draft, product: value })}
-              />
-              <label className="block">
-                <span className="block text-sm font-medium text-brand-900">
-                  Responsável pela comercialização
-                </span>
-                <select
-                  value={draft.sellerOrganizationId ?? ""}
-                  onChange={(event) => {
-                    const organization = authorizedOrganizations.find(
-                      (item) => item.id === event.target.value,
-                    );
-                    setDraft({
-                      ...draft,
-                      sellerOrganizationId: organization?.id,
-                      sellerOrganizationName: organization?.name,
-                      sellerOrganizationCnpj: organization?.cnpj,
-                    });
-                  }}
-                  className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-3 text-base text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
-                >
-                  <option value="">Negociação própria — meus dados</option>
-                  {salesOrganizations.map((organization) => {
-                    const eligible =
-                      organization.membershipStatus === "active" &&
-                      organization.canSell &&
-                      organization.organizationStatus === "active";
-                    return (
-                      <option key={organization.id} value={organization.id} disabled={!eligible}>
-                        {organization.name} — {organizationOptionLabel(organization)}
-                      </option>
-                    );
-                  })}
-                </select>
-                {salesOrganizations.length === 0 ? (
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    Nenhuma cooperativa vinculada. Solicite ou aceite um vínculo no seu{" "}
-                    <Link to="/profile/producer" className="font-semibold text-leaf-700 underline">
-                      perfil
-                    </Link>
-                    .
-                  </span>
-                ) : authorizedOrganizations.length === 0 ? (
-                  <span className="mt-1 block text-xs text-orange-700">
-                    Existe um vínculo, mas a cooperativa ainda precisa ativá-lo e autorizar sua
-                    comercialização na área de associados.
-                  </span>
-                ) : (
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    Selecione uma organização autorizada ou negocie em nome próprio.
-                  </span>
-                )}
-              </label>
-              <PhotoField
-                imageUrl={draft.imageUrl}
-                uploading={uploadingImage}
-                error={imageError}
-                onChange={handleImageChange}
-                onRemove={() => setDraft({ ...draft, imageUrl: undefined })}
-              />
-              <VideoField
-                videoUrl={draft.videoUrl}
-                uploading={uploadingVideo}
-                error={videoError}
-                onChange={handleVideoChange}
-                onRemove={() => setDraft({ ...draft, videoUrl: undefined })}
-              />
-              <div className="grid grid-cols-[1fr_120px] gap-3">
-                <NumberField
-                  label="Quantidade"
-                  value={draft.quantity}
-                  onChange={(value) => setDraft({ ...draft, quantity: value })}
-                  placeholder="120"
-                />
-                <UnitSelect
-                  value={draft.unit}
-                  onChange={(value) => setDraft({ ...draft, unit: value })}
-                />
-              </div>
-              <NumberField
-                label="Avisar quando restar"
-                value={draft.minimumStock}
-                onChange={(value) => setDraft({ ...draft, minimumStock: value })}
-                placeholder="Ex: 20"
-                suffix={draft.unit}
-                required={false}
-                helper="Opcional. Você receberá uma notificação quando o estoque chegar a esse valor."
-              />
-              <NumberField
-                label="Preço por unidade"
-                value={draft.price}
-                onChange={(value) => setDraft({ ...draft, price: value })}
-                placeholder="18.50"
-                prefix="R$"
-              />
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <DateField
-                  label="Data de colheita"
-                  value={draft.harvestDate}
-                  onChange={(value) => setDraft({ ...draft, harvestDate: value })}
-                />
-                <DateField
-                  label="Validade"
-                  value={draft.expiryDate}
-                  onChange={(value) => setDraft({ ...draft, expiryDate: value })}
-                />
-              </div>
-              <label className="block">
-                <span className="block text-sm font-medium text-brand-900">Observações</span>
-                <textarea
-                  value={draft.notes}
-                  onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-                  placeholder="Ex: lote colhido hoje, embalagem de 500g, entrega apenas terça..."
-                  className="mt-2 min-h-[92px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-brand-900 placeholder:text-[var(--text-tertiary)] focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
-                />
-              </label>
-              <label className="flex items-center justify-between rounded-xl border border-border bg-canvas px-4 py-3">
-                <span>
-                  <span className="block text-sm font-semibold text-brand-900">Produto ativo</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Produtos pausados ficam fora da venda.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={draft.status === "ativo"}
-                  onChange={(event) =>
-                    setDraft({ ...draft, status: event.target.checked ? "ativo" : "pausado" })
-                  }
-                  className="h-5 w-5 accent-[var(--color-brand-900)]"
-                />
-              </label>
-            </div>
-
-            <button
-              type="button"
-              onClick={save}
-              disabled={!isValid}
-              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-leaf-600 px-5 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
-            >
-              {editingId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {editingId ? "Salvar alterações" : "Adicionar ao estoque"}
-            </button>
-          </section>
         </div>
+        <datalist id="supplier-products">
+          {ALL_SUPPLIER_PRODUCTS.map((product) => (
+            <option key={product} value={product} />
+          ))}
+        </datalist>
+      </label>
 
-        <div className="mt-8 rounded-2xl border border-border bg-white p-5 shadow-xs">
-          <p className="font-semibold text-brand-900">Disponibilidade publicada automaticamente</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Produtos salvos como ativos aparecem no portfólio dos compradores. Para tirar um item da
-            venda, use a opção Pausar no estoque.
-          </p>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function ProductSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q
-      ? ALL_SUPPLIER_PRODUCTS.filter((item) => item.toLowerCase().includes(q))
-      : ALL_SUPPLIER_PRODUCTS;
-  }, [query]);
-
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-brand-900">
-        Produto <span className="ml-1 text-orange-600">*</span>
-      </span>
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-white px-3">
-        <Package className="h-4 w-4 text-leaf-600" />
-        <input
-          list="supplier-products"
-          value={value}
-          onChange={(event) => {
-            onChange(event.target.value);
-            setQuery(event.target.value);
-          }}
-          placeholder="Digite ou selecione..."
-          className="h-[48px] w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
-        />
-      </div>
-      <datalist id="supplier-products">
-        {filtered.map((product) => (
-          <option key={product} value={product} />
-        ))}
-      </datalist>
-    </label>
-  );
-}
-
-function PhotoField({
-  imageUrl,
-  uploading,
-  error,
-  onChange,
-  onRemove,
-}: {
-  imageUrl?: string;
-  uploading: boolean;
-  error: string;
-  onChange: (file?: File) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div>
-      <span className="block text-sm font-medium text-brand-900">Foto do produto</span>
-      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-canvas">
-        {imageUrl ? (
-          <img src={imageUrl} alt="Foto do produto" className="h-44 w-full object-cover" />
-        ) : (
-          <div className="grid h-44 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
-            <div>
-              <ImagePlus className="mx-auto h-8 w-8 text-leaf-700" />
-              <p className="mt-2 text-sm font-semibold text-brand-900">Adicionar foto</p>
-              <p className="mt-1 text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB</p>
+      <div className="m-field">
+        <span>Foto</span>
+        <div className="m-media">
+          {draft.imageUrl ? (
+            <img src={draft.imageUrl} alt="Foto do produto" />
+          ) : (
+            <div className="m-fallback">
+              <ImagePlus className="lucide" aria-hidden />
+              <span>JPG, PNG ou WebP até 5 MB</span>
             </div>
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-white p-3">
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
-            <ImagePlus className="h-4 w-4 text-leaf-700" />
-            {uploading ? "Carregando..." : imageUrl ? "Trocar foto" : "Selecionar foto"}
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              disabled={uploading}
-              onChange={(event) => onChange(event.target.files?.[0])}
-            />
-          </label>
-          {imageUrl && (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-brand-900"
-            >
-              Remover
-            </button>
           )}
+          <div className="m-media-acts">
+            <label className="m-btn m-secondary m-sm">
+              <ImagePlus className="lucide" aria-hidden />
+              {uploading === "image"
+                ? "Carregando..."
+                : draft.imageUrl
+                  ? "Trocar foto"
+                  : "Enviar foto"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                disabled={Boolean(uploading)}
+                onChange={(event) => void upload("image", event.target.files?.[0])}
+              />
+            </label>
+            {draft.imageUrl && (
+              <button
+                type="button"
+                className="m-btn m-text m-sm"
+                onClick={() => set({ imageUrl: undefined })}
+              >
+                Remover
+              </button>
+            )}
+          </div>
         </div>
       </div>
-      {error && <p className="mt-2 text-xs font-semibold text-[var(--color-error-fg)]">{error}</p>}
-    </div>
-  );
-}
 
-function VideoField({
-  videoUrl,
-  uploading,
-  error,
-  onChange,
-  onRemove,
-}: {
-  videoUrl?: string;
-  uploading: boolean;
-  error: string;
-  onChange: (file?: File) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div>
-      <span className="block text-sm font-medium text-brand-900">Vídeo curto do produto</span>
-      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-canvas">
-        {videoUrl ? (
-          <video src={videoUrl} controls muted playsInline className="h-44 w-full object-cover" />
-        ) : (
-          <div className="grid h-36 place-items-center bg-[var(--color-surface-brand-soft)] text-center">
-            <div>
-              <PlayCircle className="mx-auto h-8 w-8 text-leaf-700" />
-              <p className="mt-2 text-sm font-semibold text-brand-900">Adicionar vídeo</p>
-              <p className="mt-1 text-xs text-muted-foreground">MP4, WebM ou MOV até 30 MB</p>
-            </div>
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-white p-3">
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
-            <PlayCircle className="h-4 w-4 text-leaf-700" />
-            {uploading ? "Carregando..." : videoUrl ? "Trocar vídeo" : "Selecionar vídeo"}
+      <div className="m-field">
+        <span>Vídeo curto (opcional)</span>
+        <div className="m-media-acts">
+          <label className="m-btn m-secondary m-sm">
+            <PlayCircle className="lucide" aria-hidden />
+            {uploading === "video"
+              ? "Carregando..."
+              : draft.videoUrl
+                ? "Trocar vídeo"
+                : "Enviar vídeo"}
             <input
               type="file"
               accept="video/mp4,video/webm,video/quicktime"
               className="sr-only"
-              disabled={uploading}
-              onChange={(event) => onChange(event.target.files?.[0])}
+              disabled={Boolean(uploading)}
+              onChange={(event) => void upload("video", event.target.files?.[0])}
             />
           </label>
-          {videoUrl && (
+          {draft.videoUrl && (
             <button
               type="button"
-              onClick={onRemove}
-              className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-brand-900"
+              className="m-btn m-text m-sm"
+              onClick={() => set({ videoUrl: undefined })}
             >
-              Remover
+              Remover vídeo
             </button>
           )}
         </div>
       </div>
-      {error && <p className="mt-2 text-xs font-semibold text-[var(--color-error-fg)]">{error}</p>}
-    </div>
-  );
-}
 
-function UnitSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-brand-900">
-        Unidade <span className="ml-1 text-orange-600">*</span>
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-3 text-base text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
-      >
-        {UNITS.map((unit) => (
-          <option key={unit} value={unit}>
-            {unit}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  prefix,
-  suffix,
-  required = true,
-  helper,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  prefix?: string;
-  suffix?: string;
-  required?: boolean;
-  helper?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-brand-900">
-        {label} {required && <span className="ml-1 text-orange-600">*</span>}
-      </span>
-      <div className="mt-2 flex h-[52px] items-center rounded-xl border border-border bg-white px-4 focus-within:border-leaf-600 focus-within:ring-2 focus-within:ring-leaf-100">
-        {prefix && (
-          <span className="mr-2 text-sm font-semibold text-muted-foreground">{prefix}</span>
-        )}
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className="h-full w-full bg-transparent text-base text-brand-900 placeholder:text-[var(--text-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
-        />
-        {suffix && <span className="ml-2 text-sm text-muted-foreground">{suffix}</span>}
-      </div>
-      {helper && <span className="mt-1 block text-xs text-muted-foreground">{helper}</span>}
-    </label>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-brand-900">{label}</span>
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-white px-3">
-        <CalendarDays className="h-4 w-4 text-leaf-600" />
-        <input
-          type="date"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-[48px] w-full bg-transparent text-base text-brand-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-600"
-        />
-      </div>
-    </label>
-  );
-}
-
-function StockRow({
-  item,
-  onEdit,
-  onDelete,
-  onToggleStatus,
-  editing,
-  deleting,
-}: {
-  item: ProducerStockItem;
-  onEdit: () => void;
-  onDelete: () => void;
-  onToggleStatus: () => void;
-  editing: boolean;
-  deleting: boolean;
-}) {
-  const fmt = (date: string) => {
-    if (!date) return "sem data";
-    const [year, month, day] = date.split("-");
-    return `${day}/${month}/${year}`;
-  };
-  const total = Number(item.quantity || 0) * Number(item.price || 0);
-
-  return (
-    <li
-      className={`rounded-2xl border bg-white p-4 shadow-xs ${
-        editing ? "border-leaf-600 ring-2 ring-leaf-100" : "border-border"
-      } ${item.status === "pausado" ? "opacity-70" : ""}`}
-    >
-      <div className="flex items-start gap-3 sm:gap-4">
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.product}
-            className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-24 sm:w-28"
-          />
-        ) : (
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-[linear-gradient(160deg,#eef8e2_0%,#d9eec4_100%)] sm:h-24 sm:w-28">
-            <CategoryIcon category="" name={item.product} />
+      <div className="m-row2">
+        <label className="m-field">
+          <span>Quantidade</span>
+          <div className="m-in">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft.quantity}
+              onChange={(event) => set({ quantity: event.target.value })}
+              placeholder="120"
+            />
           </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold text-brand-900">{item.product}</p>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                item.status === "ativo"
-                  ? "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]"
-                  : "bg-surface-muted text-muted-foreground"
-              }`}
-            >
-              {item.status === "ativo" ? "ativo" : "pausado"}
+        </label>
+        <label className="m-field">
+          <span>Unidade</span>
+          <div className="m-in">
+            <select value={draft.unit} onChange={(event) => set({ unit: event.target.value })}>
+              {UNITS.map((unit) => (
+                <option key={unit}>{unit}</option>
+              ))}
+            </select>
+          </div>
+        </label>
+      </div>
+      <div className="m-row2">
+        <label className="m-field">
+          <span>Preço por {draft.unit || "unidade"}</span>
+          <div className="m-in">
+            <span className="m-end" style={{ marginLeft: 0 }}>
+              R$
             </span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft.price}
+              onChange={(event) => set({ price: event.target.value })}
+              placeholder="0,00"
+            />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {item.quantity || "0"} {item.unit} · {formatBRL(Number(item.price || 0))}/{item.unit}
-          </p>
-          {Number(item.minimumStock || 0) > 0 && (
-            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-orange-700">
-              <BellRing className="h-3.5 w-3.5" />
-              Aviso em {item.minimumStock} {item.unit}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">
-            Colheita {fmt(item.harvestDate)} · Validade {fmt(item.expiryDate)}
-          </p>
-          {item.notes && <p className="mt-2 text-sm text-brand-900">{item.notes}</p>}
-          <p className="mt-2 text-sm font-semibold text-brand-900 sm:hidden">
-            Potencial {formatBRL(total)}
-          </p>
-          {item.sellerOrganizationName && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
-              <Building2 className="h-3.5 w-3.5" />
-              Comercialização por {item.sellerOrganizationName}
-            </p>
-          )}
-          {item.videoUrl && (
-            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
-              <PlayCircle className="h-3.5 w-3.5" />
-              Vídeo disponível
-            </p>
-          )}
-        </div>
-        <div className="hidden text-right sm:block">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Potencial
-          </p>
-          <p className="text-lg font-bold text-brand-900">{formatBRL(total)}</p>
-        </div>
+        </label>
+        <label className="m-field">
+          <span>Avisar quando restar</span>
+          <div className="m-in">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft.minimumStock}
+              onChange={(event) => set({ minimumStock: event.target.value })}
+              placeholder="Opcional"
+            />
+          </div>
+        </label>
+      </div>
+      <div className="m-row2">
+        <label className="m-field">
+          <span>Colheita</span>
+          <div className="m-in">
+            <input
+              type="date"
+              value={draft.harvestDate}
+              onChange={(event) => set({ harvestDate: event.target.value })}
+            />
+          </div>
+        </label>
+        <label className="m-field">
+          <span>Validade</span>
+          <div className="m-in">
+            <input
+              type="date"
+              value={draft.expiryDate}
+              onChange={(event) => set({ expiryDate: event.target.value })}
+            />
+          </div>
+        </label>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-        <button
-          type="button"
-          onClick={onToggleStatus}
-          disabled={deleting}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-        >
-          {item.status === "ativo" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {item.status === "ativo" ? "Pausar" : "Ativar"}
-        </button>
-        <button
-          type="button"
-          onClick={onEdit}
-          disabled={deleting}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-        >
-          <Pencil className="h-4 w-4" />
-          Editar
-        </button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <button
-              type="button"
-              disabled={deleting}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
-            >
-              <Trash2 className="h-4 w-4" /> Excluir
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir {item.product}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                O produto deixará de aparecer no portfólio. Esta ação não poderá ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Manter produto</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={onDelete}
-                disabled={deleting}
-                aria-busy={deleting || undefined}
-                className="bg-red-700 text-white hover:bg-red-800"
+      <label className="m-field">
+        <span>Quem vende</span>
+        <div className="m-in">
+          <select
+            value={draft.sellerOrganizationId ?? ""}
+            onChange={(event) => {
+              const organization = authorized.find((row) => row.id === event.target.value);
+              set({
+                sellerOrganizationId: organization?.id,
+                sellerOrganizationName: organization?.name,
+                sellerOrganizationCnpj: organization?.cnpj,
+              });
+            }}
+          >
+            <option value="">Eu mesmo (venda própria)</option>
+            {salesOrganizations.map((organization) => (
+              <option
+                key={organization.id}
+                value={organization.id}
+                disabled={!authorized.includes(organization)}
               >
-                {deleting ? "Excluindo..." : "Excluir produto"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </li>
-  );
-}
+                {organization.name} — {organizationOptionLabel(organization)}
+              </option>
+            ))}
+          </select>
+        </div>
+        {salesOrganizations.length === 0 && (
+          <small>
+            Sem cooperativa vinculada. Peça o vínculo no seu{" "}
+            <Link to="/profile/producer">perfil</Link>.
+          </small>
+        )}
+      </label>
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
-      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
-    </div>
+      <label className="m-field">
+        <span>Observações</span>
+        <textarea
+          className="m-textarea"
+          rows={3}
+          value={draft.notes}
+          onChange={(event) => set({ notes: event.target.value })}
+          placeholder="Lote colhido hoje, embalagem de 500 g, entrega só terça..."
+        />
+      </label>
+
+      <div className="m-field m-toggle">
+        <span>
+          Produto ativo
+          <small>Pausados ficam fora do portfólio.</small>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={draft.status === "ativo"}
+          className={`m-sw${draft.status === "ativo" ? " m-on" : ""}`}
+          onClick={() => set({ status: draft.status === "ativo" ? "pausado" : "ativo" })}
+        >
+          <i />
+        </button>
+      </div>
+      {error && (
+        <p className="m-field">
+          <small className="m-err">{error}</small>
+        </p>
+      )}
+    </Sheet>
   );
 }

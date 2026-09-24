@@ -1,15 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
-import { supabase } from "@/lib/supabase";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronRight, Mail, MessageCircle } from "@/components/mobile/icons";
 import { useState } from "react";
+import { AuthPage, Field, FormError, PrimaryButton } from "@/components/auth/AuthShell";
+import { supportHref } from "@/lib/support";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/reset")({
   component: Reset,
 });
 
 function Reset() {
-  const navigate = useNavigate();
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,9 +20,7 @@ function Reset() {
       setError("O serviço de autenticação não está configurado.");
       return;
     }
-
-    const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "").trim();
+    const email = String(new FormData(event.currentTarget).get("email") ?? "").trim();
     setLoading(true);
     setError("");
     try {
@@ -29,7 +28,7 @@ function Reset() {
         redirectTo: `${window.location.origin}/update-password`,
       });
       if (resetError) throw resetError;
-      setSent(true);
+      setSent(email);
     } catch (resetError) {
       setError(
         resetError instanceof Error
@@ -42,42 +41,62 @@ function Reset() {
   };
 
   return (
-    <AuthLayout
-      title="Redefinir senha"
-      subtitle="Enviaremos um link de redefinição para seu e-mail."
+    <AuthPage
+      screen="m-s-a3-redefinir"
+      icon={<Mail className="lucide" aria-hidden />}
+      title={sent ? "Confira seu e-mail" : "Esqueceu a senha?"}
+      subtitle={
+        sent
+          ? `Enviamos o link para ${sent}. Ele vale por 1 hora; veja também a caixa de spam.`
+          : "Informe seu e-mail. Enviamos um link para criar uma nova senha — ele vale por 1 hora."
+      }
+      footer={
+        <>
+          {sent ? (
+            <Link to="/login" className="m-btn m-primary">
+              Voltar para entrar
+            </Link>
+          ) : (
+            <PrimaryButton form="reset-form" loading={loading}>
+              Enviar link
+            </PrimaryButton>
+          )}
+          {!sent && (
+            <div style={{ textAlign: "center" }}>
+              <Link to="/login" className="m-btn m-text">
+                Voltar para entrar
+              </Link>
+            </div>
+          )}
+        </>
+      }
     >
-      {sent ? (
-        <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--color-success-bg)] p-5">
-          <p className="font-semibold text-[var(--color-success-fg)]">
-            Pronto. Verifique seu e-mail.
-          </p>
-          <p className="mt-1 text-sm text-[var(--color-success-fg)]/80">
-            O link expira em 30 minutos.
-          </p>
-          <button
-            onClick={() => navigate({ to: "/login" })}
-            className="mt-4 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-brand-900"
-          >
-            Voltar ao login
-          </button>
-        </div>
-      ) : (
-        <form className="space-y-5" onSubmit={onSubmit}>
+      {!sent && (
+        <form id="reset-form" onSubmit={onSubmit}>
           <Field
             name="email"
             label="E-mail"
             type="email"
-            placeholder="voce@restaurante.com"
+            placeholder="voce@restaurante.com.br"
+            autoComplete="email"
             required
           />
-          {error ? (
-            <p className="text-sm text-red-700" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <PrimaryButton loading={loading}>Enviar link</PrimaryButton>
+          <FormError>{error}</FormError>
         </form>
       )}
-    </AuthLayout>
+      <a
+        href={supportHref}
+        target={supportHref.startsWith("http") ? "_blank" : undefined}
+        rel={supportHref.startsWith("http") ? "noreferrer" : undefined}
+        className="m-help m-card"
+      >
+        <MessageCircle className="lucide" aria-hidden />
+        <div>
+          <b>Não usa mais esse e-mail?</b>
+          <span>Fale com o suporte pelo WhatsApp.</span>
+        </div>
+        <ChevronRight className="lucide" aria-hidden />
+      </a>
+    </AuthPage>
   );
 }

@@ -1,34 +1,63 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { CircleHelp, Search, UserRound, Users } from "@/components/mobile/icons";
+import { useState, type FormEvent } from "react";
+import { AuthPage, Field, FormError, PrimaryButton } from "@/components/auth/AuthShell";
 import { AddressFields } from "@/components/forms/AddressFields";
-import { FormProgress, FormSection } from "@/components/forms/FormSection";
 import { SupplierProductPicker } from "@/components/forms/SupplierProductPicker";
 import { getProfileHome, useAuth } from "@/lib/auth";
+import { initials } from "@/lib/format";
+import { useOrganizationDirectory } from "@/lib/organization-directory";
 import { isValidCnpj } from "@/lib/organizations";
-import { useEffect, useRef, useState, type FormEvent } from "react";
 
 export const Route = createFileRoute("/signup/producer")({
   component: SignupProducer,
 });
 
+type Mode = "own" | "organization" | "undecided";
+const MODES = [
+  {
+    value: "own",
+    icon: UserRound,
+    title: "Em nome próprio",
+    body: "Com CPF, CAEPF ou nota de produtor rural",
+  },
+  {
+    value: "organization",
+    icon: Users,
+    title: "Pela cooperativa ou associação",
+    body: "A nota sai em nome do grupo",
+  },
+  {
+    value: "undecided",
+    icon: CircleHelp,
+    title: "Ainda estou decidindo",
+    body: "Você pode mudar isso depois no perfil",
+  },
+] as const;
+const STEPS = [
+  { title: "Sua propriedade", subtitle: "É assim que os compradores vão encontrar você." },
+  { title: "Como você vende?", subtitle: "Isso define em nome de quem sai a nota fiscal." },
+  { title: "Contato e coleta", subtitle: "Onde o comprador ou o frete busca os produtos." },
+  { title: "Produtos e senha", subtitle: "Os produtos são opcionais — dá para completar depois." },
+];
+
 function SignupProducer() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { signUp } = useAuth();
   const [picked, setPicked] = useState<string[]>([]);
-  const [commercializationMode, setCommercializationMode] = useState<
-    "own" | "organization" | "undecided"
-  >("undecided");
+  const [mode, setMode] = useState<Mode>("undecided");
+  const [orgQuery, setOrgQuery] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const { organizations } = useOrganizationDirectory(mode === "organization" ? orgQuery : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
-  const errorRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (error) errorRef.current?.focus();
-  }, [error]);
 
-  const validateStep = (form: HTMLFormElement, targetStep = step) => {
+  const validateStep = (form: HTMLFormElement | null, target = step) => {
+    if (!form) return false;
     const fields = form.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-      `[data-step="${targetStep}"] input, [data-step="${targetStep}"] select`,
+      `[data-step="${target}"] input, [data-step="${target}"] select`,
     );
     for (const field of fields) {
       if (!field.checkValidity()) {
@@ -42,22 +71,27 @@ function SignupProducer() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
-    setError("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    for (let current = 1; current <= 4; current += 1) {
+      if (!validateStep(formElement, current)) {
+        setStep(current);
+        return;
+      }
+    }
+    const form = new FormData(formElement);
     const password = String(form.get("password") ?? "");
     const cnpj = String(form.get("cnpj") ?? "");
     if (cnpj && !isValidCnpj(cnpj)) {
       setError("O CNPJ próprio não é válido. Confira os 14 números ou deixe o campo vazio.");
-      setLoading(false);
+      setStep(2);
       return;
     }
     if (password.length < 8 || password !== String(form.get("passwordConfirmation") ?? "")) {
       setError("A senha deve ter pelo menos 8 caracteres e ser repetida corretamente.");
-      setLoading(false);
       return;
     }
-
+    setLoading(true);
+    setError("");
     try {
       const result = await signUp({
         tipo: "produtor",
@@ -72,7 +106,7 @@ function SignupProducer() {
           responsavel: String(form.get("responsavel") ?? ""),
           cnpj,
           produtos: picked,
-          commercializationMode,
+          commercializationMode: mode,
           caepf: String(form.get("caepf") ?? ""),
           stateRegistration: String(form.get("stateRegistration") ?? ""),
           postalCode: String(form.get("cep") ?? ""),
@@ -87,9 +121,9 @@ function SignupProducer() {
           "origem-conecta-auth-notice",
           "Cadastro concluído. Confirme o e-mail recebido antes de entrar.",
         );
-        navigate({ to: "/login" });
+        void navigate({ to: "/login" });
       } else if (result.profile) {
-        navigate({ to: getProfileHome(result.profile.tipo, result.profile.roles) });
+        void navigate({ to: getProfileHome(result.profile.tipo, result.profile.roles) });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
@@ -98,194 +132,225 @@ function SignupProducer() {
     }
   };
 
+  const next = (button: HTMLButtonElement) => {
+    if (validateStep(button.form)) setStep((current) => current + 1);
+  };
+  const back = () => {
+    if (step > 1) setStep((current) => current - 1);
+    else if (window.history.length > 1) router.history.back();
+    else void navigate({ to: "/" });
+  };
+  const chosen = organizations.find((organization) => organization.id === orgId);
+  const results = orgQuery.trim() ? organizations.slice(0, 3) : chosen ? [chosen] : [];
+
   return (
-    <AuthLayout
-      title="Criar conta · Produtor"
-      subtitle="Conte sobre sua produção. Leva menos de 3 minutos, sem burocracia."
-      footer={
-        <>
-          Já tem conta?{" "}
-          <Link to="/login" className="font-semibold text-brand-900 hover:underline">
-            Entrar
-          </Link>
-        </>
+    <AuthPage
+      screen="m-s-a6-cad-produtor"
+      back={back}
+      headerTitle={`Etapa ${step} de 4`}
+      headerAction={
+        <Link to="/" className="m-exit">
+          Sair
+        </Link>
       }
-    >
-      <FormProgress step={step} total={4} hint="Você pode voltar sem perder os dados" />
-      <form className="space-y-6" onSubmit={onSubmit} noValidate>
-        <div data-step="1" className={step === 1 ? "space-y-6" : "hidden"}>
-          <FormSection title="Dados da propriedade">
-            <Field
-              name="nomePropriedade"
-              label="Nome da propriedade"
-              placeholder="Digite o nome da propriedade"
-              required
-            />
-            <Field
-              name="responsavel"
-              label="Responsável"
-              placeholder="Digite o nome completo"
-              required
-            />
-          </FormSection>
-
-          <FormSection
-            title="Como você pretende comercializar?"
-            caption="Isso informa ao comprador como a negociação será conduzida"
+      steps={{ current: step, total: 4 }}
+      eyebrow="Conta de produtor"
+      title={STEPS[step - 1].title}
+      subtitle={STEPS[step - 1].subtitle}
+      footer={
+        step === 1 ? (
+          <button
+            type="button"
+            form="signup-producer"
+            className="m-btn m-primary"
+            onClick={(e) => next(e.currentTarget)}
           >
-            <div className="grid gap-2">
-              {(
-                [
-                  ["own", "Em nome próprio", "Tenho ou informarei minha documentação própria."],
-                  [
-                    "organization",
-                    "Por cooperativa ou associação",
-                    "Solicitarei vínculo com uma organização após o cadastro.",
-                  ],
-                  [
-                    "undecided",
-                    "Ainda estou definindo",
-                    "Poderei divulgar minha produção e completar isso posteriormente.",
-                  ],
-                ] as const
-              ).map(([value, title, description]) => (
-                <label
-                  key={value}
-                  className={`cursor-pointer rounded-xl border p-4 ${
-                    commercializationMode === value
-                      ? "border-leaf-600 bg-leaf-100"
-                      : "border-border bg-white"
-                  }`}
-                >
-                  <span className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="commercializationMode"
-                      value={value}
-                      checked={commercializationMode === value}
-                      onChange={() => setCommercializationMode(value)}
-                      className="mt-1 h-4 w-4 accent-[var(--color-brand-900)]"
-                    />
-                    <span>
-                      <span className="block text-sm font-semibold text-brand-900">{title}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {description}
-                      </span>
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {commercializationMode === "own" && (
-              <div className="mt-4 grid gap-4">
-                <Field name="cnpj" label="CNPJ próprio, se possuir" placeholder="Digite o CNPJ" />
-                <Field
-                  name="caepf"
-                  label="CAEPF, se aplicável"
-                  placeholder="Cadastro da atividade rural"
-                  helper="Use somente se você já possui esse cadastro de produtor rural."
-                />
-                <Field
-                  name="stateRegistration"
-                  label="Inscrição estadual, se aplicável"
-                  placeholder="Digite a inscrição estadual"
-                  helper="Número estadual usado para emissão de documentos fiscais, quando aplicável."
-                />
-              </div>
-            )}
-            <p className="mt-3 text-xs text-muted-foreground">
-              Não informe o CNPJ de uma cooperativa neste cadastro. O vínculo será confirmado pela
-              própria organização.
-            </p>
-          </FormSection>
-        </div>
-
-        <div data-step="2" className={step === 2 ? "space-y-6" : "hidden"}>
-          <FormSection title="Contato">
-            <Field
-              name="telefone"
-              label="WhatsApp"
-              type="tel"
-              placeholder="Digite o telefone"
-              required
-            />
-            <Field name="email" label="E-mail" type="email" required />
-          </FormSection>
-
-          <AddressFields />
-        </div>
-
-        <div data-step="3" className={step === 3 ? "space-y-6" : "hidden"}>
-          <FormSection
-            title="O que você produz"
-            caption="Opcional — selecione agora ou informe seus produtos depois, no perfil."
-          >
-            <SupplierProductPicker value={picked} onChange={setPicked} />
-            {picked.length === 0 && (
-              <p className="mt-3 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-brand-800">
-                Você pode concluir o cadastro sem produtos. Depois do login, lembraremos você de
-                completar essa informação para aparecer nas buscas e receber demandas compatíveis.
-              </p>
-            )}
-          </FormSection>
-        </div>
-
-        <div data-step="4" className={step === 4 ? "space-y-6" : "hidden"}>
-          <FormSection title="Segurança">
-            <Field
-              name="password"
-              label="Senha"
-              type="password"
-              helper="Mínimo 8 caracteres"
-              minLength={8}
-              required
-            />
-            <Field
-              name="passwordConfirmation"
-              label="Repita a senha"
-              type="password"
-              minLength={8}
-              required
-            />
-          </FormSection>
-        </div>
-
-        {error && (
-          <p
-            ref={errorRef}
-            tabIndex={-1}
-            role="alert"
-            className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]"
-          >
-            {error}
-          </p>
-        )}
-        <div className="flex gap-3">
-          {step > 1 && (
+            Continuar
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: "10px" }}>
             <button
               type="button"
-              onClick={() => setStep((current) => current - 1)}
-              className="h-[52px] flex-1 rounded-xl border border-border bg-white font-semibold text-brand-900"
+              className="m-btn m-secondary"
+              style={{ flex: "1" }}
+              onClick={back}
             >
               Voltar
             </button>
+            {step < 4 ? (
+              <button
+                type="button"
+                form="signup-producer"
+                className="m-btn m-primary"
+                style={{ flex: "2" }}
+                onClick={(e) => next(e.currentTarget)}
+              >
+                Continuar
+              </button>
+            ) : (
+              <PrimaryButton form="signup-producer" loading={loading} style={{ flex: "2" }}>
+                Criar conta
+              </PrimaryButton>
+            )}
+          </div>
+        )
+      }
+    >
+      <form id="signup-producer" onSubmit={onSubmit} noValidate>
+        <div data-step="1" hidden={step !== 1}>
+          <Field
+            name="nomePropriedade"
+            label="Nome da propriedade"
+            placeholder="Ex.: Sítio das Laranjas"
+            required
+          />
+          <Field
+            name="responsavel"
+            label="Responsável"
+            placeholder="Nome completo"
+            autoComplete="name"
+            required
+          />
+        </div>
+
+        <div data-step="2" hidden={step !== 2}>
+          <div role="radiogroup" aria-label="Como você vende">
+            {MODES.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === item.value}
+                  className={`m-opt${mode === item.value ? " m-on" : ""}`}
+                  onClick={() => setMode(item.value)}
+                >
+                  <span className="m-oi">
+                    <Icon className="lucide" aria-hidden />
+                  </span>
+                  <div>
+                    <b>{item.title}</b>
+                    <span>{item.body}</span>
+                  </div>
+                  <span className="m-radio" />
+                </button>
+              );
+            })}
+          </div>
+          {mode === "own" && (
+            <>
+              <Field name="cnpj" label="CNPJ próprio, se tiver" placeholder="00.000.000/0000-00" />
+              <Field
+                name="caepf"
+                label="CAEPF, se tiver"
+                placeholder="Cadastro da atividade rural"
+              />
+              <Field
+                name="stateRegistration"
+                label="Inscrição estadual, se tiver"
+                placeholder="Opcional agora"
+              />
+            </>
           )}
-          {step < 4 ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                const form = event.currentTarget.form;
-                if (form && validateStep(form)) setStep((current) => current + 1);
-              }}
-              className="h-[52px] flex-1 rounded-xl bg-brand-900 font-semibold text-white"
-            >
-              {step === 3 && picked.length === 0 ? "Cadastrar depois" : "Continuar"}
-            </button>
-          ) : (
-            <PrimaryButton loading={loading}>Criar conta de produtor</PrimaryButton>
+          {mode === "organization" && (
+            <>
+              <label className="m-field">
+                <span>Qual cooperativa?</span>
+                <div className="m-in">
+                  <Search className="lucide" aria-hidden />
+                  <input
+                    type="search"
+                    value={orgQuery}
+                    onChange={(event) => setOrgQuery(event.target.value)}
+                    placeholder="Nome ou cidade"
+                  />
+                </div>
+              </label>
+              {results.map((organization) => (
+                <button
+                  key={organization.id}
+                  type="button"
+                  className="m-res m-card"
+                  onClick={() => {
+                    setOrgId(organization.id);
+                    setOrgQuery("");
+                  }}
+                >
+                  <span
+                    className="m-avatar"
+                    style={{ width: "36px", height: "36px", fontSize: "12px" }}
+                  >
+                    {initials(organization.tradeName)}
+                  </span>
+                  <div>
+                    <b>{organization.tradeName}</b>
+                    <span>
+                      {organization.city} · {organization.activeMembers} produtores
+                    </span>
+                  </div>
+                  {orgId === organization.id ? (
+                    <span className="m-chip m-leaf">Selecionada</span>
+                  ) : (
+                    <span className="m-chip m-white">Escolher</span>
+                  )}
+                </button>
+              ))}
+              <small className="m-hint">
+                O vínculo é confirmado pela própria cooperativa. Depois do cadastro, peça em Perfil
+                › Cooperativas{chosen ? ` (${chosen.tradeName})` : ""}.
+              </small>
+            </>
           )}
         </div>
+
+        <div data-step="3" hidden={step !== 3}>
+          <Field
+            name="telefone"
+            label="WhatsApp"
+            type="tel"
+            placeholder="(86) 99999-9999"
+            autoComplete="tel"
+            required
+          />
+          <Field
+            name="email"
+            label="E-mail"
+            type="email"
+            placeholder="voce@sitio.com.br"
+            autoComplete="email"
+            required
+          />
+          <AddressFields />
+        </div>
+
+        <div data-step="4" hidden={step !== 4}>
+          <div className="m-field">
+            <span>O que você produz</span>
+            <div className="m-legacy">
+              <SupplierProductPicker value={picked} onChange={setPicked} />
+            </div>
+          </div>
+          <Field
+            name="password"
+            label="Senha"
+            type="password"
+            helper="Mínimo 8 caracteres"
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <Field
+            name="passwordConfirmation"
+            label="Repita a senha"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+        </div>
+        <FormError>{error}</FormError>
       </form>
-    </AuthLayout>
+    </AuthPage>
   );
 }

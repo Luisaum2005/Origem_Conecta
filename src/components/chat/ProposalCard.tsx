@@ -4,7 +4,7 @@ import {
   type NegotiationProposal,
 } from "@/lib/negotiation-proposals";
 import { Link } from "@tanstack/react-router";
-import { Check, Clock3, Handshake, RefreshCw, ShoppingBag, X } from "lucide-react";
+import { Check, Clock3, Handshake, RefreshCw, ShoppingBag, X } from "@/components/mobile/icons";
 import { formatBRL } from "@/lib/format";
 
 const statusLabels = {

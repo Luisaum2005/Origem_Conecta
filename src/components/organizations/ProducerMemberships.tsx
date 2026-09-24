@@ -6,7 +6,7 @@ import {
   useMemberships,
   type OrganizationSearchResult,
 } from "@/lib/organization-memberships";
-import { Building2, Check, Search, X } from "lucide-react";
+import { Building2, Check, Search, X } from "@/components/mobile/icons";
 import {
   AlertDialog,
   AlertDialogAction,

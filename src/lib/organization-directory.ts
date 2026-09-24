@@ -37,6 +37,26 @@ export function useOrganizationDirectory(query: string) {
 
   useEffect(() => {
     if (!supabase) {
+      // Modo local: diretório guardado no navegador (mesmo formato do RPC).
+      try {
+        const rows = JSON.parse(
+          window.localStorage.getItem("origem-conecta-public-organizations") ?? "[]",
+        ) as Record<string, unknown>[];
+        const term = query.trim().toLowerCase();
+        setOrganizations(
+          rows
+            .map(mapOrganization)
+            .filter(
+              (organization) =>
+                !term ||
+                [organization.tradeName, organization.city, ...organization.suppliedProducts].some(
+                  (value) => value.toLowerCase().includes(term),
+                ),
+            ),
+        );
+      } catch {
+        setOrganizations([]);
+      }
       setLoading(false);
       return;
     }

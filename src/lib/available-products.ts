@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { CATALOG, type Product } from "@/lib/catalog";
+import { productGroup } from "@/lib/product-group";
 import { useProducerStock } from "@/lib/producer-stock";
 import { supabase } from "@/lib/supabase";
 
@@ -18,7 +19,7 @@ function catalogMatch(productName: string) {
 }
 
 function inferCategory(productName: string) {
-  return catalogMatch(productName)?.category ?? "Disponibilidade do produtor";
+  return productGroup(productName);
 }
 
 function inferEmoji(productName: string) {
@@ -77,6 +78,8 @@ export function useAvailableProductsResource() {
           emoji: inferEmoji(item.product),
           imageUrl: item.imageUrl,
           videoUrl: item.videoUrl,
+          harvestDate: item.harvestDate || undefined,
+          expiryDate: item.expiryDate || undefined,
           risk: "baixo",
           substitutes: [],
           producers: [
