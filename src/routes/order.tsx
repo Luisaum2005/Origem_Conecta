@@ -1,31 +1,34 @@
-import { CategoryIcon } from "@/components/marketplace/ProductCard";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  ChevronRight,
+  ClipboardCopy,
+  Clock3,
+  Ellipsis,
+  Info,
+  MapPin,
+  Minus,
+  Plus,
+  Repeat,
+  Send,
+  ShoppingBasket,
+  Wallet,
+} from "@/components/mobile/icons";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { SupportButton } from "@/components/layout/SupportButton";
+import { ProductFallback } from "@/components/marketplace/ProductCard";
+import { formatQuantity } from "@/lib/format";
+import { MoreMenu, Sheet } from "@/components/mobile/Sheet";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { useCart } from "@/lib/cart";
 import { preferredProducer } from "@/lib/catalog";
+import { formatBRL, readPaymentPreference, unitLabel } from "@/lib/format";
 import { getOperationWindow } from "@/lib/operation";
-import { useOrders } from "@/lib/orders";
-import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/orders";
+import { PAYMENT_METHODS, type PaymentMethod, useOrders } from "@/lib/orders";
 import { useRecurringOrders } from "@/lib/recurring-orders";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Calendar,
-  ClipboardCopy,
-  Minus,
-  Plus,
-  Repeat,
-  ShieldCheck,
-  ShoppingBag,
-  Trash2,
-  Truck,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/order")({
   component: () => (
@@ -35,12 +38,6 @@ export const Route = createFileRoute("/order")({
   ),
 });
 
-type RemovedItem = {
-  productId: string;
-  quantity: number;
-  name: string;
-};
-
 const maturityOptions = [
   "Sem preferência",
   "Mais verde para durar mais",
@@ -48,150 +45,144 @@ const maturityOptions = [
   "Mais maduro",
 ];
 
-function formatQuantity(value: number) {
-  return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-}
-
-function parseQuantity(value: string) {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function clampQuantity(value: number, max: number) {
   return Math.max(0, Math.min(max, Number(value.toFixed(2))));
 }
 
+function hasCompleteDeliveryAddress(details: {
+  postalCode: string;
+  addressLine: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}) {
+  return (
+    details.postalCode.replace(/\D/g, "").length === 8 &&
+    Boolean(details.addressLine.trim()) &&
+    Boolean(details.neighborhood.trim()) &&
+    Boolean(details.city.trim()) &&
+    /^[A-Za-z]{2}$/.test(details.state.trim())
+  );
+}
+
 function Order() {
   const products = useAvailableProducts();
-  const operation = getOperationWindow();
+  const operation = useMemo(() => getOperationWindow(), []);
   const { cart, setQty, clear } = useCart();
   const { details: buyerDetails } = useBuyerProfileDetails();
   const { addOrder } = useOrders();
   const { addRecurringOrder } = useRecurringOrders();
   const navigate = useNavigate();
-  const [repeatNotice, setRepeatNotice] = useState("");
-  const [recurringNotice, setRecurringNotice] = useState("");
-  const [removedItem, setRemovedItem] = useState<RemovedItem | null>(null);
+  const router = useRouter();
   const [confirmError, setConfirmError] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [maturityPreference, setMaturityPreference] = useState(maturityOptions[0]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("A combinar");
-  const [copyNotice, setCopyNotice] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    const preferred = readPaymentPreference();
+    return PAYMENT_METHODS.includes(preferred as PaymentMethod)
+      ? (preferred as PaymentMethod)
+      : "A combinar";
+  });
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const orderRequestIdRef = useRef<string | null>(null);
   const items = products.filter((product) => cart[product.id]);
 
-  const subtotal = items.reduce((sum, product) => {
-    const producer = preferredProducer(product);
-    return sum + producer.price * cart[product.id];
-  }, 0);
-  const delivery = 0;
-  const total = subtotal + delivery;
-
+  const subtotal = items.reduce(
+    (sum, product) => sum + preferredProducer(product).price * cart[product.id],
+    0,
+  );
   const orderItems = items.map((product) => {
-    const selectedProducer = preferredProducer(product);
+    const producer = preferredProducer(product);
     const quantity = cart[product.id];
     return {
       productId: product.id,
       productName: product.name,
       quantity,
       unit: product.unit,
-      unitPrice: selectedProducer.price,
-      producerId: selectedProducer.id,
-      producerName: selectedProducer.name,
-      sellerOrganizationId: selectedProducer.sellerOrganizationId,
-      sellerOrganizationName: selectedProducer.sellerOrganizationName,
-      sellerOrganizationCnpj: selectedProducer.sellerOrganizationCnpj,
+      unitPrice: producer.price,
+      producerId: producer.id,
+      producerName: producer.name,
+      sellerOrganizationId: producer.sellerOrganizationId,
+      sellerOrganizationName: producer.sellerOrganizationName,
+      sellerOrganizationCnpj: producer.sellerOrganizationCnpj,
       manualProducerChoice: false,
-      lineTotal: selectedProducer.price * quantity,
+      lineTotal: producer.price * quantity,
       notes: `Maturação: ${maturityPreference}`,
     };
   });
 
-  const summaryText = useMemo(() => {
-    if (!orderItems.length) return "";
-    const lines = [
-      "Solicitação de negociação - Origem Conecta",
-      `Comprador: ${buyerDetails.companyName || buyerDetails.responsibleName || "Comprador"}`,
-      `Solicitação enviada até: ${operation.cutoffLabel}`,
-      `Preferência de entrega: ${operation.deliveryLabel}`,
-      `Maturação: ${maturityPreference}`,
-      `Forma de pagamento sugerida: ${paymentMethod}`,
-      "",
-      ...orderItems.flatMap((item) => [
-        `- ${item.productName}`,
-        `  Quantidade: ${formatQuantity(item.quantity)} ${item.unit}`,
-        `  Produtor: ${item.producerName}`,
-        `  Valor anunciado: ${formatBRL(item.lineTotal)}`,
-      ]),
-      "",
-      `Valor estimado: ${formatBRL(subtotal)}`,
-      "Preço, logística, pagamento e documentação serão definidos na negociação.",
-    ];
-    return lines.join("\n");
-  }, [
-    buyerDetails.companyName,
-    buyerDetails.responsibleName,
-    maturityPreference,
-    paymentMethod,
-    operation.cutoffLabel,
-    operation.deliveryLabel,
-    orderItems,
-    subtotal,
-  ]);
+  const summaryText = [
+    "Solicitação de negociação - Origem Conecta",
+    `Comprador: ${buyerDetails.companyName || buyerDetails.responsibleName || "Comprador"}`,
+    `Solicitação enviada até: ${operation.cutoffLabel}`,
+    `Preferência de entrega: ${operation.deliveryLabel}`,
+    `Maturação: ${maturityPreference}`,
+    `Forma de pagamento sugerida: ${paymentMethod}`,
+    "",
+    ...orderItems.flatMap((item) => [
+      `- ${item.productName}`,
+      `  Quantidade: ${formatQuantity(item.quantity)} ${item.unit}`,
+      `  Produtor: ${item.producerName}`,
+      `  Valor anunciado: ${formatBRL(item.lineTotal)}`,
+    ]),
+    "",
+    `Valor estimado: ${formatBRL(subtotal)}`,
+    "Preço, logística, pagamento e documentação serão definidos na negociação.",
+  ].join("\n");
 
-  const stockIssues = items
-    .map((product) => {
-      const selectedProducer = preferredProducer(product);
-      const requested = cart[product.id] ?? 0;
-      return requested > selectedProducer.stock
-        ? {
-            productId: product.id,
-            productName: product.name,
-            requested,
-            available: selectedProducer.stock,
-            unit: product.unit,
-          }
-        : null;
-    })
-    .filter(Boolean);
-  const hasStockIssues = stockIssues.length > 0;
+  const hasStockIssues = items.some(
+    (product) => (cart[product.id] ?? 0) > preferredProducer(product).stock,
+  );
+  const addressReady = hasCompleteDeliveryAddress(buyerDetails);
+  const address = [
+    [buyerDetails.addressLine, buyerDetails.addressNumber].filter(Boolean).join(", "),
+    buyerDetails.neighborhood,
+    `${buyerDetails.city}/${buyerDetails.state.toUpperCase()}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  const removeProduct = (productId: string) => {
-    const product = products.find((item) => item.id === productId);
-    setRemovedItem({
-      productId,
-      quantity: cart[productId],
-      name: product?.name ?? "Produto",
-    });
-    setQty(productId, 0);
-  };
+  const cutoff = operation.cutoff;
+  const cutoffText = `${cutoff.toLocaleDateString("pt-BR", { weekday: "short" })} ${cutoff.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}, 18h`;
+  const deliveryText = `${operation.delivery.toLocaleDateString("pt-BR", { weekday: "short" })}, 8h`;
 
-  const restoreRemovedItem = () => {
-    if (!removedItem) return;
-    setQty(removedItem.productId, removedItem.quantity);
-    setRemovedItem(null);
-  };
-
-  const updateQuantity = (productId: string, value: number, max: number) => {
-    setQty(productId, clampQuantity(value, max));
+  const changeQuantity = (productId: string, name: string, next: number, max: number) => {
+    const previous = cart[productId] ?? 0;
+    const value = clampQuantity(next, max);
+    setQty(productId, value);
+    if (value === 0) {
+      toast.success(
+        <span>
+          <b>{name}</b> saiu da lista
+        </span>,
+        { action: { label: "Desfazer", onClick: () => setQty(productId, previous) } },
+      );
+    }
   };
 
   const copySummary = async () => {
-    if (!summaryText) return;
     try {
       await navigator.clipboard.writeText(summaryText);
-      setCopyNotice("Resumo copiado.");
+      toast.success("Resumo copiado");
     } catch {
-      setCopyNotice("Não foi possível copiar automaticamente. Selecione o resumo manualmente.");
+      toast.error("Não foi possível copiar o resumo.");
     }
+  };
+
+  const saveRecurring = () => {
+    addRecurringOrder({
+      name: `Cesta recorrente - ${new Date().toLocaleDateString("pt-BR")}`,
+      frequency: "semanal",
+      preferredDeliveryDay: operation.shortDeliveryLabel,
+      items: orderItems,
+    });
+    toast.success("Lista salva como pedido recorrente");
   };
 
   const handleConfirmOrder = async () => {
     if (isConfirming || hasStockIssues) return;
-    if (!hasCompleteDeliveryAddress(buyerDetails)) {
-      setConfirmError(
-        "Complete o endereço de entrega no seu perfil antes de enviar a solicitação.",
-      );
+    if (!addressReady) {
+      void navigate({ to: "/profile/buyer", hash: "endereco" });
       return;
     }
     setIsConfirming(true);
@@ -202,8 +193,8 @@ function Order() {
         {
           buyerName: buyerDetails.companyName || buyerDetails.responsibleName || "Comprador",
           subtotal,
-          delivery,
-          total,
+          delivery: 0,
+          total: subtotal,
           deliveryEta: operation.deliveryLabel,
           paymentMethod,
           deliveryAddress: {
@@ -225,7 +216,7 @@ function Order() {
         "origem-conecta-order-success",
         `Solicitação #${savedOrder.id} enviada. Aguarde o contato do produtor para negociar as condições.`,
       );
-      navigate({ to: "/orders" });
+      void navigate({ to: "/orders" });
     } catch (error) {
       setConfirmError(
         error instanceof Error
@@ -237,415 +228,263 @@ function Order() {
     }
   };
 
-  useEffect(() => {
-    const notice = window.sessionStorage.getItem("origem-conecta-repeat-notice");
-    if (!notice) return;
-    setRepeatNotice(notice);
-    window.sessionStorage.removeItem("origem-conecta-repeat-notice");
-  }, []);
+  const goBack = () => {
+    if (window.history.length > 1) router.history.back();
+    else void navigate({ to: "/portfolio" });
+  };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-6 pb-24 sm:px-8 sm:py-10 md:pb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to="/portfolio"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-          >
-            <ArrowLeft className="h-4 w-4" /> Voltar ao portfólio
-          </Link>
-          <SupportButton compact />
+      <div className="m-screen m-s-03-lista">
+        <div className="m-status" />
+        <div className="m-hd">
+          <button type="button" className="m-round" onClick={goBack} aria-label="Voltar">
+            <ArrowLeft className="lucide" aria-hidden />
+          </button>
+          <h1>Lista de interesse</h1>
+          <MoreMenu
+            label="Mais opções da lista"
+            icon={<Ellipsis className="lucide" aria-hidden />}
+            items={[
+              {
+                label: "Acrescentar itens",
+                icon: <Plus className="lucide" aria-hidden />,
+                onSelect: () => void navigate({ to: "/portfolio" }),
+              },
+              {
+                label: "Copiar resumo",
+                icon: <ClipboardCopy className="lucide" aria-hidden />,
+                onSelect: () => void copySummary(),
+              },
+              {
+                label: "Salvar como recorrente",
+                icon: <Repeat className="lucide" aria-hidden />,
+                onSelect: saveRecurring,
+              },
+            ]}
+          />
         </div>
 
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-          Lista de interesse
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-          Altere quantidades, acrescente itens, confira produtores e copie o resumo antes de
-          confirmar.
-        </p>
-
-        <div className="mt-4 rounded-2xl bg-orange-100 px-4 py-3 text-sm text-orange-700">
-          <strong>{operation.orderDeadlineText}</strong> {operation.deliveryText}
+        <div className="m-banner">
+          <Clock3 className="lucide" aria-hidden />
+          <div>
+            <b>Envie até {cutoffText}</b> · entrega {deliveryText}
+          </div>
         </div>
-
-        {repeatNotice && (
-          <div className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm font-medium text-brand-900">
-            {repeatNotice}
-          </div>
-        )}
-
-        {recurringNotice && (
-          <div className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm font-medium text-brand-900">
-            {recurringNotice}
-          </div>
-        )}
-
-        {removedItem && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-900">
-            <span>{removedItem.name} foi removido da lista de interesse.</span>
-            <button type="button" onClick={restoreRemovedItem} className="font-bold underline">
-              Desfazer
-            </button>
-          </div>
-        )}
 
         {items.length === 0 ? (
-          <div className="mt-10 rounded-2xl border border-border bg-white p-8 text-center sm:p-12">
-            <ShoppingBag className="mx-auto h-10 w-10 text-leaf-700" />
-            <h3 className="mt-4 text-lg font-semibold text-brand-900">Sua lista está vazia</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Adicione produtos do portfólio da semana para continuar.
-            </p>
-            <Link
-              to="/portfolio"
-              className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
-            >
-              Ver portfólio
-            </Link>
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>Sua lista está vazia</b>
+              <span>Adicione produtos do portfólio da semana para continuar.</span>
+              <Link to="/portfolio" className="m-btn m-secondary m-sm" style={{ marginTop: 16 }}>
+                <ShoppingBasket className="lucide" aria-hidden />
+                Ver portfólio
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-brand-900">Itens de interesse</h2>
-                <Link
-                  to="/portfolio"
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-                >
-                  Acrescentar itens
-                </Link>
-              </div>
-
+          <>
+            <div className="m-items">
               {items.map((product) => {
-                const selectedProducer = preferredProducer(product);
-                const lineTotal = selectedProducer.price * cart[product.id];
-                const currentUnit = product.unit;
+                const producer = preferredProducer(product);
+                const quantity = cart[product.id];
+                const over = quantity > producer.stock;
                 return (
-                  <div
-                    key={product.id}
-                    className="rounded-2xl border border-border bg-white p-4 shadow-xs transition-shadow hover:shadow-sm sm:p-5"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[linear-gradient(160deg,#eef8e2_0%,#d9eec4_100%)] text-3xl sm:text-4xl">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="h-full w-full rounded-xl object-cover"
+                  <div key={product.id} className="m-it m-card">
+                    {product.imageUrl ? (
+                      <div className="m-ph">
+                        <img src={product.imageUrl} alt={product.name} />
+                      </div>
+                    ) : (
+                      <ProductFallback
+                        category={product.category}
+                        name={product.name}
+                        className="m-ph"
+                        label={false}
+                      />
+                    )}
+                    <div className="m-txt">
+                      <b>{product.name}</b>
+                      <span>{producer.property}</span>
+                      <span className={over ? "m-over" : undefined}>
+                        {over
+                          ? `Estoque: ${formatQuantity(producer.stock)} ${unitLabel(product.unit, producer.stock)}`
+                          : `${formatBRL(producer.price)}/${product.unit}`}
+                      </span>
+                      <div className="m-bt">
+                        <div className="m-stepper">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeQuantity(product.id, product.name, quantity - 1, producer.stock)
+                            }
+                            aria-label={`Diminuir ${product.name}`}
+                          >
+                            <Minus className="lucide" aria-hidden />
+                          </button>
+                          <QuantityInput
+                            value={quantity}
+                            label={`Quantidade de ${product.name}`}
+                            onCommit={(value) =>
+                              changeQuantity(product.id, product.name, value, producer.stock)
+                            }
                           />
-                        ) : (
-                          <CategoryIcon category={product.category} name={product.name} />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-base font-semibold text-brand-900 sm:text-lg">
-                          {product.name}
-                        </h3>
-                        <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                          Produtor: {selectedProducer.name}
-                        </p>
-                        {selectedProducer.origin && (
-                          <p className="text-xs text-muted-foreground">{selectedProducer.origin}</p>
-                        )}
-                        <p className="mt-1.5 text-sm font-medium text-brand-700">
-                          Unidade: {currentUnit} · {formatBRL(selectedProducer.price)}/{currentUnit}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => removeProduct(product.id)}
-                        className="hidden h-10 w-10 place-items-center rounded-lg text-muted-foreground hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error-fg)] sm:grid cursor-pointer"
-                        aria-label="Remover item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="mt-4 border-t border-border pt-4">
-                      <div className="flex flex-wrap items-end justify-between gap-3 sm:justify-end">
-                        {cart[product.id] > selectedProducer.stock && (
-                          <p className="text-xs font-semibold text-[var(--color-error-fg)]">
-                            Estoque: {formatQuantity(selectedProducer.stock)} {currentUnit}
-                          </p>
-                        )}
-
-                        <OrderItemControls
-                          productId={product.id}
-                          quantity={cart[product.id]}
-                          unit={currentUnit}
-                          maxStock={selectedProducer.stock}
-                          onQuantityChange={(qty) =>
-                            updateQuantity(product.id, qty, selectedProducer.stock)
-                          }
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => removeProduct(product.id)}
-                          className="inline-flex h-11 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] sm:hidden cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Excluir
-                        </button>
-
-                        <div className="text-right">
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Total
-                          </p>
-                          <p className="text-base font-bold tabular-nums text-brand-900 sm:text-lg">
-                            {formatBRL(lineTotal)}
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeQuantity(product.id, product.name, quantity + 1, producer.stock)
+                            }
+                            aria-label={`Aumentar ${product.name}`}
+                          >
+                            <Plus className="lucide" aria-hidden />
+                          </button>
                         </div>
+                        <b className="m-price">{formatBRL(producer.price * quantity)}</b>
                       </div>
                     </div>
                   </div>
                 );
               })}
-            </section>
+            </div>
 
-            <aside className="space-y-4 lg:sticky lg:top-[88px] lg:h-fit">
-              <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-brand-900">Resumo da solicitação</h2>
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="font-medium tabular-nums text-brand-900">
-                      {formatBRL(subtotal)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Logística</dt>
-                    <dd className="font-medium text-brand-900">A negociar</dd>
-                  </div>
-                  <div className="flex justify-between border-t border-border pt-3 text-base">
-                    <dt className="font-semibold text-brand-900">Valor anunciado estimado</dt>
-                    <dd className="text-xl font-bold tabular-nums text-brand-900">
-                      {formatBRL(total)}
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="mt-5 rounded-xl border border-border bg-canvas p-4">
-                  <p className="text-sm font-semibold text-brand-900">Maturação do produto</p>
-                  <div className="mt-3 space-y-2">
-                    {maturityOptions.map((option) => (
-                      <label
-                        key={option}
-                        className="flex items-center gap-2 text-sm text-brand-900"
-                      >
-                        <input
-                          type="radio"
-                          name="maturity"
-                          value={option}
-                          checked={maturityPreference === option}
-                          onChange={() => setMaturityPreference(option)}
-                          className="h-4 w-4 accent-[var(--color-brand-900)]"
-                        />
-                        {option}
-                      </label>
-                    ))}
-                  </div>
+            <div className="m-prefs m-card">
+              <button type="button" onClick={() => setPrefsOpen(true)}>
+                <Wallet className="lucide" aria-hidden />
+                <div>
+                  Pagamento e maturação
+                  <span>
+                    {paymentMethod} · {maturityPreference.toLowerCase()}
+                  </span>
                 </div>
-
-                <fieldset className="mt-5 rounded-xl border border-border bg-canvas p-4">
-                  <legend className="px-1 text-sm font-semibold text-brand-900">
-                    Forma de pagamento
-                  </legend>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Escolha sua preferência. O produtor verá esta informação para combinar os
-                    detalhes com você.
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {PAYMENT_METHODS.map((method) => (
-                      <label
-                        key={method}
-                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-medium text-brand-900 has-[:checked]:border-leaf-600 has-[:checked]:bg-leaf-50"
-                      >
-                        <input
-                          type="radio"
-                          name="payment-method"
-                          value={method}
-                          checked={paymentMethod === method}
-                          onChange={() => setPaymentMethod(method)}
-                          className="h-4 w-4 accent-[var(--color-brand-900)]"
-                        />
-                        {method}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <div className="mt-5 rounded-xl border border-leaf-200 bg-leaf-100 p-4 text-sm text-brand-900">
-                  Esta solicitação não confirma uma compra. A forma de pagamento é uma preferência e
-                  os detalhes serão combinados diretamente com o produtor.
+                <ChevronRight className="lucide" aria-hidden />
+              </button>
+              <Link
+                to="/profile/buyer"
+                hash="endereco"
+                className={addressReady ? undefined : "m-warn"}
+              >
+                <MapPin className="lucide" aria-hidden />
+                <div>
+                  Endereço de entrega
+                  <span>{addressReady ? address : "Pendente — necessário para enviar"}</span>
                 </div>
+                <ChevronRight className="lucide" aria-hidden />
+              </Link>
+            </div>
 
-                {!hasCompleteDeliveryAddress(buyerDetails) && (
-                  <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
-                    <p className="font-semibold">Endereço de entrega pendente</p>
-                    <p className="mt-1">
-                      Antes de enviar, complete o endereço em seu perfil. Ele será mostrado apenas
-                      aos produtores que participarem desta solicitação.
-                    </p>
-                    <Link to="/profile/buyer" className="mt-3 inline-flex font-semibold underline">
-                      Completar endereço
-                    </Link>
-                  </div>
-                )}
-
-                <div className="mt-5 rounded-xl border border-border bg-white p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm font-semibold text-brand-900">Resumo para conferência</p>
-                    <button
-                      type="button"
-                      onClick={() => void copySummary()}
-                      className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
-                    >
-                      <ClipboardCopy className="h-4 w-4" />
-                      Copiar
-                    </button>
-                  </div>
-                  <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas p-3 text-xs leading-relaxed text-brand-900">
-                    {summaryText}
-                  </pre>
-                  {copyNotice && (
-                    <p className="mt-2 text-xs font-semibold text-leaf-700">{copyNotice}</p>
-                  )}
-                </div>
-
-                {hasStockIssues && (
-                  <div
-                    role="alert"
-                    className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]"
-                  >
-                    Ajuste as quantidades. Um ou mais itens ultrapassam o estoque publicado.
-                  </div>
-                )}
-                {confirmError && (
-                  <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]">
-                    {confirmError}
-                  </div>
-                )}
-                <button
-                  disabled={isConfirming || hasStockIssues}
-                  onClick={handleConfirmOrder}
-                  className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isConfirming ? "Enviando..." : "Enviar solicitação de negociação"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    addRecurringOrder({
-                      name: `Cesta recorrente - ${new Date().toLocaleDateString("pt-BR")}`,
-                      frequency: "semanal",
-                      preferredDeliveryDay: operation.shortDeliveryLabel,
-                      items: orderItems,
-                    });
-                    setRecurringNotice(
-                      "Modelo recorrente salvo. Você pode carregá-lo em Solicitações antes de iniciar uma nova negociação.",
-                    );
-                  }}
-                  className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-                >
-                  <Repeat className="h-4 w-4" />
-                  Salvar como recorrente
-                </button>
+            <div className="m-footer">
+              <div className="m-sum">
+                <span>
+                  Estimado · {items.length} {items.length === 1 ? "item" : "itens"}
+                </span>
+                <b className="m-price">{formatBRL(subtotal)}</b>
               </div>
-
-              <div className="rounded-2xl border border-[var(--border-strong)] bg-surface-brand-soft p-5">
-                <h3 className="inline-flex items-center gap-2 font-semibold text-brand-900">
-                  <ShieldCheck className="h-4 w-4 text-leaf-700" />
-                  Distribuição inteligente
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Você pode deixar a Origem escolher automaticamente ou travar produtores
-                  específicos por item.
-                </p>
-                <ul className="mt-3 space-y-1.5 text-sm text-brand-900">
-                  <li className="inline-flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-leaf-700" /> Fechamento:{" "}
-                    {operation.cutoffLabel}
-                  </li>
-                  <li className="inline-flex items-center gap-2">
-                    <Truck className="h-3.5 w-3.5 text-leaf-700" /> Entrega prevista:{" "}
-                    {operation.deliveryLabel}
-                  </li>
-                  <li className="inline-flex items-start gap-2">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-leaf-700" />
-                    <span>{operation.issueText}</span>
-                  </li>
-                </ul>
-              </div>
-            </aside>
-          </div>
+              <button
+                type="button"
+                className="m-btn m-primary"
+                disabled={isConfirming || hasStockIssues}
+                onClick={() => void handleConfirmOrder()}
+              >
+                {addressReady ? (
+                  <Send className="lucide" aria-hidden />
+                ) : (
+                  <MapPin className="lucide" aria-hidden />
+                )}
+                {isConfirming
+                  ? "Enviando..."
+                  : addressReady
+                    ? "Enviar solicitação"
+                    : "Completar endereço e enviar"}
+              </button>
+              {(confirmError || hasStockIssues || !addressReady) && (
+                <div className="m-reason" role={confirmError ? "alert" : undefined}>
+                  <Info className="lucide" aria-hidden />
+                  {confirmError ||
+                    (hasStockIssues
+                      ? "Ajuste as quantidades acima do estoque"
+                      : "O envio libera depois do endereço")}
+                </div>
+              )}
+            </div>
+          </>
         )}
-      </main>
-    </div>
-  );
-}
-
-function hasCompleteDeliveryAddress(details: {
-  postalCode: string;
-  addressLine: string;
-  neighborhood: string;
-  city: string;
-  state: string;
-}) {
-  return (
-    details.postalCode.replace(/\D/g, "").length === 8 &&
-    Boolean(details.addressLine.trim()) &&
-    Boolean(details.neighborhood.trim()) &&
-    Boolean(details.city.trim()) &&
-    /^[A-Za-z]{2}$/.test(details.state.trim())
-  );
-}
-
-function OrderItemControls({
-  productId,
-  quantity,
-  unit,
-  maxStock,
-  onQuantityChange,
-}: {
-  productId: string;
-  quantity: number;
-  unit: string;
-  maxStock: number;
-  onQuantityChange: (qty: number) => void;
-}) {
-  const [inputValue, setInputValue] = useState(
-    quantity > 0 ? quantity.toString().replace(".", ",") : "",
-  );
-
-  useEffect(() => {
-    setInputValue(quantity > 0 ? quantity.toString().replace(".", ",") : "");
-  }, [quantity]);
-
-  const handleInputChange = (valueStr: string) => {
-    setInputValue(valueStr);
-    const parsed = Number(valueStr.replace(",", "."));
-    if (Number.isFinite(parsed)) {
-      onQuantityChange(parsed);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative min-w-0 w-28">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Qtd"
-          inputMode="decimal"
-          className="h-11 w-full rounded-xl border border-border bg-white px-3 text-center text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-        />
       </div>
-      <span className="inline-flex h-11 w-24 items-center justify-center rounded-xl border border-border bg-canvas px-2 text-center text-sm font-semibold text-brand-900">
-        {unit}
-      </span>
-    </div>
+
+      <Sheet
+        open={prefsOpen}
+        title="Pagamento e maturação"
+        onClose={() => setPrefsOpen(false)}
+        footer={
+          <button type="button" className="m-btn m-primary" onClick={() => setPrefsOpen(false)}>
+            Pronto
+          </button>
+        }
+      >
+        <span className="m-lbl">Forma de pagamento</span>
+        <div className="m-opts" role="radiogroup" aria-label="Forma de pagamento">
+          {PAYMENT_METHODS.map((method) => (
+            <button
+              key={method}
+              type="button"
+              role="radio"
+              aria-checked={paymentMethod === method}
+              className={`m-pill${paymentMethod === method ? " m-sel" : ""}`}
+              onClick={() => setPaymentMethod(method)}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
+        <span className="m-lbl">Maturação do produto</span>
+        <div className="m-opts" role="radiogroup" aria-label="Maturação do produto">
+          {maturityOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={maturityPreference === option}
+              className={`m-pill${maturityPreference === option ? " m-sel" : ""}`}
+              onClick={() => setMaturityPreference(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        <p className="m-note">
+          Esta solicitação não confirma uma compra. Pagamento e maturação são preferências; os
+          detalhes são combinados direto com o produtor.
+        </p>
+      </Sheet>
+    </>
+  );
+}
+
+function QuantityInput({
+  value,
+  label,
+  onCommit,
+}: {
+  value: number;
+  label: string;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const parsed = Number(draft.replace(",", "."));
+    if (Number.isFinite(parsed)) onCommit(parsed);
+    setDraft(null);
+  };
+  return (
+    <input
+      value={draft ?? formatQuantity(value)}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => event.key === "Enter" && commit()}
+      inputMode="decimal"
+      aria-label={label}
+    />
   );
 }

@@ -17,6 +17,8 @@ export type SavedConversation = {
 
   // Joined details (computed/loaded dynamically)
   otherPartyName?: string;
+  /** Responsável pelo lado de lá (ex.: nome de quem atende no sítio). */
+  otherPartyDetail?: string;
   lastMessageText?: string;
   unreadCount?: number;
   orderStatus?: string;
@@ -495,18 +497,19 @@ export async function getUserConversations(
       const latest = convMsgs[0];
       const unreadCount = convMsgs.filter((m) => m.senderId !== profileId && !m.readAt).length;
 
-      let otherParty = "Participante";
-      if (profileType === "comprador") {
-        otherParty = `Produtor (ID: ${c.producerId.substring(0, 4)})`;
-      } else {
-        otherParty = `Estabelecimento (ID: ${c.buyerId.substring(0, 4)})`;
-      }
+      const context = localContext(c);
+      const otherParty =
+        profileType === "comprador"
+          ? (context.producerName ?? "Produtor")
+          : (context.buyerName ?? "Estabelecimento");
 
       return {
         ...c,
         otherPartyName: otherParty,
         lastMessageText: latest?.message || undefined,
         unreadCount,
+        orderStatus: c.orderStatus ?? context.orderStatus,
+        demandUrgency: c.demandUrgency ?? context.demandUrgency,
       };
     });
 
@@ -515,6 +518,43 @@ export async function getUserConversations(
     );
     return result;
   }
+}
+
+type LocalOrder = {
+  id: string;
+  status?: string;
+  buyerName?: string;
+  items?: { producerName?: string }[];
+};
+type LocalDemand = {
+  id: string;
+  urgency?: string;
+  buyerName?: string;
+  responses?: { producerName?: string }[];
+};
+
+/** No modo local, recupera nomes e status a partir dos pedidos e demandas guardados. */
+function localContext(conversation: SavedConversation) {
+  const read = <T>(key: string): T[] => {
+    try {
+      const value = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  };
+  const order = conversation.orderId
+    ? read<LocalOrder>("origem-conecta-orders").find((item) => item.id === conversation.orderId)
+    : undefined;
+  const demand = conversation.demandId
+    ? read<LocalDemand>("origem-conecta-demands").find((item) => item.id === conversation.demandId)
+    : undefined;
+  return {
+    producerName: order?.items?.[0]?.producerName ?? demand?.responses?.[0]?.producerName,
+    buyerName: order?.buyerName ?? demand?.buyerName,
+    orderStatus: order?.status,
+    demandUrgency: demand?.urgency,
+  };
 }
 
 export async function markAsRead(conversationId: string, profileId: string): Promise<void> {

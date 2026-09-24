@@ -5,7 +5,7 @@ import {
   type Organization,
   type OrganizationSettings,
 } from "@/lib/organizations";
-import { BadgeCheck, Building2, Check, Clock3, Pencil, X } from "lucide-react";
+import { BadgeCheck, Building2, Check, Clock3, Pencil, X } from "@/components/mobile/icons";
 import { useState, type FormEvent } from "react";
 
 export function OrganizationSettingsForm({

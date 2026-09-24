@@ -1,32 +1,37 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  MessageCircle,
+  MessageSquareText,
+  Plus,
+  Send,
+  SlidersHorizontal,
+  Trash2,
+  Zap,
+} from "@/components/mobile/icons";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { SupportButton } from "@/components/layout/SupportButton";
+import { Sheet } from "@/components/mobile/Sheet";
 import { useAuth } from "@/lib/auth";
 import {
   type DemandItem,
   type DemandRequest,
   type DemandResponse,
-  type DemandResponseItem,
+  type DemandStatus,
   type DemandUrgency,
   useDemandRequests,
 } from "@/lib/demands";
+import { formatBRL, initials, unitLabel } from "@/lib/format";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/orders";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  ClipboardList,
-  Plus,
-  Send,
-  ShoppingBag,
-  Trash2,
-  Zap,
-  MessageSquare,
-} from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { formatBRL } from "@/lib/format";
+
+type DemandsSearch = { respond?: string };
 
 export const Route = createFileRoute("/demands")({
+  validateSearch: (search: Record<string, unknown>): DemandsSearch => ({
+    respond: typeof search.respond === "string" ? search.respond : undefined,
+  }),
   component: () => (
     <RequireProfile allowed={["comprador", "produtor", "admin"]}>
       <DemandsHub />
@@ -34,9 +39,338 @@ export const Route = createFileRoute("/demands")({
   ),
 });
 
-const units = ["kg", "unidade", "peça", "caixa", "maço", "bandeja", "pote", "litro"];
-const productStates = ["Indiferente", "Mais verde", "No ponto", "Maduro", "Selecionado"];
-type DemandFilter = "all" | "open" | "withResponses" | "approved";
+const UNITS = ["kg", "unidade", "peça", "caixa", "maço", "bandeja", "pote", "litro"];
+const PRODUCT_STATES = ["Indiferente", "Mais verde", "No ponto", "Maduro", "Selecionado"];
+const HIDDEN_KEY = "origem-conecta-hidden-demand-responses";
+type Filter = "all" | "open" | "withResponses" | "approved";
+
+const STATUS_CHIP: Record<DemandStatus, [string, string]> = {
+  Aberta: ["m-st-recebido", "Aberta"],
+  Respondida: ["m-st-separacao", "Com proposta"],
+  Aprovada: ["m-st-entregue", "Aprovada"],
+  Cancelada: ["m-st-cancelado", "Cancelada"],
+};
+
+const qty = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const shortDate = (value: string) =>
+  value
+    ? new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+const displayId = (id: string) => (/^DEM-/i.test(id) ? id : `DEM-${id.slice(-4).toUpperCase()}`);
+
+function demandTitle(demand: DemandRequest) {
+  if (demand.items.length === 1) {
+    const [item] = demand.items;
+    const state =
+      item.productState && item.productState !== "Indiferente"
+        ? ` ${item.productState.toLowerCase()}`
+        : "";
+    return `${item.productName}${state} · ${qty(item.quantity)} ${unitLabel(item.unit, item.quantity)}`;
+  }
+  return demand.items
+    .map(
+      (item, index) =>
+        `${index === 0 ? item.productName : item.productName.split(" ")[0]} ${qty(item.quantity)} ${unitLabel(item.unit, item.quantity)}`,
+    )
+    .join(" · ");
+}
+
+function daysLeft(value: string) {
+  if (!value) return null;
+  const date = new Date(`${value}T12:00:00`);
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 864e5);
+}
+
+function responseTotal(response: DemandResponse) {
+  return response.items.filter((item) => item.canSupply).reduce((sum, item) => sum + item.price, 0);
+}
+
+function readHidden(): string[] {
+  try {
+    return JSON.parse(window.localStorage.getItem(HIDDEN_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function DemandsHub() {
+  const { profile } = useAuth();
+  const { respond } = Route.useSearch();
+  const { demands, addDemand, respondDemand, approveResponse } = useDemandRequests();
+
+  if (profile?.tipo === "produtor") {
+    const demand = respond ? demands.find((item) => item.id === respond) : undefined;
+    return demand ? (
+      <RespondDemand demand={demand} respondDemand={respondDemand} producerName={profile.nome} />
+    ) : (
+      <ProducerDemands demands={demands} producerName={profile.nome} />
+    );
+  }
+  return (
+    <BuyerDemands
+      demands={demands}
+      addDemand={addDemand}
+      approveResponse={approveResponse}
+      buyerName={profile?.nome ?? "Comprador"}
+      readOnly={profile?.tipo !== "comprador"}
+    />
+  );
+}
+
+function DemandHead({ demand, right }: { demand: DemandRequest; right?: React.ReactNode }) {
+  const [chipClass, label] = STATUS_CHIP[demand.status];
+  return (
+    <div className="m-t">
+      {demand.urgency === "urgente" && demand.status === "Aberta" ? (
+        <>
+          <span className={`m-chip ${chipClass} m-st-dot`}>{label}</span>
+          <span className="m-chip m-st-cancelado m-urg">
+            <Zap className="lucide" aria-hidden />
+            Urgente
+          </span>
+        </>
+      ) : (
+        <>
+          <span className={`m-chip ${chipClass} m-st-dot`}>{label}</span>
+          {right ?? <span className="m-muted">#{displayId(demand.id)}</span>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BuyerDemands({
+  demands,
+  addDemand,
+  approveResponse,
+  buyerName,
+  readOnly,
+}: {
+  demands: DemandRequest[];
+  addDemand: ReturnType<typeof useDemandRequests>["addDemand"];
+  approveResponse: ReturnType<typeof useDemandRequests>["approveResponse"];
+  buyerName: string;
+  readOnly: boolean;
+}) {
+  const [filter, setFilter] = useState<Filter>("all");
+  const [urgentOnly, setUrgentOnly] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [approvingId, setApprovingId] = useState("");
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden(readHidden()), []);
+
+  const counts = {
+    all: demands.length,
+    open: demands.filter((demand) => demand.status === "Aberta").length,
+    withResponses: demands.filter((demand) => demand.status === "Respondida").length,
+    approved: demands.filter((demand) => demand.status === "Aprovada").length,
+  };
+  const visible = demands.filter((demand) => {
+    if (urgentOnly && demand.urgency !== "urgente") return false;
+    if (filter === "open") return demand.status === "Aberta";
+    if (filter === "withResponses") return demand.status === "Respondida";
+    if (filter === "approved") return demand.status === "Aprovada";
+    return true;
+  });
+
+  const approve = async (demand: DemandRequest, response: DemandResponse) => {
+    setApprovingId(response.id);
+    try {
+      const orderId = await approveResponse(demand.id, response.id);
+      toast.success(`Proposta aprovada. Pedido ${orderId ? `#${orderId} ` : ""}criado.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível aprovar a proposta.");
+    } finally {
+      setApprovingId("");
+    }
+  };
+
+  const hide = (response: DemandResponse) => {
+    const next = [...hidden, response.id];
+    window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+    setHidden(next);
+    toast.success(`Proposta de ${response.producerName} ocultada`, {
+      description: "O produtor não é avisado. Você ainda pode aprovar outra proposta.",
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const restored = readHidden().filter((id) => id !== response.id);
+          window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(restored));
+          setHidden(restored);
+        },
+      },
+    });
+  };
+
+  const pills: { key: Filter; label: string; count?: number }[] = [
+    { key: "all", label: "Todas", count: counts.all },
+    { key: "open", label: "Abertas", count: counts.open },
+    { key: "withResponses", label: "Com proposta", count: counts.withResponses },
+    { key: "approved", label: "Aprovadas" },
+  ];
+
+  return (
+    <>
+      <Navbar />
+      <div className="m-screen m-s-07-demandas">
+        <div className="m-status" />
+        <div className="m-hd m-big">
+          <h1>Demandas</h1>
+          <button
+            type="button"
+            className={`m-round${urgentOnly ? " m-active" : ""}`}
+            aria-pressed={urgentOnly}
+            aria-label="Mostrar só urgentes"
+            title="Mostrar só urgentes"
+            onClick={() => setUrgentOnly((current) => !current)}
+          >
+            <SlidersHorizontal className="lucide" aria-hidden />
+          </button>
+        </div>
+        <p className="m-intro">
+          {readOnly
+            ? "Demandas publicadas pelos compradores."
+            : "Não achou no portfólio? Publique o que precisa e os produtores mandam proposta."}
+        </p>
+        <div className="m-cats" role="tablist">
+          {pills.map((pill) => (
+            <button
+              key={pill.key}
+              type="button"
+              role="tab"
+              aria-selected={filter === pill.key}
+              className={`m-pill${filter === pill.key ? " m-on" : ""}`}
+              onClick={() => setFilter(pill.key)}
+            >
+              {pill.label}
+              {pill.count !== undefined && <span className="m-n">{pill.count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>{demands.length ? "Nada neste filtro" : "Nenhuma demanda publicada"}</b>
+              <span>
+                {demands.length
+                  ? "Escolha outro filtro para ver suas demandas."
+                  : "Publique o que precisa e receba propostas dos produtores da região."}
+              </span>
+            </div>
+          </div>
+        ) : (
+          visible.map((demand) => {
+            const pending = demand.responses.filter(
+              (response) => response.status === "Enviada" && !hidden.includes(response.id),
+            );
+            const approved = demand.responses.find((response) => response.status === "Aprovada");
+            const remaining = daysLeft(demand.deliveryDate);
+            return (
+              <div key={demand.id} className="m-dm m-card">
+                <DemandHead
+                  demand={demand}
+                  right={
+                    demand.status === "Aprovada" ? undefined : (
+                      <span className="m-muted">
+                        #{displayId(demand.id)}
+                        {demand.deliveryDate ? ` · entrega ${shortDate(demand.deliveryDate)}` : ""}
+                      </span>
+                    )
+                  }
+                />
+                <b className="m-tt">{demandTitle(demand)}</b>
+                {demand.status === "Aprovada" ? (
+                  <span className="m-muted m-sub">
+                    {approved?.orderId
+                      ? `Virou o pedido #${approved.orderId}`
+                      : `Aprovada com ${approved?.producerName ?? "o produtor"}`}
+                  </span>
+                ) : pending.length === 0 ? (
+                  <span className="m-muted m-sub">
+                    Aguardando propostas
+                    {remaining !== null && remaining >= 0
+                      ? ` · fecha ${remaining === 0 ? "hoje" : remaining === 1 ? "amanhã" : `em ${remaining} dias`}`
+                      : ""}
+                  </span>
+                ) : (
+                  pending.map((response) => {
+                    const supplied = response.items.filter((item) => item.canSupply);
+                    const single = supplied.length === 1 ? supplied[0] : null;
+                    return (
+                      <div key={response.id}>
+                        <div className="m-prop">
+                          <span className="m-avatar">{initials(response.producerName)}</span>
+                          <div>
+                            <b>{response.producerName}</b>
+                            <span>
+                              {single
+                                ? `${formatBRL(single.quantity > 0 ? single.price / single.quantity : single.price)}/${single.unit} · `
+                                : `${supplied.length} de ${response.items.length} itens · `}
+                              <strong>{formatBRL(responseTotal(response))}</strong>
+                            </span>
+                          </div>
+                        </div>
+                        {response.notes && <p className="m-rnote">“{response.notes}”</p>}
+                        {!readOnly && (
+                          <div className="m-acts">
+                            {response.producerId && (
+                              <Link
+                                to="/chat"
+                                search={{ demandId: demand.id, producerId: response.producerId }}
+                                className="m-btn m-text m-sm"
+                              >
+                                <MessageCircle className="lucide" aria-hidden />
+                                Conversar
+                              </Link>
+                            )}
+                            <button
+                              type="button"
+                              className="m-btn m-secondary m-sm"
+                              onClick={() => hide(response)}
+                            >
+                              Recusar
+                            </button>
+                            <button
+                              type="button"
+                              className="m-btn m-primary m-sm"
+                              disabled={approvingId === response.id}
+                              onClick={() => void approve(demand, response)}
+                            >
+                              {approvingId === response.id ? "Aprovando..." : "Aprovar"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {!readOnly && (
+          <button type="button" className="m-fab" onClick={() => setComposing(true)}>
+            <Plus className="lucide" aria-hidden />
+            Nova demanda
+          </button>
+        )}
+      </div>
+      <NewDemandSheet
+        open={composing}
+        onClose={() => setComposing(false)}
+        addDemand={addDemand}
+        buyerName={buyerName}
+      />
+    </>
+  );
+}
 
 function emptyItem(): DemandItem {
   return {
@@ -49,933 +383,538 @@ function emptyItem(): DemandItem {
   };
 }
 
-function DemandsHub() {
-  const { profile } = useAuth();
-  const { demands, addDemand, respondDemand, approveResponse } = useDemandRequests();
-
-  return (
-    <div className="min-h-screen bg-canvas">
-      <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-6 pb-24 sm:px-8 sm:py-10 md:pb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to={profile?.tipo === "produtor" ? "/producer/orders" : "/portfolio"}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Link>
-          <SupportButton compact />
-        </div>
-
-        <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Hub de demandas
-        </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Demandas de compra
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              O comprador informa o que precisa e os produtores enviam propostas para atender.
-            </p>
-          </div>
-        </div>
-
-        {profile?.tipo === "comprador" && (
-          <BuyerDemandView
-            demands={demands}
-            addDemand={addDemand}
-            approveResponse={approveResponse}
-            buyerName={profile.nome}
-          />
-        )}
-
-        {profile?.tipo === "produtor" && (
-          <ProducerDemandView
-            demands={demands}
-            respondDemand={respondDemand}
-            producerName={profile.nome}
-          />
-        )}
-
-        {profile?.tipo === "admin" && <AdminDemandView demands={demands} />}
-      </main>
-    </div>
-  );
+function parseDecimal(value: string) {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function BuyerDemandView({
-  demands,
+function NewDemandSheet({
+  open,
+  onClose,
   addDemand,
-  approveResponse,
   buyerName,
 }: {
-  demands: DemandRequest[];
+  open: boolean;
+  onClose: () => void;
   addDemand: ReturnType<typeof useDemandRequests>["addDemand"];
-  approveResponse: ReturnType<typeof useDemandRequests>["approveResponse"];
   buyerName: string;
 }) {
   const [items, setItems] = useState<DemandItem[]>([emptyItem()]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [urgency, setUrgency] = useState<DemandUrgency>("normal");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Pix");
-  const [paymentNotes, setPaymentNotes] = useState("");
   const [notes, setNotes] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [composing, setComposing] = useState(demands.length === 0);
-  const formRef = useRef<HTMLDivElement>(null);
+  const [sending, setSending] = useState(false);
+  const valid = items.filter((item) => item.productName.trim() && item.quantity > 0);
+  const update = (id: string, patch: Partial<DemandItem>) =>
+    setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
 
-  const openComposer = () => {
-    setComposing(true);
-    requestAnimationFrame(() =>
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
-  };
-
-  const validItems = items.filter((item) => item.productName.trim() && item.quantity > 0);
-
-  const createDemand = async () => {
+  const submit = async () => {
     setError("");
-    setMessage("");
-    if (!deliveryDate) {
-      setError("Informe a data desejada.");
-      return;
-    }
-    if (!validItems.length) {
-      setError("Adicione pelo menos um produto.");
-      return;
-    }
+    if (!deliveryDate) return setError("Informe a data desejada.");
+    if (!valid.length) return setError("Adicione pelo menos um produto.");
+    setSending(true);
     try {
       await addDemand({
         buyerName,
         deliveryDate,
         urgency,
         paymentMethod,
-        paymentNotes: paymentNotes.trim() || undefined,
         notes: notes.trim() || undefined,
-        items: validItems.map((item) => ({
+        items: valid.map((item) => ({
           ...item,
           productName: item.productName.trim(),
           notes: item.notes?.trim() || undefined,
         })),
       });
+      toast.success("Demanda enviada para os produtores");
       setItems([emptyItem()]);
       setDeliveryDate("");
       setUrgency("normal");
-      setPaymentMethod("Pix");
-      setPaymentNotes("");
       setNotes("");
-      setMessage("Demanda enviada para os produtores.");
-      setComposing(false);
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a demanda.");
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[0.95fr_1.05fr]">
-      <div
-        ref={formRef}
-        className={`order-2 scroll-mt-24 lg:order-1 ${composing ? "" : "hidden lg:block"}`}
-      >
-        <Panel
-          title="Criar demanda"
-          icon={Send}
-          description="Use quando precisar de um produto urgente, fora do portfólio ou em maior quantidade."
+    <Sheet
+      open={open}
+      title="Nova demanda"
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          className="m-btn m-primary"
+          disabled={sending}
+          onClick={() => void submit()}
         >
-          <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Data desejada">
-                <input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(event) => setDeliveryDate(event.target.value)}
-                  className="form-input"
-                />
-              </Field>
-              <Field label="Urgência">
-                <select
-                  value={urgency}
-                  onChange={(event) => setUrgency(event.target.value as DemandUrgency)}
-                  className="form-input"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="urgente">Urgente</option>
-                </select>
-              </Field>
+          <Send className="lucide" aria-hidden />
+          {sending ? "Enviando..." : "Enviar para produtores"}
+        </button>
+      }
+    >
+      {items.map((item, index) => (
+        <div key={item.id} className="m-subcard">
+          <div className="m-subcard-hd">
+            Produto {index + 1}
+            {items.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))}
+                aria-label={`Remover produto ${index + 1}`}
+              >
+                <Trash2 className="lucide" aria-hidden />
+              </button>
+            )}
+          </div>
+          <label className="m-field">
+            <span>O que você precisa</span>
+            <div className="m-in">
+              <input
+                value={item.productName}
+                onChange={(event) => update(item.id, { productName: event.target.value })}
+                placeholder="Ex.: tomate italiano"
+              />
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Forma de pagamento">
+          </label>
+          <div className="m-row2">
+            <label className="m-field">
+              <span>Quantidade</span>
+              <div className="m-in">
+                <input
+                  value={item.quantity ? String(item.quantity).replace(".", ",") : ""}
+                  onChange={(event) =>
+                    update(item.id, { quantity: parseDecimal(event.target.value) })
+                  }
+                  inputMode="decimal"
+                />
+              </div>
+            </label>
+            <label className="m-field">
+              <span>Unidade</span>
+              <div className="m-in">
                 <select
-                  value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                  className="form-input"
+                  value={item.unit}
+                  onChange={(event) => update(item.id, { unit: event.target.value })}
                 >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
+                  {UNITS.map((unit) => (
+                    <option key={unit}>{unit}</option>
                   ))}
                 </select>
-              </Field>
-              <Field label="Observação do pagamento">
-                <input
-                  value={paymentNotes}
-                  onChange={(event) => setPaymentNotes(event.target.value)}
-                  placeholder="Ex: Pix na entrega"
-                  className="form-input"
-                />
-              </Field>
-            </div>
-
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <DemandItemEditor
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  onChange={(next) =>
-                    setItems((current) =>
-                      current.map((currentItem) =>
-                        currentItem.id === item.id ? next : currentItem,
-                      ),
-                    )
-                  }
-                  onRemove={() =>
-                    setItems((current) =>
-                      current.length === 1
-                        ? [emptyItem()]
-                        : current.filter((currentItem) => currentItem.id !== item.id),
-                    )
-                  }
-                />
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setItems((current) => [...current, emptyItem()])}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar produto
-            </button>
-
-            <Field label="Observações gerais">
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={3}
-                placeholder="Ex: padrão de maturação, embalagem, horário preferido..."
-                className="form-input min-h-[92px] py-3"
-              />
-            </Field>
-
-            {error && <Alert tone="error">{error}</Alert>}
-            {message && <Alert tone="success">{message}</Alert>}
-
-            <button
-              type="button"
-              onClick={() => void createDemand()}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
-            >
-              <Send className="h-4 w-4" />
-              Enviar para produtores
-            </button>
+              </div>
+            </label>
           </div>
-        </Panel>
-      </div>
-
-      <div className="order-1 lg:order-2">
-        {message && !composing && (
-          <div className="mb-4">
-            <Alert tone="success">{message}</Alert>
+          <label className="m-field">
+            <span>Ponto do produto</span>
+            <div className="m-in">
+              <select
+                value={item.productState}
+                onChange={(event) => update(item.id, { productState: event.target.value })}
+              >
+                {PRODUCT_STATES.map((state) => (
+                  <option key={state}>{state}</option>
+                ))}
+              </select>
+            </div>
+          </label>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="m-btn m-text"
+        style={{ marginTop: 6 }}
+        onClick={() => setItems((current) => [...current, emptyItem()])}
+      >
+        <Plus className="lucide" aria-hidden />
+        Adicionar produto
+      </button>
+      <div className="m-row2">
+        <label className="m-field">
+          <span>Entregar até</span>
+          <div className="m-in">
+            <input
+              type="date"
+              value={deliveryDate}
+              onChange={(event) => setDeliveryDate(event.target.value)}
+            />
           </div>
-        )}
-        <Panel
-          title="Acompanhar demandas"
-          icon={ClipboardList}
-          description="Veja as propostas recebidas e aprove a melhor para gerar o pedido."
-        >
-          <DemandList demands={demands} approveResponse={approveResponse} />
-        </Panel>
+        </label>
+        <div className="m-field">
+          <span>Urgência</span>
+          <div className="m-pills">
+            {(["normal", "urgente"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={urgency === value}
+                className={`m-pill${urgency === value ? " m-on" : ""}`}
+                onClick={() => setUrgency(value)}
+              >
+                {value === "normal" ? "Normal" : "Urgente"}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-
-      {!composing && (
-        <button
-          type="button"
-          onClick={openComposer}
-          className="cta-orange fixed bottom-[104px] right-5 z-40 inline-flex h-13 items-center gap-2 rounded-full px-5 py-3.5 text-[15px] font-semibold lg:hidden"
-        >
-          <Plus className="h-5 w-5" />
-          Nova demanda
-        </button>
-      )}
-    </div>
+      <div className="m-field">
+        <span>Pagamento</span>
+        <div className="m-pills">
+          {PAYMENT_METHODS.map((method) => (
+            <button
+              key={method}
+              type="button"
+              aria-pressed={paymentMethod === method}
+              className={`m-pill${paymentMethod === method ? " m-sel" : ""}`}
+              onClick={() => setPaymentMethod(method)}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="m-field">
+        <span>Observações</span>
+        <textarea
+          className="m-textarea"
+          rows={3}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Maturação, embalagem, horário de entrega..."
+        />
+        {error && <small className="m-err">{error}</small>}
+      </label>
+    </Sheet>
   );
 }
 
-function ProducerDemandView({
+function ProducerDemands({
   demands,
-  respondDemand,
   producerName,
 }: {
   demands: DemandRequest[];
-  respondDemand: ReturnType<typeof useDemandRequests>["respondDemand"];
   producerName: string;
 }) {
-  const openDemands = demands.filter(
+  const open = demands.filter(
     (demand) => demand.status === "Aberta" || demand.status === "Respondida",
   );
-
   return (
-    <section className="mt-8 grid gap-4">
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-xs sm:p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Novas oportunidades
+    <>
+      <Navbar />
+      <div className="m-screen m-s-07-demandas">
+        <div className="m-status" />
+        <div className="m-hd m-big">
+          <h1>Demandas</h1>
+        </div>
+        <p className="m-intro">
+          Compradores da região pedindo o que não acharam no portfólio. Responda o que consegue
+          entregar.
         </p>
-        <h2 className="mt-1 text-xl font-bold text-brand-900">Responda o que consegue entregar</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Confira quantidade, unidade, data e pagamento. Sua proposta deve ser o valor total para o
-          que você vai fornecer.
-        </p>
-      </div>
-      {openDemands.length === 0 ? (
-        <Empty
-          title="Nenhuma demanda aberta"
-          text="Quando compradores dispararem demandas, elas aparecem aqui."
-        />
-      ) : (
-        openDemands.map((demand) => (
-          <ProducerDemandCard
-            key={demand.id}
-            demand={demand}
-            producerName={producerName}
-            respondDemand={respondDemand}
-          />
-        ))
-      )}
-    </section>
-  );
-}
-
-function AdminDemandView({ demands }: { demands: DemandRequest[] }) {
-  return (
-    <section className="mt-8 grid gap-4">
-      {demands.map((demand) => (
-        <DemandCard key={demand.id} demand={demand} />
-      ))}
-      {demands.length === 0 && (
-        <Empty title="Nenhuma demanda criada" text="As demandas dos compradores aparecerão aqui." />
-      )}
-    </section>
-  );
-}
-
-function DemandItemEditor({
-  item,
-  index,
-  onChange,
-  onRemove,
-}: {
-  item: DemandItem;
-  index: number;
-  onChange: (item: DemandItem) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-canvas p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-brand-900">Produto {index + 1}</p>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-xs font-semibold text-[var(--color-error-fg)]"
-        >
-          <Trash2 className="h-4 w-4" />
-          Remover
-        </button>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_0.8fr_0.8fr]">
-        <Field label="Produto">
-          <input
-            value={item.productName}
-            onChange={(event) => onChange({ ...item, productName: event.target.value })}
-            placeholder="Digite o produto desejado"
-            className="form-input"
-          />
-        </Field>
-        <Field label="Quantidade">
-          <input
-            value={item.quantity === 0 ? "" : String(item.quantity)}
-            onChange={(event) => onChange({ ...item, quantity: parseDecimal(event.target.value) })}
-            inputMode="decimal"
-            className="form-input"
-          />
-        </Field>
-        <Field label="Unidade">
-          <select
-            value={item.unit}
-            onChange={(event) => onChange({ ...item, unit: event.target.value })}
-            className="form-input"
-          >
-            {units.map((unit) => (
-              <option key={unit} value={unit}>
-                {unit}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="Estado do produto">
-          <select
-            value={item.productState}
-            onChange={(event) => onChange({ ...item, productState: event.target.value })}
-            className="form-input"
-          >
-            {productStates.map((state) => (
-              <option key={state} value={state}>
-                {state}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Observação">
-          <input
-            value={item.notes ?? ""}
-            onChange={(event) => onChange({ ...item, notes: event.target.value })}
-            placeholder="Opcional"
-            className="form-input"
-          />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
-function DemandList({
-  demands,
-  approveResponse,
-}: {
-  demands: DemandRequest[];
-  approveResponse: ReturnType<typeof useDemandRequests>["approveResponse"];
-}) {
-  const [approvingId, setApprovingId] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [activeFilter, setActiveFilter] = useState<DemandFilter>("all");
-
-  const openCount = demands.filter((demand) => demand.status === "Aberta").length;
-  const withResponsesCount = demands.filter((demand) => demand.responses.length > 0).length;
-  const approvedCount = demands.filter((demand) => demand.status === "Aprovada").length;
-  const filteredDemands = demands.filter((demand) => {
-    if (activeFilter === "open") return demand.status === "Aberta";
-    if (activeFilter === "withResponses") return demand.responses.length > 0;
-    if (activeFilter === "approved") return demand.status === "Aprovada";
-    return true;
-  });
-
-  const approve = async (demandId: string, responseId: string) => {
-    setApprovingId(responseId);
-    setError("");
-    setMessage("");
-    try {
-      const orderId = await approveResponse(demandId, responseId);
-      setMessage(`Proposta aprovada e pedido ${orderId ? `#${orderId}` : ""} criado.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível aprovar a proposta.");
-    } finally {
-      setApprovingId("");
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
-        <MiniStat
-          label="Abertas"
-          value={openCount}
-          active={activeFilter === "open"}
-          onClick={() => setActiveFilter("open")}
-        />
-        <MiniStat
-          label="Com propostas"
-          value={withResponsesCount}
-          active={activeFilter === "withResponses"}
-          onClick={() => setActiveFilter("withResponses")}
-        />
-        <MiniStat
-          label="Pedidos"
-          value={approvedCount}
-          active={activeFilter === "approved"}
-          onClick={() => setActiveFilter("approved")}
-        />
-      </div>
-      {activeFilter !== "all" && (
-        <button
-          type="button"
-          onClick={() => setActiveFilter("all")}
-          className="inline-flex h-10 w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
-        >
-          Limpar filtro
-        </button>
-      )}
-      {message && <Alert tone="success">{message}</Alert>}
-      {error && <Alert tone="error">{error}</Alert>}
-      {filteredDemands.map((demand) => (
-        <DemandCard key={demand.id} demand={demand}>
-          {demand.responses.length > 0 && (
-            <div className="mt-4 space-y-3">
-              <p className="text-sm font-semibold text-brand-900">Respostas dos produtores</p>
-              {demand.responses.map((response) => (
-                <ResponseSummary
-                  key={response.id}
-                  response={response}
-                  action={
-                    demand.status !== "Aprovada" && response.status === "Enviada" ? (
-                      <button
-                        type="button"
-                        disabled={approvingId === response.id}
-                        onClick={() => void approve(demand.id, response.id)}
-                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        {approvingId === response.id ? "Aprovando..." : "Aprovar proposta"}
-                      </button>
-                    ) : null
+        {open.length === 0 ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>Nenhuma demanda aberta</b>
+              <span>Quando um comprador publicar uma demanda, ela aparece aqui.</span>
+            </div>
+          </div>
+        ) : (
+          open.map((demand) => {
+            const answered = demand.responses.some(
+              (response) => response.producerName === producerName,
+            );
+            return (
+              <div key={demand.id} className="m-dm m-card">
+                <DemandHead
+                  demand={demand}
+                  right={
+                    <span className="m-muted">
+                      #{displayId(demand.id)}
+                      {demand.deliveryDate ? ` · entrega ${shortDate(demand.deliveryDate)}` : ""}
+                    </span>
                   }
                 />
-              ))}
-            </div>
-          )}
-        </DemandCard>
-      ))}
-      {demands.length === 0 && (
-        <Empty
-          title="Nenhuma demanda enviada"
-          text="Dispare uma demanda para todos os produtores verem."
-        />
-      )}
-      {demands.length > 0 && filteredDemands.length === 0 && (
-        <Empty
-          title="Nenhuma demanda nesse filtro"
-          text="Limpe o filtro ou escolha outra categoria para ver suas demandas."
-        />
-      )}
-    </div>
+                <b className="m-tt">{demandTitle(demand)}</b>
+                <span className="m-muted m-sub">
+                  {demand.buyerName}
+                  {demand.paymentMethod ? ` · ${demand.paymentMethod}` : ""}
+                </span>
+                <div className="m-acts">
+                  {demand.buyerId && (
+                    <Link
+                      to="/chat"
+                      search={{ demandId: demand.id, buyerId: demand.buyerId }}
+                      className="m-btn m-text m-sm"
+                    >
+                      <MessageCircle className="lucide" aria-hidden />
+                      Conversar
+                    </Link>
+                  )}
+                  {answered ? (
+                    <span className="m-chip m-st-entregue">Proposta enviada</span>
+                  ) : (
+                    <Link
+                      to="/demands"
+                      search={{ respond: demand.id }}
+                      className="m-btn m-primary m-sm"
+                    >
+                      Responder
+                    </Link>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
   );
 }
 
-function ProducerDemandCard({
+type Line = {
+  demandItemId: string;
+  productName: string;
+  requested: number;
+  unit: string;
+  canSupply: boolean;
+  quantity: string;
+  unitPrice: string;
+};
+
+function RespondDemand({
   demand,
-  producerName,
   respondDemand,
+  producerName,
 }: {
   demand: DemandRequest;
-  producerName: string;
   respondDemand: ReturnType<typeof useDemandRequests>["respondDemand"];
+  producerName: string;
 }) {
-  const alreadyResponded = demand.responses.some(
-    (response) => response.producerName === producerName,
-  );
-  const [items, setItems] = useState<DemandResponseItem[]>(
+  const navigate = useNavigate();
+  const answered = demand.responses.some((response) => response.producerName === producerName);
+  const [lines, setLines] = useState<Line[]>(() =>
     demand.items.map((item) => ({
-      id: crypto.randomUUID(),
       demandItemId: item.id,
       productName: item.productName,
-      quantity: item.quantity,
+      requested: item.quantity,
       unit: item.unit,
-      price: 0,
       canSupply: true,
-      notes: "",
+      quantity: qty(item.quantity),
+      unitPrice: "",
     })),
   );
   const [notes, setNotes] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const requestedItems = useMemo(
-    () => new Map(demand.items.map((item) => [item.id, item])),
-    [demand.items],
+  const [sending, setSending] = useState(false);
+  const update = (id: string, patch: Partial<Line>) =>
+    setLines((current) =>
+      current.map((line) => (line.demandItemId === id ? { ...line, ...patch } : line)),
+    );
+  const priced = useMemo(
+    () =>
+      lines.map((line) => {
+        const amount = parseDecimal(line.quantity);
+        const price = parseDecimal(line.unitPrice);
+        return { ...line, amount, total: line.canSupply ? amount * price : 0 };
+      }),
+    [lines],
   );
+  const supplied = priced.filter((line) => line.canSupply && line.total > 0);
+  const total = supplied.reduce((sum, line) => sum + line.total, 0);
+  const deadline = demand.deliveryDate
+    ? new Date(`${demand.deliveryDate}T12:00:00`).toLocaleDateString("pt-BR", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
 
-  const sendResponse = async () => {
-    setError("");
-    setMessage("");
-    if (demand.status === "Aprovada") {
-      setError("Essa demanda já foi aceita por outro produtor.");
+  const back = () => void navigate({ to: "/demands" });
+
+  const submit = async () => {
+    if (!supplied.length) {
+      toast.error("Informe preço e quantidade de pelo menos um item.");
       return;
     }
-    if (!items.some((item) => item.canSupply && item.price > 0)) {
-      setError("Informe a oferta total para pelo menos um item que você consegue atender.");
-      return;
-    }
+    setSending(true);
     try {
       await respondDemand(demand.id, {
         producerName,
         notes: notes.trim() || undefined,
-        items: items.map((item) => ({ ...item, notes: item.notes?.trim() || undefined })),
+        items: priced.map((line) => ({
+          id: crypto.randomUUID(),
+          demandItemId: line.demandItemId,
+          productName: line.productName,
+          quantity: line.amount,
+          unit: line.unit,
+          price: Number(line.total.toFixed(2)),
+          canSupply: line.canSupply && line.total > 0,
+        })),
       });
-      setMessage("Resposta enviada ao comprador.");
+      toast.success("Proposta enviada ao comprador");
+      back();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível responder a demanda.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar a proposta.");
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <DemandCard demand={demand}>
-      {demand.buyerId && (
-        <div className="mt-2 mb-4 flex justify-end">
-          <Link
-            to="/chat"
-            search={{ demandId: demand.id, buyerId: demand.buyerId }}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
-          >
-            <MessageSquare className="h-3.5 w-3.5 text-leaf-700" />
-            Conversar com Comprador
-          </Link>
-        </div>
-      )}
-      {alreadyResponded ? (
-        <Alert tone="success">Sua resposta já foi enviada para essa demanda.</Alert>
-      ) : (
-        <div className="mt-4 rounded-2xl border border-border bg-canvas p-4">
-          <p className="text-sm font-semibold text-brand-900">Sua proposta</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Marque os itens que consegue atender e informe o valor total para a quantidade
-            oferecida.
-          </p>
-          <div className="mt-3 space-y-3">
-            {items.map((item) => {
-              const requested = item.demandItemId
-                ? requestedItems.get(item.demandItemId)
-                : undefined;
-              return (
-                <div key={item.id} className="rounded-xl border border-border bg-white p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-brand-900">{item.productName}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Pedido do comprador:{" "}
-                        {(requested?.quantity ?? item.quantity).toLocaleString("pt-BR")} {item.unit}
-                      </p>
-                    </div>
-                    <label className="inline-flex items-center gap-2 rounded-full bg-surface-brand-soft px-3 py-2 text-xs font-bold text-brand-900">
-                      <input
-                        type="checkbox"
-                        checked={item.canSupply}
-                        onChange={(event) =>
-                          setItems((current) =>
-                            current.map((currentItem) =>
-                              currentItem.id === item.id
-                                ? { ...currentItem, canSupply: event.target.checked }
-                                : currentItem,
-                            ),
-                          )
-                        }
-                        className="h-4 w-4 accent-[var(--color-brand-900)]"
-                      />
-                      Consigo atender
-                    </label>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Field label={`Quantidade que vou entregar (${item.unit})`}>
-                      <input
-                        value={item.quantity === 0 ? "" : String(item.quantity)}
-                        onChange={(event) =>
-                          setItems((current) =>
-                            current.map((currentItem) =>
-                              currentItem.id === item.id
-                                ? { ...currentItem, quantity: parseDecimal(event.target.value) }
-                                : currentItem,
-                            ),
-                          )
-                        }
-                        inputMode="decimal"
-                        className="form-input"
-                      />
-                    </Field>
-                    <Field label="Minha oferta total">
-                      <input
-                        value={item.price ? String(item.price) : ""}
-                        onChange={(event) =>
-                          setItems((current) =>
-                            current.map((currentItem) =>
-                              currentItem.id === item.id
-                                ? { ...currentItem, price: parseDecimal(event.target.value) }
-                                : currentItem,
-                            ),
-                          )
-                        }
-                        inputMode="decimal"
-                        placeholder={`R$ pelas ${item.quantity.toLocaleString("pt-BR")} ${item.unit}`}
-                        className="form-input"
-                      />
-                    </Field>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Exemplo: se o comprador pediu 60 bandejas, informe o valor pelas 60 bandejas.
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-          <Field label="Condições da proposta">
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={3}
-              placeholder="Ex: disponibilidade, embalagem, validade da proposta..."
-              className="form-input mt-2 min-h-[92px] py-3"
-            />
-          </Field>
-          {error && <Alert tone="error">{error}</Alert>}
-          {message && <Alert tone="success">{message}</Alert>}
-          <button
-            type="button"
-            onClick={() => void sendResponse()}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
-          >
-            <Send className="h-4 w-4" />
-            Enviar proposta
+    <>
+      <Navbar />
+      <div className="m-screen m-s-p3-responder">
+        <div className="m-status" />
+        <div className="m-hd">
+          <button type="button" className="m-round" onClick={back} aria-label="Voltar">
+            <ArrowLeft className="lucide" aria-hidden />
           </button>
+          <h1>Responder demanda</h1>
+          <span style={{ width: "44px" }} />
         </div>
-      )}
-    </DemandCard>
-  );
-}
-
-function DemandCard({ demand, children }: { demand: DemandRequest; children?: React.ReactNode }) {
-  const totalResponses = demand.responses.length;
-  return (
-    <article className="rounded-2xl border border-border bg-white p-4 shadow-xs sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Demanda #{shortId(demand.id)}
-          </p>
-          <h2 className="mt-1 text-lg font-bold text-brand-900">{demandTitle(demand)}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{demandSubtitle(demand)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Entrega desejada: {formatDate(demand.deliveryDate)} · Pagamento:{" "}
-            {demand.paymentMethod ?? "A combinar"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-surface-brand-soft px-3 py-1 text-xs font-bold text-brand-900">
-            {demand.status}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
-              demand.urgency === "urgente"
-                ? "bg-orange-100 text-orange-800"
-                : "bg-leaf-100 text-brand-900"
-            }`}
-          >
-            {demand.urgency === "urgente" && <Zap className="h-3 w-3" />}
-            {demand.urgency === "urgente" ? "Urgente" : "Normal"}
-          </span>
-        </div>
-      </div>
-
-      <ul className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-canvas">
-        {demand.items.map((item) => (
-          <li key={item.id} className="p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-semibold text-brand-900">{item.productName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {item.quantity.toLocaleString("pt-BR")} {item.unit} · Estado: {item.productState}
-                </p>
-              </div>
-              {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
+        <div className="m-dm m-card">
+          <div className="m-t">
+            {demand.urgency === "urgente" ? (
+              <span className="m-chip m-st-cancelado">
+                <Zap className="lucide" aria-hidden />
+                Urgente
+              </span>
+            ) : (
+              <span className={`m-chip ${STATUS_CHIP[demand.status][0]} m-st-dot`}>
+                {STATUS_CHIP[demand.status][1]}
+              </span>
+            )}
+            <span className="m-muted">#{displayId(demand.id)}</span>
+          </div>
+          <div className="m-by">
+            <span className="m-avatar">{initials(demand.buyerName)}</span>
+            <div>
+              <b>{demand.buyerName}</b>
+              <span>
+                {[deadline && `entrega até ${deadline}`, demand.paymentMethod]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
             </div>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-        <p>
-          {totalResponses} proposta{totalResponses === 1 ? "" : "s"} recebida
-          {totalResponses === 1 ? "" : "s"}
-        </p>
-        {demand.notes && <p>{demand.notes}</p>}
-      </div>
-      {children}
-    </article>
-  );
-}
-
-function ResponseSummary({
-  response,
-  action,
-}: {
-  response: DemandResponse;
-  action?: React.ReactNode;
-}) {
-  const total = useMemo(
-    () =>
-      response.items.filter((item) => item.canSupply).reduce((sum, item) => sum + item.price, 0),
-    [response.items],
-  );
-  return (
-    <div className="rounded-xl border border-border bg-canvas p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-brand-900">{response.producerName}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {response.status} · Proposta total {formatBRL(total)}
-          </p>
+          </div>
+          {demand.notes && <p className="m-note">“{demand.notes}”</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {response.producerId && (
-            <Link
-              to="/chat"
-              search={{ demandId: response.demandId, producerId: response.producerId }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
-            >
-              <MessageSquare className="h-4 w-4 text-leaf-700" />
-              Conversar
-            </Link>
-          )}
-          {action}
-        </div>
-      </div>
-      <ul className="mt-3 space-y-2 text-sm text-brand-900">
-        {response.items
-          .filter((item) => item.canSupply)
-          .map((item) => {
-            const unitPrice = item.quantity > 0 ? item.price / item.quantity : item.price;
-            return (
-              <li key={item.id}>
-                <span className="font-semibold">{item.productName}</span>: entrega{" "}
-                {item.quantity.toLocaleString("pt-BR")} {item.unit} por {formatBRL(item.price)}
-                <span className="text-muted-foreground">
-                  {" "}
-                  · equivalente {formatBRL(unitPrice)}/{item.unit}
+
+        {answered ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>Proposta enviada</b>
+              <span>O comprador vai comparar as propostas e avisar se aprovar a sua.</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3 className="m-lb">Sua proposta</h3>
+            <div className="m-lines m-card">
+              {lines.map((line) => (
+                <div key={line.demandItemId} className="m-li">
+                  <div className="m-top">
+                    <div>
+                      <b>{line.productName}</b>
+                      <span className="m-muted">
+                        Pediram {qty(line.requested)} {unitLabel(line.unit, line.requested)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={line.canSupply}
+                      aria-label={`Atender ${line.productName}`}
+                      className={`m-sw${line.canSupply ? " m-on" : ""}`}
+                      onClick={() => update(line.demandItemId, { canSupply: !line.canSupply })}
+                    >
+                      <i />
+                    </button>
+                  </div>
+                  {line.canSupply ? (
+                    <div className="m-in">
+                      <label className="m-f">
+                        <span>Consigo entregar</span>
+                        <b>
+                          <input
+                            value={line.quantity}
+                            onChange={(event) =>
+                              update(line.demandItemId, { quantity: event.target.value })
+                            }
+                            inputMode="decimal"
+                            style={
+                              {
+                                "--w": `${Math.max(line.quantity.length, 1)}ch`,
+                              } as React.CSSProperties
+                            }
+                            aria-label={`Quantidade de ${line.productName}`}
+                          />{" "}
+                          {unitLabel(line.unit, parseDecimal(line.quantity))}
+                        </b>
+                      </label>
+                      <label className="m-f">
+                        <span>Seu preço</span>
+                        <b>
+                          R${"\u00a0"}
+                          <input
+                            value={line.unitPrice}
+                            onChange={(event) =>
+                              update(line.demandItemId, { unitPrice: event.target.value })
+                            }
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            style={
+                              {
+                                "--w": `${Math.max(line.unitPrice.length, 4)}ch`,
+                              } as React.CSSProperties
+                            }
+                            aria-label={`Preço por ${line.unit} de ${line.productName}`}
+                          />
+                          /{line.unit}
+                        </b>
+                      </label>
+                    </div>
+                  ) : (
+                    <span className="m-muted" style={{ fontSize: "12px" }}>
+                      Não vou atender este item
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <label className="m-obs m-card">
+              <MessageSquareText className="lucide" aria-hidden />
+              <textarea
+                rows={1}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Condições: remessas, embalagem, validade da proposta"
+                aria-label="Condições da proposta"
+              />
+            </label>
+            <div className="m-footer">
+              <div className="m-sum">
+                <span>
+                  Total da proposta · {supplied.length} de {lines.length}{" "}
+                  {lines.length === 1 ? "item" : "itens"}
                 </span>
-              </li>
-            );
-          })}
-      </ul>
-      {response.notes && <p className="mt-3 text-xs text-muted-foreground">{response.notes}</p>}
-    </div>
+                <b className="m-price">{formatBRL(total)}</b>
+              </div>
+              <button
+                type="button"
+                className="m-btn m-primary"
+                disabled={sending || !supplied.length}
+                onClick={() => void submit()}
+              >
+                <Send className="lucide" aria-hidden />
+                {sending ? "Enviando..." : "Enviar proposta"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
-}
-
-function MiniStat({
-  label,
-  value,
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`rounded-xl border px-3 py-2 text-left transition hover:border-leaf-500 hover:bg-surface-brand-soft ${
-        active
-          ? "border-leaf-500 bg-surface-brand-soft ring-2 ring-leaf-200"
-          : "border-border bg-canvas"
-      }`}
-    >
-      <p className="text-xs font-medium leading-tight text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-bold text-brand-900">{value}</p>
-    </button>
-  );
-}
-
-function demandTitle(demand: DemandRequest) {
-  const firstItem = demand.items[0];
-  if (!firstItem) return "Demanda sem produtos";
-  if (demand.items.length === 1) {
-    return `${firstItem.productName} - ${firstItem.quantity.toLocaleString("pt-BR")} ${firstItem.unit}`;
-  }
-  return `${demand.items.length} produtos solicitados`;
-}
-
-function demandSubtitle(demand: DemandRequest) {
-  const productNames = demand.items.map((item) => item.productName).filter(Boolean);
-  const productPreview = productNames.slice(0, 2).join(", ");
-  const extra = productNames.length > 2 ? ` e mais ${productNames.length - 2}` : "";
-  return `Pedido por ${demand.buyerName}${productPreview ? ` · ${productPreview}${extra}` : ""}`;
-}
-
-function shortId(value: string) {
-  return value.slice(0, 8).toUpperCase();
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-sm font-semibold text-brand-900">{label}</span>
-      <div className="mt-2">{children}</div>
-    </label>
-  );
-}
-
-function Panel({
-  title,
-  icon: Icon,
-  description,
-  children,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-white p-4 shadow-xs sm:p-6">
-      <h2 className="inline-flex items-center gap-2 text-base font-semibold text-brand-900">
-        <Icon className="h-4 w-4 text-leaf-700" />
-        {title}
-      </h2>
-      {description && <p className="mt-2 text-sm text-muted-foreground">{description}</p>}
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Alert({ tone, children }: { tone: "success" | "error"; children: React.ReactNode }) {
-  return (
-    <div
-      className={`rounded-xl px-4 py-3 text-sm font-semibold ${
-        tone === "success"
-          ? "border border-leaf-200 bg-leaf-50 text-brand-900"
-          : "border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] text-[var(--color-error-fg)]"
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Empty({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-8 text-center">
-      <ShoppingBag className="mx-auto h-10 w-10 text-leaf-700" />
-      <h3 className="mt-4 text-base font-semibold text-brand-900">{title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{text}</p>
-    </div>
-  );
-}
-
-function parseDecimal(value: string) {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatDate(value: string) {
-  if (!value) return "A combinar";
-  return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
 }

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "@/components/mobile/icons";
 import { useEffect, useMemo, useState } from "react";
 import { formatBRL } from "@/lib/format";
 

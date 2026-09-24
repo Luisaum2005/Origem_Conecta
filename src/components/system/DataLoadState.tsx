@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "@/components/mobile/icons";
 
 type DataLoadErrorProps = {
   title?: string;

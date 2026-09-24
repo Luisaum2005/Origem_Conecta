@@ -1,11 +1,40 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Ban,
+  Check,
+  CircleCheck,
+  Handshake,
+  LifeBuoy,
+  MessageCircle,
+  Package,
+  PackageCheck,
+  Star,
+  TriangleAlert,
+  Truck,
+} from "@/components/mobile/icons";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { formatOrderDate, type OrderStatus, type SavedOrder, useOrders } from "@/lib/orders";
-import { Check, ClipboardList, Package, ShieldCheck, Sparkles, Truck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { supportHref } from "@/lib/support";
+import { Sheet } from "@/components/mobile/Sheet";
+import { StatusChip } from "@/components/mobile/order-ui";
+import { arrivalLabel, orderItemsLabel, orderProducersLabel } from "@/lib/order-status";
+import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
+import { formatQuantity } from "@/lib/format";
+import { relativeDay, unitLabel } from "@/lib/format";
+import {
+  canCancelOrder,
+  formatCancellationDeadline,
+  type SavedOrder,
+  useOrders,
+} from "@/lib/orders";
 
 export const Route = createFileRoute("/tracking")({
+  validateSearch: (search: Record<string, unknown>): { id?: string } => ({
+    id: typeof search.id === "string" ? search.id : undefined,
+  }),
   component: () => (
     <RequireProfile allowed={["comprador"]}>
       <Tracking />
@@ -13,336 +42,354 @@ export const Route = createFileRoute("/tracking")({
   ),
 });
 
-type TrackingStatus = Exclude<OrderStatus, "Cancelado">;
-
-const statusTone: Record<OrderStatus, string> = {
-  Recebido: "bg-[var(--color-status-neutral-bg)] text-[var(--color-status-neutral-fg)]",
-  "Em separação": "bg-orange-100 text-orange-700",
-  "Em entrega": "bg-[var(--color-status-info-bg)] text-[var(--color-status-info-fg)]",
-  Entregue: "bg-leaf-100 text-brand-700",
-  Cancelado: "bg-[var(--color-status-danger-bg)] text-[var(--color-status-danger-fg)]",
+const stamp = (value?: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  const today = new Date().toDateString() === date.toDateString();
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return today
+    ? `hoje, ${time}`
+    : `${date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}, ${time}`;
 };
 
-const statusFlow: TrackingStatus[] = ["Recebido", "Em separação", "Em entrega", "Entregue"];
+type Step = {
+  label: string;
+  caption: string;
+  state: "done" | "now" | "next";
+  icon: React.ComponentType<{ className?: string }>;
+};
 
-const stepConfig: Record<
-  TrackingStatus,
-  {
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    doneCaption: string;
-    pendingCaption: string;
+function buildSteps(order: SavedOrder): Step[] {
+  const rank = { Recebido: 1, "Em separação": 2, "Em entrega": 3, Entregue: 5, Cancelado: 0 }[
+    order.status
+  ];
+  const state = (index: number): Step["state"] =>
+    index < rank ? "done" : index === rank ? "now" : "next";
+  const city = order.deliveryAddress
+    ? ` · ${order.deliveryAddress.city}, ${order.deliveryAddress.state}`
+    : "";
+  const eta = order.deliveryEta.match(/(\d{1,2})h\s*$/)?.[1];
+  return [
+    { label: "Solicitação enviada", caption: stamp(order.createdAt), state: "done", icon: Check },
+    {
+      label: "Confirmado pelo produtor",
+      caption: order.confirmedAt ? stamp(order.confirmedAt) : "aguardando o produtor",
+      state: state(1),
+      icon: Handshake,
+    },
+    {
+      label: "Em separação",
+      caption: rank > 2 ? "concluída" : rank === 2 ? "o produtor está separando" : "",
+      state: state(2),
+      icon: Package,
+    },
+    {
+      label: "Saiu para entrega",
+      caption: order.shippedAt ? `${stamp(order.shippedAt)}${city}` : "",
+      state: state(3),
+      icon: Truck,
+    },
+    {
+      label: "Entregue",
+      caption: order.deliveredAt
+        ? stamp(order.deliveredAt)
+        : eta
+          ? `previsto até ${eta}h`
+          : order.deliveryEta,
+      state: rank >= 5 ? "done" : "next",
+      icon: PackageCheck,
+    },
+  ];
+}
+
+function headline(order: SavedOrder) {
+  switch (order.status) {
+    case "Em entrega":
+      return arrivalLabel(order);
+    case "Entregue":
+      return `Entregue ${relativeDay(order.deliveredAt ?? order.createdAt, false)}`;
+    case "Cancelado":
+      return "Solicitação cancelada";
+    case "Em separação":
+      return "Separando seu pedido";
+    default:
+      return "Aguardando o produtor";
   }
-> = {
-  Recebido: {
-    label: "Pedido recebido",
-    icon: ClipboardList,
-    doneCaption: "Pedido confirmado na plataforma",
-    pendingCaption: "Aguardando confirmação",
-  },
-  "Em separação": {
-    label: "Em separação",
-    icon: Package,
-    doneCaption: "Produtor separando os itens",
-    pendingCaption: "Aguardando separação",
-  },
-  "Em entrega": {
-    label: "Em entrega",
-    icon: Truck,
-    doneCaption: "Pedido saiu para entrega",
-    pendingCaption: "Aguardando saída",
-  },
-  Entregue: {
-    label: "Entregue",
-    icon: Check,
-    doneCaption: "Entrega concluída",
-    pendingCaption: "Aguardando confirmação",
-  },
-};
+}
+
+function summary(order: SavedOrder) {
+  if (order.items.length === 1) {
+    const item = order.items[0];
+    return `${item.productName} · ${formatQuantity(item.quantity)} ${unitLabel(item.unit, item.quantity)} · ${item.producerName}`;
+  }
+  return `${orderItemsLabel(order)} · ${orderProducersLabel(order)}`;
+}
 
 function Tracking() {
-  const { orders } = useOrders();
-  const [selectedId, setSelectedId] = useState("");
-  const selectedOrder = useMemo(() => {
-    if (!orders.length) return null;
-    return orders.find((order) => order.id === selectedId) ?? orders[0];
-  }, [orders, selectedId]);
+  const { id } = Route.useSearch();
+  const {
+    orders,
+    loading,
+    error,
+    reload,
+    isOrderPending,
+    completeDelivery,
+    cancelOrder,
+    openComplaint,
+  } = useOrders();
+  const navigate = useNavigate();
+  const router = useRouter();
+  const [sheet, setSheet] = useState<"problem" | "cancel" | null>(null);
+  const [text, setText] = useState("");
+  const order = useMemo(
+    () =>
+      orders.find((item) => item.id === id) ??
+      orders.find((item) => item.status !== "Entregue" && item.status !== "Cancelado") ??
+      orders[0],
+    [id, orders],
+  );
 
-  const currentIndex =
-    selectedOrder?.status === "Cancelado"
-      ? -1
-      : selectedOrder
-        ? statusFlow.indexOf(selectedOrder.status)
-        : -1;
-  const producers = selectedOrder ? groupByProducer(selectedOrder) : [];
-  const timeline = selectedOrder ? buildTimeline(selectedOrder) : [];
+  const goBack = () => {
+    if (window.history.length > 1) router.history.back();
+    else void navigate({ to: "/orders" });
+  };
+
+  if (!order) {
+    return (
+      <>
+        <Navbar />
+        <div className="m-screen m-s-05-acompanhamento">
+          <div className="m-status" />
+          <div className="m-hd">
+            <button type="button" className="m-round" onClick={goBack} aria-label="Voltar">
+              <ArrowLeft className="lucide" aria-hidden />
+            </button>
+            <h1>Acompanhamento</h1>
+            <span style={{ width: 44 }} />
+          </div>
+          <div className="m-pad">
+            {error ? (
+              <DataLoadError message={error} onRetry={reload} />
+            ) : loading ? (
+              <DataLoading label="Carregando pedido..." />
+            ) : (
+              <div className="m-card m-empty">
+                <b>Nenhum pedido para acompanhar</b>
+                <span>Envie uma lista de interesse para acompanhar a entrega por aqui.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const pending = isOrderPending(order.id);
+  const steps = buildSteps(order);
+  const firstItem = order.items[0];
+  const chatSearch = { orderId: order.id, producerId: firstItem?.producerId };
+
+  const confirmReceipt = async () => {
+    try {
+      await completeDelivery(order.id, order.deliveryCode ?? "");
+      toast.success("Recebimento confirmado");
+      void navigate({ to: "/rating", search: { id: order.id } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível confirmar o recebimento.");
+    }
+  };
+
+  const submitSheet = async () => {
+    const value = text.trim();
+    if (!value) return;
+    try {
+      if (sheet === "cancel") {
+        await cancelOrder(order.id, "comprador", value);
+        toast.success("Solicitação cancelada");
+      } else {
+        await openComplaint(order.id, value);
+        toast.success("Problema enviado. A operação vai acompanhar este pedido.");
+      }
+      setSheet(null);
+      setText("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível enviar. Tente novamente.");
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-8 pb-20 sm:px-8 sm:py-10 md:pb-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-              {selectedOrder ? `Pedido #${selectedOrder.id}` : "Rastreamento"}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Acompanhamento da entrega
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Veja o status real do pedido conforme comprador e produtores atualizam a operação.
-            </p>
-          </div>
+      <div className="m-screen m-s-05-acompanhamento">
+        <div className="m-status" />
+        <div className="m-hd">
+          <button type="button" className="m-round" onClick={goBack} aria-label="Voltar">
+            <ArrowLeft className="lucide" aria-hidden />
+          </button>
+          <h1>Pedido #{order.id}</h1>
+          <a
+            href={supportHref}
+            target={supportHref.startsWith("http") ? "_blank" : undefined}
+            rel={supportHref.startsWith("http") ? "noreferrer" : undefined}
+            className="m-round"
+            aria-label="Falar com o suporte"
+          >
+            <LifeBuoy className="lucide" aria-hidden />
+          </a>
+        </div>
 
-          {orders.length > 0 && (
-            <label className="block w-full sm:w-[260px]">
-              <span className="text-xs font-semibold text-muted-foreground">Selecionar pedido</span>
-              <select
-                value={selectedOrder?.id ?? ""}
-                onChange={(event) => setSelectedId(event.target.value)}
-                className="mt-1 h-11 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 focus:border-leaf-600 focus:outline-none"
-              >
-                {orders.map((order) => (
-                  <option key={order.id} value={order.id}>
-                    #{order.id} - {order.status}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <div className="m-hero m-card">
+          <StatusChip status={order.status} />
+          <h2>{headline(order)}</h2>
+          <p>{summary(order)}</p>
+          {order.status === "Cancelado" ? (
+            <p className="m-cancel">
+              Cancelada por {order.canceledBy ?? "usuário"}:{" "}
+              {order.cancellationReason ?? "sem motivo informado"}
+            </p>
+          ) : order.status === "Entregue" ? (
+            order.receiptCode && (
+              <div className="m-code">
+                <div>
+                  <span>Recibo</span>
+                  <b>{order.receiptCode}</b>
+                </div>
+                <p>Guarde este número para conferência.</p>
+              </div>
+            )
+          ) : (
+            <div className="m-code">
+              <div>
+                <span>Código de entrega</span>
+                <b>{order.deliveryCode ?? "····"}</b>
+              </div>
+              <p>Mostre ao entregador na hora de receber.</p>
+            </div>
           )}
         </div>
 
-        {!selectedOrder ? (
-          <EmptyState />
-        ) : (
-          <>
-            <section className="surface-card mt-6 p-5">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone[selectedOrder.status]}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                {selectedOrder.status}
-              </span>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-900">
-                {selectedOrder.status === "Entregue"
-                  ? "Pedido entregue"
-                  : `Entrega ${selectedOrder.deliveryEta}`}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {producers.map((producer) => producer.name).join(", ")}
-              </p>
-              {selectedOrder.status !== "Cancelado" && (
-                <div className="mt-4 flex items-center gap-4 rounded-2xl bg-brand-900 px-4 py-3 text-white">
+        {order.status !== "Cancelado" && (
+          <div className="m-tl m-card">
+            {steps.map((step) => {
+              const Icon = step.state === "done" ? Check : step.icon;
+              return (
+                <div key={step.label} className={`m-stp m-${step.state}`}>
+                  <span className="m-dotc">
+                    <Icon className="lucide" aria-hidden />
+                  </span>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.06em] text-white/75">
-                      Código de entrega
-                    </p>
-                    <p className="text-[28px] font-bold tracking-[0.18em]">
-                      {selectedOrder.deliveryCode ?? "····"}
-                    </p>
+                    <b>{step.label}</b>
+                    {step.caption && <span>{step.caption}</span>}
                   </div>
-                  <p className="text-xs leading-snug text-white/85">
-                    Informe ao produtor só quando receber e conferir os produtos.
-                  </p>
                 </div>
-              )}
-            </section>
-
-            {selectedOrder.status === "Cancelado" && (
-              <div className="mt-6 rounded-2xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-5 text-sm text-[var(--color-error-fg)]">
-                <h2 className="font-semibold">Pedido cancelado</h2>
-                <p className="mt-1">
-                  Cancelado por {selectedOrder.canceledBy ?? "usuário"}:{" "}
-                  {selectedOrder.cancellationReason ?? "sem motivo informado"}.
-                </p>
-              </div>
-            )}
-
-            {selectedOrder.status !== "Cancelado" && (
-              <section className="mt-4 rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-8">
-                <ol className="relative grid grid-cols-1 gap-5 md:grid-cols-4 md:gap-8">
-                  {statusFlow.map((status, index) => {
-                    const config = stepConfig[status];
-                    const done = index < currentIndex || selectedOrder.status === "Entregue";
-                    const current = index === currentIndex && selectedOrder.status !== "Entregue";
-                    const Icon = config.icon;
-
-                    return (
-                      <li key={status} className="relative flex items-start gap-4">
-                        {index < statusFlow.length - 1 && (
-                          <span
-                            className={`absolute left-5 top-10 h-full w-0.5 md:top-12 md:left-12 md:right-0 md:top-6 md:h-0.5 md:w-auto ${
-                              index < currentIndex ? "bg-leaf-600" : "bg-surface-muted"
-                            }`}
-                          />
-                        )}
-                        <span
-                          className={`relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all md:h-12 md:w-12 ${
-                            done
-                              ? "bg-leaf-100 text-brand-700"
-                              : current
-                                ? "bg-[var(--color-status-info-fg)] text-white ring-4 ring-[var(--color-status-info-bg)]"
-                                : "bg-surface-muted text-muted-foreground"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-brand-900">
-                            {config.label}
-                            {current && (
-                              <span className="ml-2 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
-                                em curso
-                              </span>
-                            )}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {done || current ? config.doneCaption : config.pendingCaption}
-                          </p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-
-                <div className="mt-8 border-t border-border pt-6">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Linha do tempo
-                  </p>
-                  <ul className="mt-3 space-y-2.5">
-                    {timeline.map((event) => (
-                      <li key={event.label} className="flex items-center gap-3 text-sm">
-                        <span
-                          className={`grid h-6 w-6 place-items-center rounded-full ${
-                            event.done
-                              ? "bg-leaf-100 text-brand-700"
-                              : "bg-surface-muted text-muted-foreground"
-                          }`}
-                        >
-                          {event.done ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : (
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                          )}
-                        </span>
-                        <span className="w-28 text-xs font-mono text-muted-foreground">
-                          {event.time}
-                        </span>
-                        <span className={event.done ? "text-brand-900" : "text-muted-foreground"}>
-                          {event.label}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            )}
-
-            <section
-              className={`mt-6 grid gap-4 ${
-                selectedOrder.status === "Cancelado" ? "" : "md:grid-cols-2"
-              }`}
-            >
-              <div className="rounded-2xl border border-[var(--border-strong)] bg-surface-brand-soft p-6">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-leaf-700" />
-                  <h3 className="font-semibold text-brand-900">Produtores neste pedido</h3>
-                </div>
-                <ul className="mt-4 space-y-3 text-sm">
-                  {producers.map((producer) => (
-                    <li
-                      key={producer.name}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-4 py-3"
-                    >
-                      <span className="font-medium text-brand-900">{producer.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {producer.products.join(", ")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {selectedOrder.status !== "Cancelado" && (
-                <div className="rounded-2xl border border-border bg-white p-6">
-                  <h3 className="font-semibold text-brand-900">Segurança da entrega</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    O código acima confirma o recebimento. Não compartilhe antes de conferir a
-                    carga.
-                  </p>
-                  {selectedOrder.receiptCode && (
-                    <p className="mt-2 text-sm font-semibold text-brand-900">
-                      Recibo: {selectedOrder.receiptCode}
-                    </p>
-                  )}
-                  {selectedOrder.complaint && (
-                    <p className="mt-3 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800">
-                      Reclamação aberta: {selectedOrder.complaint}
-                    </p>
-                  )}
-                </div>
-              )}
-            </section>
-          </>
+              );
+            })}
+          </div>
         )}
-      </main>
-    </div>
-  );
-}
 
-function EmptyState() {
-  return (
-    <div className="mt-8 rounded-2xl border border-border bg-white p-12 text-center">
-      <h3 className="text-lg font-semibold text-brand-900">Nenhum pedido para rastrear</h3>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Crie um pedido no portfólio para acompanhar o status por aqui.
-      </p>
-      <Link
-        to="/portfolio"
-        className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+        {order.complaint && (
+          <div className="m-pad">
+            <div className="m-card m-alert">
+              <TriangleAlert className="lucide" aria-hidden />
+              <span>
+                Problema reportado: {order.complaint}
+                {order.complaintStatus ? ` · ${order.complaintStatus.toLowerCase()}` : ""}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {order.status !== "Cancelado" && (
+          <div className="m-footer">
+            {order.status === "Em entrega" ? (
+              <button
+                type="button"
+                className="m-btn m-primary"
+                disabled={pending}
+                onClick={() => void confirmReceipt()}
+              >
+                <CircleCheck className="lucide" aria-hidden />
+                {pending ? "Confirmando..." : "Confirmar recebimento"}
+              </button>
+            ) : order.status === "Entregue" ? (
+              <Link to="/rating" search={{ id: order.id }} className="m-btn m-primary">
+                <Star className="lucide" aria-hidden />
+                Avaliar entrega
+              </Link>
+            ) : (
+              <Link to="/chat" search={chatSearch} className="m-btn m-primary">
+                <MessageCircle className="lucide" aria-hidden />
+                Conversar com o produtor
+              </Link>
+            )}
+            <div className="m-two">
+              {order.status === "Recebido" || order.status === "Em separação" ? (
+                canCancelOrder(order) ? (
+                  <button
+                    type="button"
+                    className="m-btn m-text"
+                    style={{ color: "var(--m-danger-700)" }}
+                    onClick={() => setSheet("cancel")}
+                  >
+                    <Ban className="lucide" aria-hidden />
+                    Cancelar
+                  </button>
+                ) : (
+                  <span />
+                )
+              ) : (
+                <Link to="/chat" search={chatSearch} className="m-btn m-text">
+                  <MessageCircle className="lucide" aria-hidden />
+                  Conversar
+                </Link>
+              )}
+              <button
+                type="button"
+                className="m-btn m-text"
+                style={{ color: "var(--m-danger-700)" }}
+                onClick={() => setSheet("problem")}
+              >
+                <TriangleAlert className="lucide" aria-hidden />
+                Reportar problema
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Sheet
+        open={sheet !== null}
+        title={sheet === "cancel" ? "Cancelar solicitação" : "Reportar problema"}
+        onClose={() => setSheet(null)}
+        footer={
+          <button
+            type="button"
+            className="m-btn m-primary"
+            disabled={!text.trim() || pending}
+            onClick={() => void submitSheet()}
+          >
+            {sheet === "cancel" ? "Confirmar cancelamento" : "Enviar para a operação"}
+          </button>
+        }
       >
-        Ver portfólio
-      </Link>
-    </div>
+        <label className="m-lbl" htmlFor="tracking-text">
+          {sheet === "cancel"
+            ? `Motivo do cancelamento (até ${formatCancellationDeadline(order)})`
+            : "O que aconteceu com a entrega?"}
+        </label>
+        <textarea
+          id="tracking-text"
+          className="m-textarea"
+          rows={4}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder={
+            sheet === "cancel"
+              ? "Conte ao produtor por que vai cancelar"
+              : "Produto não chegou, veio diferente, em falta..."
+          }
+        />
+      </Sheet>
+    </>
   );
-}
-
-function groupByProducer(order: SavedOrder) {
-  const map = new Map<string, string[]>();
-  for (const item of order.items) {
-    const current = map.get(item.producerName) ?? [];
-    current.push(item.productName);
-    map.set(item.producerName, current);
-  }
-  return Array.from(map.entries()).map(([name, products]) => ({ name, products }));
-}
-
-function buildTimeline(order: SavedOrder) {
-  if (order.status === "Cancelado") {
-    return [
-      {
-        label: `Pedido cancelado por ${order.canceledBy ?? "usuário"}`,
-        time: order.canceledAt ? formatOrderDate(order.canceledAt) : "Atualizado",
-        done: true,
-      },
-    ];
-  }
-  const currentIndex = statusFlow.indexOf(order.status);
-  const createdAt = formatOrderDate(order.createdAt);
-
-  return statusFlow.map((status, index) => {
-    const done = index <= currentIndex;
-    const labelByStatus: Record<TrackingStatus, string> = {
-      Recebido: "Pedido confirmado",
-      "Em separação": "Separação iniciada com os produtores",
-      "Em entrega": "Saiu para entrega",
-      Entregue: "Entrega concluída",
-    };
-
-    return {
-      label: labelByStatus[status],
-      time: index === 0 ? createdAt : done ? "Atualizado" : "Pendente",
-      done,
-    };
-  });
 }

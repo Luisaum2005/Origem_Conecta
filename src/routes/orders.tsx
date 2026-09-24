@@ -1,41 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  MessageCircle,
+  Repeat,
+  Search,
+  ShoppingBasket,
+  Star,
+  Truck,
+  X,
+} from "@/components/mobile/icons";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { SupportButton } from "@/components/layout/SupportButton";
+import { OrderThumbs, StatusChip } from "@/components/mobile/order-ui";
+import {
+  STATUS_PROGRESS,
+  arrivalLabel,
+  orderItemsLabel,
+  orderProducersLabel,
+} from "@/lib/order-status";
 import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
 import { useAvailableProducts } from "@/lib/available-products";
 import { useCart } from "@/lib/cart";
-import { getOperationWindow } from "@/lib/operation";
-import {
-  canCancelOrder,
-  formatCancellationDeadline,
-  formatOrderDate,
-  type SavedOrder,
-  useOrders,
-} from "@/lib/orders";
-import { type RecurringOrder, useRecurringOrders } from "@/lib/recurring-orders";
-import {
-  ArrowLeft,
-  CalendarClock,
-  ClipboardList,
-  PackageCheck,
-  Repeat,
-  ShoppingBag,
-  Trash2,
-  Truck,
-  MessageSquare,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatCompactBRL, relativeDay } from "@/lib/format";
+import { type SavedOrder, useOrders } from "@/lib/orders";
 
 export const Route = createFileRoute("/orders")({
   component: () => (
@@ -46,560 +34,270 @@ export const Route = createFileRoute("/orders")({
 });
 
 function Orders() {
-  const {
-    orders,
-    loading,
-    error: loadError,
-    reload,
-    isOrderPending,
-    cancelOrder,
-    openComplaint,
-  } = useOrders();
-  const operation = getOperationWindow();
-  const { recurringOrders, toggleRecurringOrder, removeRecurringOrder } = useRecurringOrders();
+  const { orders, loading, error, reload } = useOrders();
   const products = useAvailableProducts();
   const { replaceCart } = useCart();
   const navigate = useNavigate();
-  const [repeatNotice, setRepeatNotice] = useState("");
-  const [successNotice, setSuccessNotice] = useState("");
-  const openOrders = orders.filter(
-    (order) => order.status !== "Entregue" && order.status !== "Cancelado",
-  );
-  const deliveredOrders = orders.filter((order) => order.status === "Entregue");
-  const availableProductIds = new Set(products.map((product) => product.id));
+  const [tab, setTab] = useState<"open" | "done">("open");
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const notice = window.sessionStorage.getItem("origem-conecta-order-success");
     if (!notice) return;
-    setSuccessNotice(notice);
+    toast.success(notice);
     window.sessionStorage.removeItem("origem-conecta-order-success");
   }, []);
 
-  const loadItemsToCart = (items: RecurringOrder["items"], successMessage: string) => {
+  const open = orders.filter(
+    (order) => order.status !== "Entregue" && order.status !== "Cancelado",
+  );
+  const delivered = orders.filter((order) => order.status === "Entregue");
+  const closed = orders.filter(
+    (order) => order.status === "Entregue" || order.status === "Cancelado",
+  );
+  const bought = orders
+    .filter((order) => order.status !== "Cancelado")
+    .reduce((sum, order) => sum + order.total, 0);
+
+  const visible = useMemo(() => {
+    const list = tab === "open" ? open : closed;
+    const term = query.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter(
+      (order) =>
+        order.id.toLowerCase().includes(term) ||
+        order.items.some(
+          (item) =>
+            item.productName.toLowerCase().includes(term) ||
+            item.producerName.toLowerCase().includes(term),
+        ),
+    );
+  }, [closed, open, query, tab]);
+
+  const repeatOrder = (order: SavedOrder) => {
+    const available = new Set(products.map((product) => product.id));
     const nextCart: Record<string, number> = {};
-    const nextProducerChoices: Record<string, string> = {};
-    let skippedItems = 0;
-
-    for (const item of items) {
-      if (!availableProductIds.has(item.productId)) {
-        skippedItems += 1;
-        continue;
-      }
+    const producerChoices: Record<string, string> = {};
+    for (const item of order.items) {
+      if (!available.has(item.productId)) continue;
       nextCart[item.productId] = item.quantity;
-      if (item.manualProducerChoice) {
-        nextProducerChoices[item.productId] = item.producerId;
-      }
+      if (item.manualProducerChoice) producerChoices[item.productId] = item.producerId;
     }
-
-    replaceCart(nextCart, nextProducerChoices);
     if (!Object.keys(nextCart).length) {
-      setRepeatNotice(
-        "Nenhum item deste pedido está disponível no estoque atual. Escolha novos produtos no portfólio.",
-      );
-    } else if (skippedItems > 0) {
-      window.sessionStorage.setItem(
-        "origem-conecta-repeat-notice",
-        `${skippedItems} item(ns) não entraram porque não estão disponíveis no estoque atual.`,
-      );
-    } else {
-      window.sessionStorage.setItem("origem-conecta-repeat-notice", successMessage);
+      toast.error("Nenhum item deste pedido está disponível no estoque atual.");
+      return;
     }
-    navigate({ to: Object.keys(nextCart).length ? "/order" : "/portfolio" });
-  };
-
-  const repeatOrder = (orderId: string) => {
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) return;
-    loadItemsToCart(order.items, "Pedido anterior carregado para revisão.");
-  };
-
-  const loadRecurringOrder = (recurringOrder: RecurringOrder) => {
-    loadItemsToCart(recurringOrder.items, "Pedido recorrente carregado para revisão.");
+    replaceCart(nextCart, producerChoices);
+    toast.success("Pedido anterior carregado para revisão.");
+    void navigate({ to: "/order" });
   };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-8 pb-24 sm:px-8 sm:py-10 md:pb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to="/portfolio"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+      <div className="m-screen m-s-04-solicitacoes">
+        <div className="m-status" />
+        <div className="m-hd m-big">
+          <h1>Solicitações</h1>
+          <button
+            type="button"
+            className="m-round"
+            aria-label={searching ? "Fechar busca" : "Buscar solicitação"}
+            aria-expanded={searching}
+            onClick={() => {
+              setSearching((current) => !current);
+              setQuery("");
+            }}
           >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao portfólio
-          </Link>
-          <SupportButton compact />
+            {searching ? (
+              <X className="lucide" aria-hidden />
+            ) : (
+              <Search className="lucide" aria-hidden />
+            )}
+          </button>
         </div>
-
-        <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Comprador
-        </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-              Minhas solicitações
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Acompanhe interesses enviados, produtores envolvidos e negociações em andamento.
-            </p>
-          </div>
-          <Link
-            to="/portfolio"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-          >
-            <ShoppingBag className="h-4 w-4" />
-            Nova solicitação
-          </Link>
-        </div>
-
-        <section className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
-          <Metric icon={ClipboardList} label="Solicitações totais" value={`${orders.length}`} />
-          <Metric icon={Truck} label="Em andamento" value={`${openOrders.length}`} />
-          <Metric icon={PackageCheck} label="Entregues" value={`${deliveredOrders.length}`} />
-        </section>
-
-        {successNotice && (
-          <div className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm font-semibold text-brand-900">
-            {successNotice}
+        {searching && (
+          <div style={{ padding: "14px 20px 0" }}>
+            <label className="m-search">
+              <Search className="lucide" aria-hidden />
+              <input
+                type="search"
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar por produto ou número"
+                aria-label="Buscar solicitação"
+              />
+            </label>
           </div>
         )}
 
-        {repeatNotice && (
-          <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800">
-            {repeatNotice}
+        <div className="m-kpi">
+          <div className="m-card">
+            <span>Andamento</span>
+            <b>{open.length}</b>
           </div>
-        )}
-
-        <div className="mt-4 rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted-foreground">
-          {operation.issueText}
+          <div className="m-card">
+            <span>Entregues</span>
+            <b>{delivered.length}</b>
+          </div>
+          <div className="m-card">
+            <span>Comprado</span>
+            <b>{formatCompactBRL(bought)}</b>
+          </div>
         </div>
 
-        {loadError && (
-          <div className="mt-6">
-            <DataLoadError message={loadError} onRetry={reload} />
+        <div style={{ padding: "14px 20px 0" }}>
+          <div className="m-seg" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "open"}
+              className={tab === "open" ? "m-on" : undefined}
+              onClick={() => setTab("open")}
+            >
+              Em andamento <span>{open.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "done"}
+              className={tab === "done" ? "m-on" : undefined}
+              onClick={() => setTab("done")}
+            >
+              Entregues <span>{closed.length}</span>
+            </button>
           </div>
-        )}
+        </div>
 
-        {recurringOrders.length > 0 && (
-          <section className="mt-8 rounded-2xl border border-border bg-white p-5 shadow-xs">
-            <div>
-              <h2 className="inline-flex items-center gap-2 text-base font-semibold text-brand-900">
-                <CalendarClock className="h-4 w-4 text-leaf-700" />
-                Pedidos recorrentes
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Carregue um modelo salvo, revise quantidades e confirme quando quiser.
-              </p>
-            </div>
-            <ul className="mt-4 grid gap-3 md:grid-cols-2">
-              {recurringOrders.map((recurringOrder) => (
-                <li
-                  key={recurringOrder.id}
-                  className="rounded-xl border border-border bg-canvas p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-brand-900">{recurringOrder.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {recurringOrder.frequency} · {recurringOrder.items.length} item(ns)
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                        recurringOrder.active
-                          ? "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]"
-                          : "bg-surface-muted text-muted-foreground"
-                      }`}
-                    >
-                      {recurringOrder.active ? "ativo" : "pausado"}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => loadRecurringOrder(recurringOrder)}
-                      className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-                    >
-                      <Repeat className="h-4 w-4 text-leaf-700" />
-                      Carregar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleRecurringOrder(recurringOrder.id)}
-                      className="inline-flex h-9 items-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-                    >
-                      {recurringOrder.active ? "Pausar" : "Ativar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeRecurringOrder(recurringOrder.id)}
-                      className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Excluir
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {error && (
+          <div className="m-pad">
+            <DataLoadError message={error} onRetry={reload} />
+          </div>
         )}
 
         {loading && orders.length === 0 ? (
-          <div className="mt-8">
-            <DataLoading label={"Carregando suas solicita\u00e7\u00f5es..."} />
+          <div className="m-pad">
+            <DataLoading label="Carregando suas solicitações..." />
           </div>
-        ) : !loadError && orders.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-border bg-white p-12 text-center">
-            <h3 className="text-lg font-semibold text-brand-900">Nenhuma solicitação enviada</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Adicione produtos à lista de interesse e envie uma solicitação de negociação.
-            </p>
-            <Link
-              to="/portfolio"
-              className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
-            >
-              Ver portfólio
-            </Link>
-          </div>
-        ) : (
-          <section className="mt-8 grid gap-4">
-            {orders.map((order) => (
-              <BuyerOrderCard
-                key={order.id}
-                order={order}
-                pending={isOrderPending(order.id)}
-                repeatOrder={repeatOrder}
-                cancelOrder={cancelOrder}
-                openComplaint={openComplaint}
-              />
-            ))}
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function BuyerOrderCard({
-  order,
-  pending,
-  repeatOrder,
-  cancelOrder,
-  openComplaint,
-}: {
-  order: SavedOrder;
-  pending: boolean;
-  repeatOrder: (orderId: string) => void;
-  cancelOrder: (id: string, actor: "comprador", reason: string) => Promise<void>;
-  openComplaint: (id: string, complaint: string) => Promise<void>;
-}) {
-  const [cancelReason, setCancelReason] = useState("");
-  const [complaint, setComplaint] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const cancelAllowed = canCancelOrder(order);
-
-  const cancel = async () => {
-    if (!cancelReason.trim()) {
-      setError("O motivo do cancelamento é obrigatório.");
-      return;
-    }
-    setError("");
-    setMessage("");
-    try {
-      await cancelOrder(order.id, "comprador", cancelReason);
-      setMessage("Pedido cancelado.");
-      toast.success("Pedido cancelado com sucesso.");
-      setIsCancelModalOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível cancelar o pedido.");
-    }
-  };
-
-  const complain = async () => {
-    setError("");
-    setMessage("");
-    try {
-      await openComplaint(order.id, complaint);
-      setComplaint("");
-      setMessage("Reclamação enviada. Nossa operação vai acompanhar este pedido.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível enviar a reclamação.");
-    }
-  };
-
-  return (
-    <article className="rounded-2xl border border-border bg-white p-5 shadow-xs">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-            Solicitação #{order.id}
-          </p>
-          <h2 className="mt-1 text-xl font-bold text-brand-900">
-            {order.items.length} {order.items.length > 1 ? "itens" : "item"} ·{" "}
-            {formatBRL(order.total)}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Criado em {formatOrderDate(order.createdAt)} · entrega {order.deliveryEta}
-          </p>
-          {order.status !== "Cancelado" && order.status !== "Entregue" && (
-            <p className="mt-1 text-xs font-semibold text-orange-700">
-              Pode cancelar até {formatCancellationDeadline(order)}
-            </p>
-          )}
-          <p className="mt-1 text-sm font-semibold text-brand-900">
-            Forma de pagamento escolhida: {order.paymentMethod ?? "A combinar"}
-          </p>
-          {order.paymentNotes && (
-            <p className="mt-1 text-xs text-muted-foreground">{order.paymentNotes}</p>
-          )}
-          {order.deliveryNotes && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              <strong>Entrega/retirada:</strong> {order.deliveryNotes}
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              to="/tracking"
-              className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-            >
-              <Truck className="h-4 w-4 text-leaf-700" />
-              Rastrear pedido
-            </Link>
-            <button
-              type="button"
-              onClick={() => repeatOrder(order.id)}
-              className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
-            >
-              <Repeat className="h-4 w-4 text-leaf-700" />
-              Repetir pedido
-            </button>
-          </div>
-        </div>
-        <div className="min-w-[180px]">
-          <span className="text-xs font-semibold text-muted-foreground">Status</span>
-          <p className="mt-1 inline-flex h-10 items-center rounded-lg border border-border bg-canvas px-3 text-sm font-semibold text-brand-900">
-            {order.status}
-          </p>
-        </div>
-      </div>
-
-      <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-canvas">
-        {order.items.map((item) => (
-          <li
-            key={`${order.id}-${item.productId}`}
-            className="flex flex-wrap items-start justify-between gap-3 p-4"
-          >
-            <div>
-              <p className="font-semibold text-brand-900">{item.productName}</p>
-              <p className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
-                <span>Produtor: {item.producerName}</span>
-                {item.sellerOrganizationName && (
-                  <span>Comercialização: {item.sellerOrganizationName}</span>
-                )}
-                <span>·</span>
-                <span>
-                  {item.manualProducerChoice ? "produtor escolhido" : "produtor automático"}
-                </span>
-                <span>·</span>
-                <Link
-                  to="/chat"
-                  search={{ orderId: order.id, producerId: item.producerId }}
-                  className="font-bold text-leaf-700 hover:underline hover:text-leaf-800 inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <MessageSquare className="h-3 w-3" /> Conversar
+        ) : visible.length === 0 && !error ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>
+                {query
+                  ? "Nada encontrado"
+                  : tab === "open"
+                    ? "Nenhuma solicitação em andamento"
+                    : "Nenhuma entrega concluída"}
+              </b>
+              <span>
+                {query
+                  ? "Tente outro produto ou número de pedido."
+                  : "Monte sua lista no portfólio e envie para os produtores."}
+              </span>
+              {!query && (
+                <Link to="/portfolio" className="m-btn m-secondary m-sm" style={{ marginTop: 16 }}>
+                  <ShoppingBasket className="lucide" aria-hidden />
+                  Ver portfólio
                 </Link>
-              </p>
-              {item.notes && (
-                <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-brand-900">
-                  {item.notes}
-                </p>
               )}
             </div>
-            <p className="text-sm font-semibold text-brand-900">
-              {item.quantity.toLocaleString("pt-BR")} {item.unit} · {formatBRL(item.lineTotal)}
-            </p>
-          </li>
-        ))}
-      </ul>
-
-      {order.status !== "Recebido" && order.status !== "Cancelado" && (
-        <div className="mt-4 rounded-xl border border-leaf-200 bg-leaf-50 p-4 text-sm text-brand-900">
-          <p className="font-semibold">Resumo confirmado pelo produtor</p>
-          <p className="mt-1">
-            Entrega confirmada para {order.deliveryEta}. Informe o código abaixo ao produtor somente
-            no momento do recebimento.
-          </p>
-          <p className="mt-3 inline-flex rounded-lg bg-white px-3 py-2 text-lg font-bold tracking-widest">
-            Código: {order.deliveryCode ?? "gerando"}
-          </p>
-          {order.receiptCode && (
-            <p className="mt-2 text-sm font-semibold">Recibo: {order.receiptCode}</p>
-          )}
-          <ul className="mt-3 space-y-1 text-xs">
-            {order.items.map((item) => (
-              <li key={`${order.id}-summary-${item.productId}`}>
-                {item.productName}: {item.quantity.toLocaleString("pt-BR")} {item.unit} ·{" "}
-                {item.producerName}
-                {item.sellerOrganizationName ? ` · ${item.sellerOrganizationName}` : ""} ·{" "}
-                {formatBRL(item.lineTotal)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {order.status === "Cancelado" && (
-        <div className="mt-4 rounded-xl border border-[var(--color-error-bg)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error-fg)] space-y-1">
-          <p className="font-bold text-base">Pedido Cancelado</p>
-          <p>
-            <strong>Responsável pelo cancelamento:</strong>{" "}
-            {order.canceledBy === "comprador"
-              ? "Comprador"
-              : order.canceledBy === "produtor"
-                ? "Produtor"
-                : "Administrador"}
-          </p>
-          <p>
-            <strong>Motivo:</strong> {order.cancellationReason ?? "sem motivo informado"}
-          </p>
-          {order.canceledAt && (
-            <p>
-              <strong>Data/Hora:</strong> {formatOrderDate(order.canceledAt)}
-            </p>
-          )}
-        </div>
-      )}
-
-      {cancelAllowed && (
-        <>
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setIsCancelModalOpen(true)}
-              disabled={pending}
-              className="inline-flex h-10 items-center justify-center rounded-full border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer"
-            >
-              Cancelar solicitação
-            </button>
           </div>
-
-          <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="text-brand-900 font-bold">
-                  Cancelar solicitação #{order.id}
-                </DialogTitle>
-                <DialogDescription>
-                  Tem certeza que deseja cancelar esta solicitação? Esta ação não pode ser desfeita.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-brand-900">
-                    Motivo do cancelamento <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={cancelReason}
-                    onChange={(event) => setCancelReason(event.target.value)}
-                    disabled={pending}
-                    placeholder="Informe o motivo do cancelamento"
-                    rows={3}
-                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <button
-                  type="button"
-                  onClick={() => setIsCancelModalOpen(false)}
-                  disabled={pending}
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
-                >
-                  Voltar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void cancel()}
-                  disabled={!cancelReason.trim() || pending}
-                  aria-busy={pending || undefined}
-                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                >
-                  {pending ? "Cancelando..." : "Confirmar cancelamento"}
-                </button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-
-      {order.status !== "Cancelado" && (
-        <div className="mt-4 rounded-xl border border-border bg-white p-3">
-          <label className="block">
-            <span className="text-xs font-semibold text-brand-900">
-              Produto não chegou ou veio diferente?
-            </span>
-            <textarea
-              value={complaint}
-              onChange={(event) => setComplaint(event.target.value)}
-              disabled={pending}
-              rows={3}
-              placeholder="Descreva o problema para a operação acompanhar."
-              className="mt-2 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void complain()}
-            disabled={pending}
-            aria-busy={pending || undefined}
-            className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
-          >
-            Enviar reclamação
-          </button>
-          {order.complaint && (
-            <p className="mt-2 text-xs font-semibold text-orange-700">
-              Reclamação em aberto: {order.complaint}
-            </p>
-          )}
-        </div>
-      )}
-
-      {message && (
-        <p className="mt-3 rounded-xl border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm font-semibold text-brand-900">
-          {message}
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-error-fg)]">
-          {error}
-        </p>
-      )}
-    </article>
+        ) : (
+          <div className="m-list">
+            {visible.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                products={products}
+                onRepeat={() => repeatOrder(order)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
+function OrderCard({
+  order,
+  products,
+  onRepeat,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
+  order: SavedOrder;
+  products: ReturnType<typeof useAvailableProducts>;
+  onRepeat: () => void;
 }) {
+  const firstItem = order.items[0];
   return (
-    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
-      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
+    <div className="m-oc m-card">
+      <div className="m-t">
+        <StatusChip status={order.status} />
+        <span className="m-muted">
+          #{order.id} · {relativeDay(order.createdAt)}
+        </span>
+      </div>
+      <div className="m-b">
+        <OrderThumbs order={order} products={products} />
+        <div className="m-nm">
+          <b>{orderItemsLabel(order)}</b>
+          <span>{orderProducersLabel(order)}</span>
+        </div>
+        <span className="m-price">{formatBRL(order.total)}</span>
+      </div>
+      {order.status !== "Cancelado" && (
+        <div className="m-prog">
+          <i style={{ width: `${STATUS_PROGRESS[order.status]}%` }} />
+        </div>
+      )}
+      <div className="m-acts">
+        {order.status === "Em entrega" ? (
+          <>
+            <span className="m-eta">
+              <Truck className="lucide" aria-hidden />
+              {arrivalLabel(order)}
+            </span>
+            <Link to="/tracking" search={{ id: order.id }} className="m-btn m-primary m-sm">
+              Acompanhar
+            </Link>
+          </>
+        ) : order.status === "Entregue" || order.status === "Cancelado" ? (
+          <>
+            <button type="button" className="m-btn m-text m-sm" onClick={onRepeat}>
+              <Repeat className="lucide" aria-hidden />
+              Repetir
+            </button>
+            {order.status === "Entregue" ? (
+              <Link to="/rating" search={{ id: order.id }} className="m-btn m-secondary m-sm">
+                <Star className="lucide" aria-hidden />
+                Avaliar
+              </Link>
+            ) : (
+              <Link to="/tracking" search={{ id: order.id }} className="m-btn m-secondary m-sm">
+                Ver detalhes
+              </Link>
+            )}
+          </>
+        ) : (
+          <>
+            {firstItem && (
+              <Link
+                to="/chat"
+                search={{ orderId: order.id, producerId: firstItem.producerId }}
+                className="m-btn m-text m-sm"
+              >
+                <MessageCircle className="lucide" aria-hidden />
+                Conversar
+              </Link>
+            )}
+            <Link to="/tracking" search={{ id: order.id }} className="m-btn m-secondary m-sm">
+              Ver detalhes
+            </Link>
+          </>
+        )}
+      </div>
     </div>
   );
 }

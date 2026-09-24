@@ -26,6 +26,8 @@ export type Product = {
   emoji: string;
   imageUrl?: string;
   videoUrl?: string;
+  harvestDate?: string;
+  expiryDate?: string;
   risk: RiskLevel;
   substitutes: string[];
   producers: ProducerOption[];

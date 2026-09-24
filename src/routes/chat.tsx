@@ -1,7 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
-import { SupportButton } from "@/components/layout/SupportButton";
+import { ProductFallback } from "@/components/marketplace/ProductCard";
+import { MoreMenu } from "@/components/mobile/Sheet";
+import { StatusChip } from "@/components/mobile/order-ui";
+import { orderItemsLabel } from "@/lib/order-status";
+import { useAvailableProducts } from "@/lib/available-products";
+import { useDemandRequests } from "@/lib/demands";
+import { useOrders } from "@/lib/orders";
 import { ProposalCard } from "@/components/chat/ProposalCard";
 import { ProposalComposer } from "@/components/chat/ProposalComposer";
 import { useAuth } from "@/lib/auth";
@@ -16,7 +22,7 @@ import {
   type SavedConversation,
   type SavedMessage,
 } from "@/lib/chats";
-import { getBuyerId, getProducerId, formatOrderDate } from "@/lib/orders";
+import { getBuyerId, getProducerId } from "@/lib/orders";
 import { supabase } from "@/lib/supabase";
 import {
   acceptNegotiationProposal,
@@ -32,24 +38,19 @@ import {
   type ProposalInventoryItem,
 } from "@/lib/negotiation-proposals";
 import {
-  ArrowLeft,
-  Send,
-  MessageCircle,
   AlertCircle,
-  ShoppingBag,
-  ClipboardList,
-  Check,
-  CheckCheck,
-  MessageSquare,
+  ArrowLeft,
+  Handshake,
   Mic,
+  Plus,
+  Send,
   Square,
   Trash2,
-  DollarSign,
-} from "lucide-react";
+} from "@/components/mobile/icons";
 import { getProduct } from "@/lib/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, initials } from "@/lib/format";
 
 type ChatSearch = {
   id?: string;
@@ -104,6 +105,9 @@ function ChatRoom() {
   const [proposalBusy, setProposalBusy] = useState(false);
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalError, setProposalError] = useState("");
+  const { orders } = useOrders();
+  const { demands } = useDemandRequests();
+  const availableProducts = useAvailableProducts();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const oldestMessageIdRef = useRef<string | null>(null);
@@ -288,6 +292,12 @@ function ChatRoom() {
               updatedAt: chatData.updated_at,
               lastMessageAt: chatData.last_message_at,
               otherPartyName: otherParty,
+              otherPartyDetail:
+                profile!.tipo === "comprador" &&
+                chatData.producers?.responsavel &&
+                chatData.producers.responsavel !== otherParty
+                  ? chatData.producers.responsavel.split(" ").slice(0, 2).join(" ")
+                  : undefined,
               orderStatus: chatData.orders?.status || undefined,
               orderTotal: chatData.orders?.total ? Number(chatData.orders.total) : undefined,
             };
@@ -704,171 +714,144 @@ function ChatRoom() {
     [messages, proposals],
   );
 
+  const contextOrder = conversation?.orderId
+    ? orders.find((order) => order.id === conversation.orderId)
+    : undefined;
+  const contextDemand = conversation?.demandId
+    ? demands.find((demand) => demand.id === conversation.demandId)
+    : undefined;
+  const contextProduct = conversation?.portfolioProductId
+    ? (availableProducts.find((product) => product.id === conversation.portfolioProductId) ??
+      getProduct(conversation.portfolioProductId))
+    : undefined;
+  const contextPhoto = contextOrder
+    ? availableProducts.find((product) =>
+        contextOrder.items.some((item) => item.productId === product.id && product.imageUrl),
+      )?.imageUrl
+    : contextProduct?.imageUrl;
+  const dayLabel = (value: string) => {
+    const date = new Date(value);
+    const diff = Math.round(
+      (new Date(new Date().toDateString()).getTime() - new Date(date.toDateString()).getTime()) /
+        864e5,
+    );
+    return diff === 0
+      ? "Hoje"
+      : diff === 1
+        ? "Ontem"
+        : date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  };
+  const quickReplies = isBuyer
+    ? ["Combinado 👍", "Qual o valor final?", "Pode trocar?"]
+    : ["Combinado 👍", "Saiu para entrega", "Vou confirmar o estoque"];
+  const canPropose = Boolean(conversation) && !proposalLoading && proposalInventory.length > 0;
+
   return (
-    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-canvas">
+    <>
       <Navbar />
-
-      {/* Main chat window layout */}
-      <div className="mx-auto flex min-h-0 w-full max-w-[800px] flex-1 flex-col overflow-hidden border-x border-border bg-white pb-[calc(68px+env(safe-area-inset-bottom))] lg:pb-0">
-        {/* Chat Header */}
-        <header className="border-b border-border p-4 bg-white shrink-0 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              to="/chats"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-brand-900 hover:border-leaf-500 transition-colors shrink-0"
-              aria-label="Voltar para mensagens"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="font-bold text-brand-900 truncate text-base leading-tight">
-                {loading ? "Carregando..." : conversation?.otherPartyName}
-              </h1>
-              {conversation && (
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  {conversation.orderId ? (
-                    <>
-                      <ShoppingBag className="h-3 w-3 text-leaf-600 shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">
-                        Negociação do Pedido #{conversation.orderId}
-                      </span>
-                    </>
-                  ) : conversation.demandId ? (
-                    <>
-                      <ClipboardList className="h-3 w-3 text-amber-600 shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">
-                        Negociação da Demanda #{conversation.demandId.substring(0, 8)}
-                      </span>
-                    </>
-                  ) : conversation.portfolioProductId ? (
-                    <>
-                      <MessageSquare className="h-3 w-3 text-leaf-600 shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">
-                        Negociação de Anúncio
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare className="h-3 w-3 text-leaf-600 shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">
-                        Negociação direta
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <SupportButton compact />
-        </header>
-
-        {/* Demand context remains useful; the order is available in its accepted proposal. */}
-        {conversation && !loading && conversation.demandId && !conversation.orderId && (
-          <div className="bg-canvas border-b border-border p-3 shrink-0 text-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-brand-900 font-medium">
-                Chat vinculado a uma Demanda aberta
+      <div className="m-screen m-s-09-conversa">
+        <div className="m-status" />
+        <div className="m-hd">
+          <Link to="/chats" className="m-round" aria-label="Voltar para mensagens">
+            <ArrowLeft className="lucide" aria-hidden />
+          </Link>
+          <div className="m-who">
+            <span className="m-avatar">{initials(conversation?.otherPartyName) || "…"}</span>
+            <div>
+              <b>{loading ? "Carregando..." : conversation?.otherPartyName}</b>
+              <span>
+                {conversation?.otherPartyDetail
+                  ? conversation.otherPartyDetail
+                  : conversation?.orderId
+                    ? `Pedido #${conversation.orderId}`
+                    : conversation?.demandId
+                      ? "Negociação de demanda"
+                      : conversation?.portfolioProductId
+                        ? "Negociação de produto"
+                        : "Negociação direta"}
               </span>
             </div>
-            <Link
-              to="/demands"
-              className="font-bold text-leaf-700 hover:underline hover:text-leaf-800"
-            >
-              Ver demandas
-            </Link>
+          </div>
+          <span style={{ width: 44 }} />
+        </div>
+
+        {conversation && !loading && (contextOrder || contextDemand || contextProduct) && (
+          <div className="m-ctx m-card">
+            {contextPhoto ? (
+              <img src={contextPhoto} alt="" />
+            ) : (
+              <ProductFallback
+                category={contextProduct?.category ?? ""}
+                name={contextProduct?.name ?? contextOrder?.items[0]?.productName ?? ""}
+                className="m-ctxf"
+                label={false}
+              />
+            )}
+            <div>
+              {contextOrder ? (
+                <StatusChip status={contextOrder.status} />
+              ) : contextDemand ? (
+                <span className="m-chip m-st-separacao m-st-dot">Demanda</span>
+              ) : (
+                <span className="m-chip m-leaf">Produto</span>
+              )}
+              <b>
+                {contextOrder
+                  ? `#${contextOrder.id} · ${orderItemsLabel(contextOrder)}`
+                  : contextDemand
+                    ? contextDemand.items.map((item) => item.productName).join(", ")
+                    : `${contextProduct!.name} · ${formatBRL(contextProduct!.producers[0]?.price ?? 0)}/${contextProduct!.unit}`}
+              </b>
+            </div>
+            {contextOrder ? (
+              <Link
+                to={isBuyer ? "/tracking" : "/producer/orders"}
+                search={isBuyer ? { id: contextOrder.id } : undefined}
+                className="m-btn m-text m-sm"
+              >
+                Ver
+              </Link>
+            ) : contextDemand ? (
+              <Link to="/demands" className="m-btn m-text m-sm">
+                Ver
+              </Link>
+            ) : (
+              <Link to="/product" search={{ id: contextProduct!.id }} className="m-btn m-text m-sm">
+                Ver
+              </Link>
+            )}
           </div>
         )}
-
-        {/* Info panel for Portfolio announcement context */}
-        {conversation &&
-          !loading &&
-          conversation.portfolioProductId &&
-          getProduct(conversation.portfolioProductId) &&
-          getProduct(conversation.portfolioProductId)!.producers.find(
-            (p) => p.id === conversation.producerId,
-          ) &&
-          (() => {
-            const prod = getProduct(conversation.portfolioProductId!)!;
-            const opt = prod.producers.find((p) => p.id === conversation.producerId)!;
-            return (
-              <div className="bg-leaf-50/50 border-b border-leaf-100 p-4 shrink-0 flex items-center gap-4">
-                <div className="h-14 w-14 rounded-xl bg-leaf-100 flex items-center justify-center text-3xl overflow-hidden border border-leaf-200 shrink-0">
-                  {prod.imageUrl ? (
-                    <img
-                      src={prod.imageUrl}
-                      alt={prod.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    prod.emoji
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-leaf-700">
-                    Negociando Anúncio
-                  </span>
-                  <h4 className="font-bold text-brand-900 text-sm truncate leading-tight mt-0.5">
-                    {prod.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    Vendido por <span className="font-semibold text-brand-850">{opt.name}</span> (
-                    {opt.property})
-                  </p>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-brand-900 leading-tight">
-                    {formatBRL(opt.price)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">por {prod.unit}</p>
-                  <span className="inline-flex items-center rounded-full bg-leaf-100 px-2 py-0.5 text-[9px] font-bold text-brand-900 mt-1">
-                    Estoque: {opt.stock.toLocaleString("pt-BR")} {prod.unit}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
 
         {proposalError && (
-          <div
-            role="alert"
-            className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800"
-          >
-            {proposalError}
+          <div className="m-pad">
+            <div role="alert" className="m-card m-alert">
+              <AlertCircle className="lucide" aria-hidden />
+              <span>{proposalError}</span>
+            </div>
           </div>
         )}
 
-        {/* Message bubble flow */}
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-canvas/40 p-4 pb-28 lg:pb-4"
-        >
+        <div ref={scrollRef} onScroll={handleScroll} className="m-thread">
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-              <MessageCircle className="h-10 w-10 animate-bounce mb-2 text-leaf-600" />
-              <p className="text-sm font-semibold">Carregando conversa...</p>
-            </div>
+            <span className="m-day">Carregando conversa...</span>
           ) : (
             <>
-              {loadingMore && (
-                <div className="text-center py-2 text-xs text-muted-foreground animate-pulse">
-                  Carregando mensagens anteriores...
-                </div>
-              )}
-
+              {loadingMore && <span className="m-day">Carregando mensagens anteriores...</span>}
               {timeline.length === 0 && (
-                <div className="text-center py-10">
-                  <p className="text-sm text-muted-foreground">
-                    Inicie a negociação enviando uma mensagem abaixo.
-                  </p>
-                </div>
+                <span className="m-day">Envie a primeira mensagem para começar a negociar</span>
               )}
-
-              {timeline.map((event) => {
+              {timeline.map((event, index) => {
+                const previous = timeline[index - 1];
+                const day =
+                  !previous || dayLabel(previous.createdAt) !== dayLabel(event.createdAt) ? (
+                    <span key={`day-${event.createdAt}`} className="m-day">
+                      {dayLabel(event.createdAt)}
+                    </span>
+                  ) : null;
                 if (event.type === "proposal") {
-                  return (
+                  return [
+                    day,
                     <ProposalCard
                       key={`proposal-${event.proposal.id}`}
                       proposal={event.proposal}
@@ -879,193 +862,155 @@ function ChatRoom() {
                       onAccept={() => void acceptProposal(event.proposal)}
                       onReject={() => void rejectProposal(event.proposal)}
                       onCounter={() => openProposalComposer(event.proposal)}
-                    />
-                  );
+                    />,
+                  ];
                 }
                 const msg = event.message;
                 const isMine = msg.senderId === profile?.id;
-                const isRead = !!msg.readAt;
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] ${
-                      isMine ? "ml-auto" : "mr-auto"
-                    }`}
-                  >
-                    <div
-                      className={`px-4 py-2.5 rounded-2xl text-sm break-words whitespace-pre-wrap ${
-                        isMine
-                          ? "bg-brand-900 text-white rounded-tr-none shadow-xs"
-                          : "bg-white text-brand-900 border border-border rounded-tl-none shadow-xs"
-                      }`}
-                    >
-                      {msg.messageType === "audio" ? (
-                        msg.audioUrl ? (
-                          <div className="min-w-[220px]">
-                            <span className="mb-1 block text-xs font-semibold">
-                              Mensagem de áudio
-                            </span>
-                            <audio
-                              controls
-                              preload="metadata"
-                              src={msg.audioUrl}
-                              className="h-10 w-full max-w-[280px]"
-                              aria-label={`Mensagem de áudio de ${msg.audioDurationSeconds ?? 0} segundos`}
-                            />
-                          </div>
-                        ) : (
-                          <span>Áudio indisponível</span>
-                        )
+                return [
+                  day,
+                  <div key={msg.id} className={`m-msg${isMine ? " m-me" : ""}`}>
+                    {msg.messageType === "audio" ? (
+                      msg.audioUrl ? (
+                        <audio
+                          controls
+                          preload="metadata"
+                          src={msg.audioUrl}
+                          aria-label={`Mensagem de áudio de ${msg.audioDurationSeconds ?? 0} segundos`}
+                        />
                       ) : (
-                        msg.message
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1 px-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatMessageTime(msg.createdAt)}
-                      </span>
-                      {isMine && (
-                        <span className="text-muted-foreground">
-                          {isRead ? (
-                            <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
+                        <p>Áudio indisponível</p>
+                      )
+                    ) : (
+                      <p>{msg.message}</p>
+                    )}
+                    <span>
+                      {formatMessageTime(msg.createdAt)}
+                      {isMine && (msg.readAt ? " ✓✓" : " ✓")}
+                    </span>
+                  </div>,
+                ];
               })}
+              {!loading && (
+                <div className="m-quick">
+                  {quickReplies.map((reply) => (
+                    <button
+                      key={reply}
+                      type="button"
+                      className="m-pill"
+                      onClick={() => setInputText(reply)}
+                    >
+                      {reply}
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
 
-        {/* Input box section */}
-        <footer className="fixed inset-x-0 bottom-0 z-40 pb-[calc(12px+env(safe-area-inset-bottom))] mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 lg:static lg:border-x-0">
+        <div className="m-composer">
           {isRecording ? (
-            <div
-              className="flex min-h-16 items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-2.5"
-              role="status"
-            >
-              <span className="ml-1 h-3 w-3 animate-pulse rounded-full bg-red-600 motion-reduce:animate-none" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-brand-900">Gravando áudio</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatRecordingTime(recordingSeconds)} / 2:00
-                </p>
+            <>
+              <span className="m-rec" aria-hidden />
+              <div className="m-in" role="status">
+                Gravando · {formatRecordingTime(recordingSeconds)} / 2:00
               </div>
               <button
                 type="button"
+                className="m-round m-mic"
                 onClick={stopRecording}
-                className="grid h-12 w-12 place-items-center rounded-xl bg-red-600 text-white hover:bg-red-700"
                 aria-label="Parar gravação"
               >
-                <Square className="h-5 w-5 fill-current" />
+                <Square className="lucide" aria-hidden />
               </button>
-            </div>
+            </>
           ) : audioPreview ? (
-            <div className="flex min-h-16 items-center gap-2 rounded-2xl border border-border bg-canvas p-2">
-              <audio
-                controls
-                preload="metadata"
-                src={audioPreview.url}
-                className="h-10 min-w-0 flex-1"
-                aria-label="Ouvir áudio antes de enviar"
-              />
+            <>
               <button
                 type="button"
+                className="m-round"
                 onClick={discardAudio}
                 disabled={sending}
-                className="grid h-12 w-12 place-items-center rounded-xl border border-border text-red-700 hover:bg-red-50 disabled:opacity-50"
                 aria-label="Descartar áudio"
               >
-                <Trash2 className="h-5 w-5" />
+                <Trash2 className="lucide" aria-hidden />
               </button>
+              <div className="m-in m-audio">
+                <audio
+                  controls
+                  preload="metadata"
+                  src={audioPreview.url}
+                  aria-label="Ouvir áudio antes de enviar"
+                />
+              </div>
               <button
                 type="button"
+                className="m-round m-mic"
                 onClick={() => void handleSendAudio()}
                 disabled={sending}
-                className="grid h-12 w-12 place-items-center rounded-xl bg-brand-900 text-white hover:bg-brand-800 disabled:opacity-50"
                 aria-label="Enviar áudio"
               >
-                <Send className="h-5 w-5" />
+                <Send className="lucide" aria-hidden />
               </button>
-            </div>
+            </>
           ) : (
-            <div className="flex items-end gap-2 bg-canvas rounded-2xl border border-border p-2 focus-within:border-leaf-600">
-              <textarea
-                aria-label="Mensagem da negociação"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value.slice(0, 2000))}
-                onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem de negociação..."
-                rows={1}
-                className="min-w-0 flex-1 max-h-24 resize-none bg-transparent py-1.5 px-2 text-base text-brand-900 focus:outline-none focus:ring-0 leading-relaxed font-sans placeholder-muted-foreground sm:text-sm"
-                style={{ height: "auto" }}
+            <>
+              <MoreMenu
+                label="Mais ações"
+                icon={<Plus className="lucide" aria-hidden />}
+                items={[
+                  {
+                    label: canPropose
+                      ? activeProposal
+                        ? activeProposal.createdBy === profile?.id
+                          ? "Substituir proposta"
+                          : "Fazer contraproposta"
+                        : "Fazer proposta"
+                      : proposalLoading
+                        ? "Carregando produtos..."
+                        : "Proposta indisponível (sem produto)",
+                    icon: <Handshake className="lucide" aria-hidden />,
+                    onSelect: () => {
+                      if (canPropose) openProposalComposer(activeProposal);
+                    },
+                  },
+                ]}
               />
-              <button
-                type="button"
-                onClick={() => void startRecording()}
-                disabled={sending || !!inputText.trim()}
-                className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:border-leaf-600 hover:bg-leaf-50 disabled:pointer-events-none disabled:opacity-50"
-                aria-label="Gravar mensagem de áudio"
-              >
-                <Mic className="h-5 w-5" />
-              </button>
-              {conversation && (
+              <label className="m-in">
+                <textarea
+                  aria-label="Mensagem da negociação"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value.slice(0, 2000))}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Escreva uma mensagem…"
+                  rows={1}
+                />
+              </label>
+              {inputText.trim() ? (
                 <button
                   type="button"
-                  onClick={() => openProposalComposer(activeProposal)}
-                  disabled={proposalBusy || proposalLoading || proposalInventory.length === 0}
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand-900 hover:border-leaf-600 hover:bg-leaf-50 disabled:pointer-events-none disabled:opacity-50"
-                  aria-label={
-                    proposalLoading
-                      ? "Carregando produtos para proposta"
-                      : proposalInventory.length === 0
-                        ? "Não há produto disponível para proposta"
-                        : activeProposal
-                          ? activeProposal.createdBy === profile?.id
-                            ? "Substituir proposta"
-                            : "Fazer contraproposta"
-                          : "Fazer proposta"
-                  }
-                  title={
-                    proposalLoading
-                      ? "Carregando produtos..."
-                      : proposalInventory.length === 0
-                        ? "Sem produto disponível"
-                        : activeProposal
-                          ? activeProposal.createdBy === profile?.id
-                            ? "Substituir proposta"
-                            : "Fazer contraproposta"
-                          : "Fazer proposta"
-                  }
-                >
-                  <DollarSign className="h-5 w-5" aria-hidden="true" />
-                </button>
-              )}
-              <div className="flex flex-col justify-end shrink-0 gap-1.5">
-                <span
-                  className="px-1 text-right text-sm text-muted-foreground select-none"
-                  aria-live="polite"
-                >
-                  {inputText.length}/2000
-                </span>
-                <button
-                  type="button"
+                  className="m-round m-mic"
                   onClick={() => void handleSend()}
-                  disabled={sending || !inputText.trim()}
-                  className="grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-xl bg-brand-900 text-white transition-colors hover:bg-brand-800 disabled:pointer-events-none disabled:opacity-50"
+                  disabled={sending}
                   aria-label="Enviar mensagem"
                 >
-                  <Send className="h-4.5 w-4.5" />
+                  <Send className="lucide" aria-hidden />
                 </button>
-              </div>
-            </div>
+              ) : (
+                <button
+                  type="button"
+                  className="m-round m-mic"
+                  onClick={() => void startRecording()}
+                  disabled={sending}
+                  aria-label="Gravar mensagem de áudio"
+                >
+                  <Mic className="lucide" aria-hidden />
+                </button>
+              )}
+            </>
           )}
-        </footer>
+        </div>
       </div>
       <ProposalComposer
         open={proposalComposerOpen}
@@ -1079,6 +1024,6 @@ function ChatRoom() {
         submitting={proposalBusy}
         onSubmit={submitProposal}
       />
-    </div>
+    </>
   );
 }

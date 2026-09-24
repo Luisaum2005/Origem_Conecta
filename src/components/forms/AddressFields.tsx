@@ -1,6 +1,6 @@
 import { Field } from "@/components/auth/AuthShell";
 import { CepLookupError, lookupAddressByCep } from "@/lib/cep";
-import { Search } from "lucide-react";
+import { Search } from "@/components/mobile/icons";
 import { useRef, useState, type FocusEvent } from "react";
 
 function setFormValue(form: HTMLFormElement | null, name: string, value?: string) {
@@ -75,9 +75,9 @@ export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
   };
 
   return (
-    <fieldset ref={fieldsetRef} className="space-y-5 rounded-2xl border border-border bg-white p-5">
-      <legend className="px-2 text-sm font-semibold text-brand-900">Endereço</legend>
-      <div className="grid gap-5 sm:grid-cols-[1fr_2fr]">
+    <fieldset ref={fieldsetRef} className="m-fieldset">
+      <legend className="sr-only">Endereço</legend>
+      <div className="m-row2">
         <div>
           <Field
             name="cep"
@@ -94,9 +94,9 @@ export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
             type="button"
             onClick={handleSearchClick}
             disabled={searching}
-            className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-secondary disabled:cursor-wait disabled:opacity-60"
+            className="m-btn m-text m-sm"
           >
-            <Search className="h-4 w-4" aria-hidden="true" />
+            <Search className="lucide" aria-hidden="true" />
             {searching ? "Buscando..." : "Buscar CEP"}
           </button>
           <span id="cep-status" className="sr-only" aria-live="polite">
@@ -111,7 +111,7 @@ export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
           required
         />
       </div>
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="m-row2">
         <Field
           name="numero"
           label="Número"
@@ -132,7 +132,7 @@ export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
           required
         />
       </div>
-      <div className="grid gap-5 sm:grid-cols-[2fr_1fr]">
+      <div className="m-row2">
         <Field
           name="municipio"
           label="Município"

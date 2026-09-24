@@ -1,9 +1,19 @@
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Package,
+  Search,
+  Users,
+  Warehouse,
+} from "@/components/mobile/icons";
+import { useMemo, useState } from "react";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { useAuth } from "@/lib/auth";
+import { useBuyerProfileDetails } from "@/lib/buyer-profile";
 import { useOrganizationDirectory } from "@/lib/organization-directory";
-import { createFileRoute } from "@tanstack/react-router";
-import { Building2, MapPin, Search, ShieldCheck, Users } from "lucide-react";
-import { useState } from "react";
+import { PRODUCT_GROUPS, productGroup } from "@/lib/product-group";
 
 export const Route = createFileRoute("/directory/organizations")({
   component: () => (
@@ -13,99 +23,180 @@ export const Route = createFileRoute("/directory/organizations")({
   ),
 });
 
+type Filter = "all" | "near" | "cooperativa" | "associacao";
+
+const normalize = (value: string) =>
+  value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
 function OrganizationDirectory() {
+  const router = useRouter();
+  const { profile } = useAuth();
+  const { details } = useBuyerProfileDetails();
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const { organizations, loading, error } = useOrganizationDirectory(query);
+  const city = normalize(details.city || "");
+
+  const visible = useMemo(
+    () =>
+      organizations.filter((organization) => {
+        if (filter === "near") return Boolean(city) && normalize(organization.city) === city;
+        if (filter === "cooperativa" || filter === "associacao")
+          return organization.type === filter;
+        return true;
+      }),
+    [city, filter, organizations],
+  );
+
+  const pills: { key: Filter; label: string }[] = [
+    { key: "all", label: "Todas" },
+    { key: "near", label: "Perto de mim" },
+    { key: "cooperativa", label: "Cooperativas" },
+    { key: "associacao", label: "Associações" },
+  ];
+
+  const back = () => {
+    if (window.history.length > 1) router.history.back();
+    else
+      void router.navigate({
+        to: profile?.tipo === "produtor" ? "/producer/orders" : "/portfolio",
+      });
+  };
+
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-8 pb-24 sm:px-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Rede Origem Conecta
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-brand-900">Cooperativas e associações</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Encontre organizações, produtores associados e os produtos que fazem parte da rede.
-        </p>
-        <label className="relative mt-6 block max-w-xl">
-          <Search className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por organização, cidade ou produto"
-            className="h-11 w-full rounded-xl border border-border bg-white pl-11 pr-4 text-sm text-brand-900 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-100"
-          />
-        </label>
+      <div className="m-screen m-s-10-cooperativas">
+        <div className="m-status" />
+        <div className="m-hd">
+          <button type="button" className="m-round" onClick={back} aria-label="Voltar">
+            <ArrowLeft className="lucide" aria-hidden />
+          </button>
+          <h1>Cooperativas e associações</h1>
+          <span style={{ width: "44px" }} />
+        </div>
+        <div style={{ padding: "12px 20px 0" }}>
+          <label className="m-search">
+            <Search className="lucide" aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por nome ou cidade"
+              aria-label="Buscar cooperativa ou associação"
+            />
+          </label>
+        </div>
+        <div className="m-cats" role="tablist">
+          {pills.map((pill) => (
+            <button
+              key={pill.key}
+              type="button"
+              role="tab"
+              aria-selected={filter === pill.key}
+              className={`m-pill${filter === pill.key ? " m-on" : ""}`}
+              onClick={() => setFilter(pill.key)}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
 
         {loading ? (
-          <p className="mt-8 rounded-2xl border border-border bg-white p-6 text-sm text-muted-foreground">
-            Carregando organizações...
-          </p>
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <span>Carregando organizações...</span>
+            </div>
+          </div>
         ) : error ? (
-          <p className="mt-8 rounded-2xl bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error-fg)]">
-            Não foi possível carregar o diretório: {error}
-          </p>
-        ) : organizations.length === 0 ? (
-          <p className="mt-8 rounded-2xl border border-border bg-white p-8 text-center text-sm text-muted-foreground">
-            Nenhuma organização encontrada para esta busca.
-          </p>
+          <div className="m-pad">
+            <div className="m-card m-alert" role="alert">
+              <span>Não foi possível carregar o diretório: {error}</span>
+            </div>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>Nenhuma organização encontrada</b>
+              <span>
+                {filter === "near" && !city
+                  ? "Informe sua cidade no perfil para ver as organizações perto de você."
+                  : "Tente outra busca ou filtro."}
+              </span>
+            </div>
+          </div>
         ) : (
-          <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {organizations.map((organization) => (
-              <article
-                key={organization.id}
-                className="rounded-2xl border border-border bg-white p-5 shadow-xs"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-leaf-100 text-brand-700">
-                    <Building2 className="h-5 w-5" />
-                  </span>
+          visible.map((organization) => {
+            const groups = [
+              ...new Set(
+                organization.suppliedProducts.map(productGroup).filter((g) => g !== "Outros"),
+              ),
+            ].sort(
+              (a, b) =>
+                ((PRODUCT_GROUPS.indexOf(a as never) + 99) % 99) -
+                ((PRODUCT_GROUPS.indexOf(b as never) + 99) % 99),
+            );
+            const type = organization.type === "cooperativa" ? "Cooperativa" : "Associação";
+            return (
+              <article key={organization.id} className="m-co m-card">
+                <div className="m-ph">
+                  <div className="m-fallback" style={{ width: "100%", height: "100%" }}>
+                    <Warehouse className="lucide" aria-hidden />
+                    <span>{type}</span>
+                  </div>
                   {organization.verificationStatus === "verified" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-success-fg)]">
-                      <ShieldCheck className="h-3.5 w-3.5" /> Verificada
+                    <span className="m-chip m-white m-v">
+                      <BadgeCheck className="lucide" aria-hidden />
+                      Verificada
                     </span>
                   )}
                 </div>
-                <p className="mt-4 text-xs font-semibold uppercase text-leaf-700">
-                  {organization.type === "cooperativa" ? "Cooperativa" : "Associação"}
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-brand-900">{organization.tradeName}</h2>
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5 text-leaf-700" />
-                    {organization.city}, {organization.state}
+                <div className="m-bd">
+                  <b>{organization.tradeName}</b>
+                  <span>
+                    {[organization.city && `${organization.city}, ${organization.state}`, type]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-leaf-700" />
-                    {organization.activeMembers} associado(s)
-                  </span>
-                </div>
-                <div className="mt-5 border-t border-border pt-4">
-                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-                    Produtos fornecidos pela rede
-                  </p>
-                  <div className="mt-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
-                    {organization.suppliedProducts.length ? (
-                      organization.suppliedProducts.map((product) => (
-                        <span
-                          key={product}
-                          className="rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-medium text-brand-900"
-                        >
-                          {product}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Produtos ainda não informados.
-                      </span>
-                    )}
+                  <div className="m-mt">
+                    <span>
+                      <Users className="lucide" aria-hidden />
+                      {organization.activeMembers}{" "}
+                      {organization.activeMembers === 1 ? "associado" : "associados"}
+                    </span>
+                    <span>
+                      <Package className="lucide" aria-hidden />
+                      {organization.suppliedProducts.length}{" "}
+                      {organization.suppliedProducts.length === 1 ? "produto" : "produtos"}
+                    </span>
                   </div>
+                  {groups.length > 0 && (
+                    <div className="m-cs">
+                      {groups.slice(0, 4).map((group) => (
+                        <span key={group} className="m-chip m-leaf">
+                          {group}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </article>
-            ))}
-          </section>
+            );
+          })
         )}
-      </main>
-    </div>
+
+        <div className="m-footer" style={{ paddingBottom: "30px" }}>
+          <div className="m-cta2">
+            <div>
+              <b>Você representa uma?</b>
+              <span>Cadastre e venda para restaurantes da região.</span>
+            </div>
+            <Link to="/signup/organization" className="m-btn m-secondary m-sm">
+              Cadastrar
+            </Link>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

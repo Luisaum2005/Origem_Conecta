@@ -6,7 +6,7 @@ import {
   Repeat2,
   User,
   Users,
-} from "lucide-react";
+} from "@/components/mobile/icons";
 
 export const organizationNavigation = [
   { to: "/organizations" as const, label: "Painel", icon: Building2, exact: true },

@@ -1,11 +1,28 @@
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Bell,
+  Building2,
+  LifeBuoy,
+  LogOut,
+  Repeat2,
+  Settings,
+  UserCog,
+} from "@/components/mobile/icons";
+import { useState } from "react";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
+import { supportHref } from "@/lib/support";
+import { ListRow, TextSizeOptions } from "@/components/mobile/ProfileParts";
+import { Sheet } from "@/components/mobile/Sheet";
 import { PushSettings } from "@/components/notifications/PushSettings";
 import { OrganizationSettingsForm } from "@/components/organizations/OrganizationSettingsForm";
+import { InstallButton } from "@/components/pwa/InstallButton";
 import { useAuth } from "@/lib/auth";
+import { initials } from "@/lib/format";
+import { useOrganizationDashboard } from "@/lib/organization-dashboard";
 import { useOrganizations } from "@/lib/organizations";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { BellRing, Building2, LogOut, Repeat2, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/profile/organization")({
   component: () => (
@@ -15,116 +32,162 @@ export const Route = createFileRoute("/profile/organization")({
   ),
 });
 
+const formatCnpj = (value: string) =>
+  value.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+
 function OrganizationProfile() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const router = useRouter();
   const { organizations, loading, error, refresh } = useOrganizations();
+  const organization = organizations[0];
+  const { metrics } = useOrganizationDashboard(organizations.map((item) => item.id));
+  const [sheet, setSheet] = useState<"data" | "notifications" | "settings" | null>(null);
+
   const logout = async () => {
     await signOut();
     await navigate({ to: "/login", replace: true });
   };
+  const back = () => {
+    if (window.history.length > 1) router.history.back();
+    else void navigate({ to: "/organizations" });
+  };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1000px] px-4 py-8 pb-24 sm:px-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-leaf-700">
-          Configurações institucionais
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-brand-900">Perfil da organização</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Mantenha os contatos e endereços atualizados e escolha quais avisos deseja receber.
-        </p>
-
-        <section className="mt-8 rounded-2xl border border-border bg-white p-5 shadow-xs sm:p-6">
-          <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-leaf-100">
-              <ShieldCheck className="h-5 w-5 text-leaf-700" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-bold text-brand-900">Conta responsável</h2>
-              <p className="truncate text-sm text-muted-foreground">
-                {profile?.nome} · {profile?.email}
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-3 border-t border-border pt-5">
-            <Link
-              to="/organizations/members"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
+      <div className="m-screen m-s-c6-perfil">
+        <div className="m-cover">
+          <img src="/img/campo.jpg" alt="" />
+          <div className="m-veil" />
+          <div className="m-status" />
+          <div className="m-cb">
+            <button type="button" className="m-round m-glass" onClick={back} aria-label="Voltar">
+              <ArrowLeft className="lucide" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="m-round m-glass"
+              onClick={() => void logout()}
+              aria-label="Sair da conta"
             >
-              <Users className="h-4 w-4" /> Gerenciar associados
-            </Link>
-            {profile?.roles.includes("produtor") && (
-              <Link
-                to="/profile/producer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
-              >
-                <Repeat2 className="h-4 w-4" /> Acessar perfil de produtor
-              </Link>
+              <LogOut className="lucide" aria-hidden />
+            </button>
+          </div>
+        </div>
+
+        <div className="m-me m-card">
+          <div className="m-top">
+            <span className="m-avatar m-big m-mono">
+              {initials(organization?.tradeName ?? profile?.nome) || "?"}
+            </span>
+            {organization?.verificationStatus === "verified" && (
+              <span className="m-chip m-leaf">
+                <BadgeCheck className="lucide" aria-hidden />
+                CNPJ verificado
+              </span>
             )}
           </div>
-        </section>
-
-        <section className="mt-6 space-y-4" aria-labelledby="organization-data-title">
-          <div>
-            <h2 id="organization-data-title" className="text-xl font-bold text-brand-900">
-              Dados das organizações
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Alterações de contato são aplicadas imediatamente.
-            </p>
+          <b>{organization?.tradeName ?? (loading ? "Carregando..." : "Sua organização")}</b>
+          {organization && (
+            <>
+              <span>
+                {organization.legalName} · {organization.city}
+              </span>
+              <span>CNPJ {formatCnpj(organization.cnpj)}</span>
+            </>
+          )}
+          <div className="m-kp">
+            <div>
+              <strong>{metrics.activeMembers}</strong>
+              <em>associados</em>
+            </div>
+            <div>
+              <strong>{metrics.activeProducts}</strong>
+              <em>produtos</em>
+            </div>
+            <div>
+              <strong>{metrics.authorizedMembers}</strong>
+              <em>vendem</em>
+            </div>
           </div>
-          {loading ? (
-            <div className="h-72 animate-pulse rounded-2xl bg-white" />
-          ) : error ? (
-            <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-800" role="alert">
-              <p>Não foi possível carregar os dados das organizações.</p>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="mt-2 font-semibold underline"
-              >
-                Tentar novamente
+        </div>
+
+        {error && (
+          <div className="m-pad">
+            <div className="m-card m-alert" role="alert">
+              <span>Não foi possível carregar os dados da organização.</span>
+              <button type="button" onClick={() => void refresh()}>
+                Tentar de novo
               </button>
             </div>
-          ) : organizations.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-white p-8 text-center">
-              <Building2 className="mx-auto h-10 w-10 text-leaf-700" />
-              <p className="mt-3 font-semibold text-brand-900">Nenhuma organização vinculada</p>
-            </div>
-          ) : (
-            organizations.map((organization) => (
-              <OrganizationSettingsForm
-                key={organization.id}
-                organization={organization}
-                onUpdated={refresh}
-              />
-            ))
+          </div>
+        )}
+
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<Building2 className="lucide" aria-hidden />}
+            title="Dados institucionais"
+            subtitle="Razão social, endereço, IE"
+            onClick={() => setSheet("data")}
+          />
+          <ListRow
+            icon={<UserCog className="lucide" aria-hidden />}
+            title="Responsáveis"
+            subtitle={
+              organization
+                ? `${organization.responsibleName} · ${organization.responsibleRole.toLowerCase()}`
+                : "Quem administra a organização"
+            }
+            onClick={() => setSheet("data")}
+          />
+          <ListRow
+            icon={<Bell className="lucide" aria-hidden />}
+            title="Notificações"
+            subtitle="Adesões, pedidos e mensagens"
+            onClick={() => setSheet("notifications")}
+          />
+          {profile?.roles.includes("produtor") && (
+            <ListRow
+              icon={<Repeat2 className="lucide" aria-hidden />}
+              title="Área do produtor"
+              subtitle="Estoque e negociações da sua unidade"
+              to="/profile/producer"
+            />
           )}
-        </section>
+        </div>
+        <div className="m-grp m-card">
+          <ListRow
+            icon={<Settings className="lucide" aria-hidden />}
+            title="Ajustes"
+            subtitle="Tamanho do texto e instalar o app"
+            onClick={() => setSheet("settings")}
+          />
+          <ListRow
+            icon={<LifeBuoy className="lucide" aria-hidden />}
+            title="Suporte"
+            subtitle="WhatsApp da equipe Origem"
+            href={supportHref}
+          />
+        </div>
+      </div>
 
-        <section aria-labelledby="notification-settings-title">
-          <h2 id="notification-settings-title" className="sr-only">
-            Preferências de notificações
-          </h2>
-          <PushSettings />
-        </section>
-
-        <aside className="mt-6 flex gap-3 rounded-2xl border border-leaf-200 bg-leaf-50 p-4 text-sm text-brand-900">
-          <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-leaf-700" />
-          As preferências acima pertencem à sua conta e valem para todos os perfis acessados com
-          este login.
-        </aside>
-
-        <button
-          type="button"
-          onClick={() => void logout()}
-          className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 font-semibold text-red-700 sm:w-auto"
-        >
-          <LogOut className="h-5 w-5" /> Sair da conta
-        </button>
-      </main>
-    </div>
+      <Sheet open={sheet === "data"} title="Dados institucionais" onClose={() => setSheet(null)}>
+        <div className="m-legacy">
+          {organizations.map((item) => (
+            <OrganizationSettingsForm key={item.id} organization={item} onUpdated={refresh} />
+          ))}
+        </div>
+      </Sheet>
+      <Sheet open={sheet === "notifications"} title="Notificações" onClose={() => setSheet(null)}>
+        <PushSettings />
+      </Sheet>
+      <Sheet open={sheet === "settings"} title="Ajustes" onClose={() => setSheet(null)}>
+        <span className="m-lbl">Tamanho do texto</span>
+        <TextSizeOptions />
+        <span className="m-lbl">Aplicativo</span>
+        <InstallButton variant="compact" />
+      </Sheet>
+    </>
   );
 }

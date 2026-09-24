@@ -1,14 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Building2,
+  ChevronRight,
+  CircleCheck,
+  Clock3,
+  Search,
+  ShoppingBasket,
+  SlidersHorizontal,
+} from "@/components/mobile/icons";
+import { useEffect, useMemo, useState } from "react";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProductCard } from "@/components/marketplace/ProductCard";
+import { NotificationBell } from "@/components/mobile/NotificationBell";
 import { DataLoadError, DataLoading } from "@/components/system/DataLoadState";
-import { useAvailableProductsResource } from "@/lib/available-products";
-import { useCart } from "@/lib/cart";
-import { Building2, Clock3, Search, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useAvailableProductsResource } from "@/lib/available-products";
+import { useBuyerProfileDetails } from "@/lib/buyer-profile";
+import { useCart } from "@/lib/cart";
+import { preferredProducer } from "@/lib/catalog";
+import { initials } from "@/lib/format";
 import { getOperationWindow } from "@/lib/operation";
-import { useMemo, useState } from "react";
+import { PRODUCT_GROUPS } from "@/lib/product-group";
 
 export const Route = createFileRoute("/portfolio")({
   component: () => (
@@ -18,144 +31,208 @@ export const Route = createFileRoute("/portfolio")({
   ),
 });
 
+const weekday = (date: Date) => date.toLocaleDateString("pt-BR", { weekday: "short" });
+
 function Portfolio() {
   const { products, loading, error, reload } = useAvailableProductsResource();
-  const categories = useMemo(
-    () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
-    [products],
-  );
   const { cart, setQty, totalItems } = useCart();
   const { profile } = useAuth();
+  const { details } = useBuyerProfileDetails();
   const operation = useMemo(() => getOperationWindow(), []);
   const [cat, setCat] = useState("Todos");
   const [q, setQ] = useState("");
+  const [cheapestFirst, setCheapestFirst] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [added, setAdded] = useState<{ message: React.ReactNode; undo: () => void } | null>(null);
+  useEffect(() => {
+    if (!added) return;
+    const timer = window.setTimeout(() => setAdded(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [added]);
+  const listCount = Object.values(cart).filter((value) => value > 0).length;
 
-  const filtered = useMemo(
-    () =>
-      products.filter(
-        (product) =>
-          (cat === "Todos" || product.category === cat) &&
-          (q === "" || product.name.toLowerCase().includes(q.toLowerCase())),
-      ),
-    [cat, products, q],
-  );
+  const categories = useMemo(() => {
+    const present = new Set(products.map((product) => product.category));
+    const ordered = PRODUCT_GROUPS.filter((group) => present.has(group));
+    const others = [...present].filter((group) => !ordered.includes(group as never)).sort();
+    return ["Todos", ...ordered, ...others];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    const list = products.filter(
+      (product) =>
+        (cat === "Todos" || product.category === cat) &&
+        (q === "" || product.name.toLowerCase().includes(q.toLowerCase())),
+    );
+    return cheapestFirst
+      ? [...list].sort((a, b) => preferredProducer(a).price - preferredProducer(b).price)
+      : list;
+  }, [cat, cheapestFirst, products, q]);
+
+  const name = profile?.nome ?? "";
+  const firstName = name.split(" ")[0];
+  const company = details.companyName || "Complete seu perfil";
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <Navbar />
-      <main className="mx-auto max-w-[1200px] px-4 py-6 pb-44 sm:px-8 sm:py-10 md:pb-10">
-        <section className="relative -mx-4 -mt-6 overflow-hidden rounded-b-[28px] text-white sm:mx-0 sm:mt-0 sm:rounded-[28px]">
-          <img
-            src="/img/campo.jpg"
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,61,34,.55)_0%,rgba(20,61,34,.15)_38%,rgba(20,61,34,.94)_100%)]" />
-          <div className="relative flex min-h-[300px] flex-col justify-end px-5 pb-5 pt-6 sm:min-h-[340px] sm:px-10 sm:pb-8">
-            {profile?.nome && (
-              <p className="mb-auto text-sm font-medium text-white/85">Olá, {profile.nome}</p>
-            )}
-            <h1 className="mt-10 text-[28px] font-normal leading-tight tracking-tight text-white sm:text-4xl">
-              Direto do produtor
-              <span className="block text-[34px] font-semibold sm:text-5xl">para sua cozinha</span>
+      <div className="m-screen m-s-01-portfolio">
+        <section className="m-hero">
+          <img src="/img/campo.jpg" alt="" />
+          <div className="m-veil" />
+          <div className="m-in">
+            <div className="m-status" />
+            <div className="m-hello">
+              <Link
+                to="/profile/buyer"
+                className="m-avatar m-l"
+                style={{ background: "#fff" }}
+                aria-label="Abrir perfil"
+              >
+                {initials(name) || "?"}
+              </Link>
+              <div className="m-who">
+                <b>Olá, {firstName}</b>
+                <span>{company}</span>
+              </div>
+              <NotificationBell glass />
+            </div>
+            <h1>
+              Direto do produtor<b>para sua cozinha</b>
             </h1>
-            <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-brand-900">
-              <Clock3 className="h-3.5 w-3.5" />
-              Pedidos até{" "}
-              {operation.cutoff.toLocaleDateString("pt-BR", {
-                weekday: "short",
-                day: "2-digit",
-                month: "2-digit",
-              })}
-              , 18h · entrega {operation.delivery.toLocaleDateString("pt-BR", { weekday: "short" })}
-              , 8h
-            </span>
-            <div className="relative mt-4 w-full sm:max-w-md">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <div className="m-dl">
+              <span className="m-chip m-white">
+                <Clock3 className="lucide" aria-hidden />
+                Pedidos até {weekday(operation.cutoff)}, 18h · entrega {weekday(operation.delivery)}
+                , 8h
+              </span>
+            </div>
+            <label className="m-search">
+              <Search className="lucide" aria-hidden />
               <input
-                aria-label="Buscar produto no portfólio"
                 type="search"
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
                 placeholder="Buscar alface, tomate, ovos…"
-                className="h-13 w-full rounded-full border-0 bg-white/97 py-3.5 pl-12 pr-4 text-[15px] text-brand-900 shadow-lg placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-leaf-300"
+                aria-label="Buscar produto no portfólio"
               />
-            </div>
+              <button
+                type="button"
+                className="m-go"
+                aria-pressed={cheapestFirst}
+                aria-label="Ordenar pelo menor preço"
+                title="Ordenar pelo menor preço"
+                onClick={() => setCheapestFirst((current) => !current)}
+              >
+                <SlidersHorizontal className="lucide" aria-hidden />
+              </button>
+            </label>
           </div>
         </section>
 
-        <Link
-          to="/directory/organizations"
-          className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-leaf-700 hover:underline"
-        >
-          <Building2 className="h-4 w-4" />
-          Conhecer cooperativas e associações
-        </Link>
+        <div className="m-cats" role="tablist" aria-label="Categorias">
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              role="tab"
+              aria-selected={category === cat}
+              className={`m-pill${category === cat ? " m-on" : ""}`}
+              onClick={() => setCat(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
 
-        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-          {categories.map((category) => {
-            const active = category === cat;
-            return (
-              <button
-                key={category}
-                onClick={() => setCat(category)}
-                className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-medium transition-colors motion-reduce:transition-none ${
-                  active
-                    ? "bg-brand-900 text-white"
-                    : "border border-border bg-white text-muted-foreground hover:text-brand-900"
-                }`}
-              >
-                {category}
-              </button>
-            );
-          })}
+        <div className="m-sec">
+          <h2>{expanded ? "Todos os produtos" : "Colhido esta semana"}</h2>
+          {filtered.length > 2 && (
+            <button type="button" onClick={() => setExpanded((current) => !current)}>
+              {expanded ? "Ver menos" : "Ver tudo"}
+            </button>
+          )}
         </div>
 
         {error && (
-          <div className="mt-8">
+          <div className="m-pad">
             <DataLoadError message={error} onRetry={reload} />
           </div>
         )}
 
         {loading && products.length === 0 ? (
-          <div className="mt-10">
-            <DataLoading label={"Carregando produtos dispon\u00edveis..."} />
+          <div className="m-pad">
+            <DataLoading label="Carregando produtos disponíveis..." />
+          </div>
+        ) : filtered.length === 0 && !error ? (
+          <div className="m-pad">
+            <div className="m-card m-empty">
+              <b>Nenhum produto disponível</b>
+              <span>
+                {q || cat !== "Todos"
+                  ? "Tente outra busca ou categoria."
+                  : "Os produtos aparecem aqui quando os produtores publicam estoque."}
+              </span>
+            </div>
           </div>
         ) : (
-          <section className="mt-5 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3">
+          <div className={`m-rail${expanded ? " m-grid" : ""}`}>
             {filtered.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 qty={cart[product.id] ?? 0}
                 onChange={(qty) => setQty(product.id, qty)}
+                onAdded={(message, undo) => setAdded({ message, undo })}
               />
             ))}
-          </section>
-        )}
-
-        {!loading && !error && filtered.length === 0 && (
-          <div className="mt-10 rounded-2xl border border-border bg-canvas p-12 text-center">
-            <h3 className="text-lg font-semibold text-brand-900">Nenhum produto disponível</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Publique produtos ativos no estoque do produtor para aparecerem aqui.
-            </p>
           </div>
         )}
-      </main>
 
-      {totalItems > 0 && (
-        <Link
-          to="/order"
-          className="fixed bottom-[92px] left-1/2 z-40 inline-flex h-14 max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full bg-brand-900 px-5 text-base font-semibold text-white shadow-md transition-all hover:bg-brand-800 hover:shadow-lg motion-reduce:transition-none md:bottom-6 md:px-6"
-        >
-          <ShoppingBag className="h-5 w-5" />
-          Ver lista de interesse
-          <span className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-orange-600 px-2 text-sm font-bold">
-            {totalItems.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
-          </span>
-        </Link>
-      )}
-    </div>
+        {expanded && (
+          <div className="m-pad">
+            <Link to="/directory/organizations" className="m-card m-linkrow">
+              <span className="m-ic">
+                <Building2 className="lucide" aria-hidden />
+              </span>
+              <span className="m-tx">
+                <b>Cooperativas e associações</b>
+                <span>Compre de grupos de produtores da região</span>
+              </span>
+              <ChevronRight className="lucide" aria-hidden />
+            </Link>
+          </div>
+        )}
+
+        {added ? (
+          <div className="m-toast" role="status">
+            <CircleCheck className="lucide" aria-hidden />
+            {added.message}
+            <button
+              type="button"
+              onClick={() => {
+                added.undo();
+                setAdded(null);
+              }}
+            >
+              Desfazer
+            </button>
+          </div>
+        ) : (
+          totalItems > 0 && (
+            <Link to="/order" className="m-toast">
+              <ShoppingBasket className="lucide" aria-hidden />
+              <span>
+                <b>
+                  {listCount} {listCount === 1 ? "item" : "itens"}
+                </b>{" "}
+                na lista de interesse
+              </span>
+              <span className="m-act">Ver lista</span>
+            </Link>
+          )
+        )}
+      </div>
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { readDemoList } from "@/lib/demo-store";
 import { assertSupabaseConfigured, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
@@ -58,6 +59,8 @@ function mapProduct(row: Record<string, unknown>): OrganizationProduct {
 }
 
 export async function listManagedOrganizationProducts() {
+  const demo = readDemoList<OrganizationProduct>("organization-products");
+  if (demo) return demo;
   const { data, error } = await assertSupabaseConfigured().rpc(
     "list_managed_organization_products",
   );

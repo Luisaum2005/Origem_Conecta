@@ -1,3 +1,4 @@
+import { readDemoList } from "@/lib/demo-store";
 import { assertSupabaseConfigured, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
@@ -67,6 +68,13 @@ export function useOrganizationNegotiations() {
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     setLoading(true);
+    const demo = readDemoList<OrganizationNegotiation>("organization-negotiations");
+    if (demo) {
+      setNegotiations(demo);
+      setError("");
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error: queryError } = await assertSupabaseConfigured().rpc(
         "list_managed_organization_negotiations",

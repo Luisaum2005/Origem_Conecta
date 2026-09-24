@@ -1,5 +1,5 @@
 import { SUPPLIER_PRODUCT_GROUPS } from "@/lib/hortifruti";
-import { Check, ChevronDown, CirclePlus, Search, X } from "lucide-react";
+import { Check, ChevronDown, CirclePlus, Search, X } from "@/components/mobile/icons";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type SupplierProductPickerProps = {

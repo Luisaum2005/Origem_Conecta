@@ -1,7 +1,5 @@
-import { MessageCircle } from "lucide-react";
-
-const supportHref =
-  (import.meta.env.VITE_SUPPORT_WHATSAPP as string | undefined) || "mailto:origemconecta@gmail.com";
+import { MessageCircle } from "@/components/mobile/icons";
+import { supportHref } from "@/lib/support";
 
 export function SupportButton({ compact = false }: { compact?: boolean }) {
   return (

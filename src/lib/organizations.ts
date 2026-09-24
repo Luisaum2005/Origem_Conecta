@@ -1,3 +1,4 @@
+import { readDemoList } from "@/lib/demo-store";
 import { assertSupabaseConfigured, supabase, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
@@ -57,6 +58,7 @@ export function useOrganizations() {
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     if (!supabase) {
+      setOrganizations(readDemoList<Organization>("organizations") ?? []);
       setLoading(false);
       return;
     }

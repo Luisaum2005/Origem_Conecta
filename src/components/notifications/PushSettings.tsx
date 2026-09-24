@@ -11,7 +11,7 @@ import {
   type NotificationPreferences,
   type PushState,
 } from "@/lib/push-notifications";
-import { BellRing } from "lucide-react";
+import { BellRing } from "@/components/mobile/icons";
 import { useEffect, useState } from "react";
 import { reportAppError } from "@/lib/error-monitor";
 

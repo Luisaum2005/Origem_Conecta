@@ -12,7 +12,7 @@ import {
   organizationNavigation,
   producerAreaNavigationItem,
 } from "@/lib/organization-navigation";
-import { Bell, Building2, LogOut, Repeat2, User } from "lucide-react";
+import { Bell, Building2, LogOut, Repeat2, User } from "@/components/mobile/icons";
 import { useEffect, useRef, useState } from "react";
 
 const links = [
@@ -113,7 +113,7 @@ export function Navbar() {
   }, [accountOpen]);
   return (
     <>
-      <header className="sticky top-0 z-30 h-[64px] border-b border-border bg-white/90 backdrop-blur md:h-[72px]">
+      <header className="sticky top-0 z-30 hidden h-[72px] border-b border-border bg-white/90 backdrop-blur lg:block">
         <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-4 xl:gap-8">
             <Logo compactOnMobile />

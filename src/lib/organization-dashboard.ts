@@ -42,6 +42,12 @@ export function useOrganizationDashboard(organizationIds: string[]) {
   const organizationKey = organizationIds.join(",");
 
   const loadInventory = useCallback(async () => {
+    if (!supabase && organizationIds.length > 0) {
+      const products = await listManagedOrganizationProducts();
+      setInventory(products.map((product: OrganizationProduct) => ({ ativo: product.active })));
+      setInventoryLoading(false);
+      return;
+    }
     if (!supabase || organizationIds.length === 0) {
       setInventory([]);
       setInventoryLoading(false);

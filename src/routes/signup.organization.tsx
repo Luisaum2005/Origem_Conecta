@@ -1,26 +1,40 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { AuthLayout, Field, PrimaryButton } from "@/components/auth/AuthShell";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { BadgeCheck } from "@/components/mobile/icons";
+import { useState, type FormEvent } from "react";
+import { AuthPage, Field, FormError, PrimaryButton } from "@/components/auth/AuthShell";
 import { AddressFields } from "@/components/forms/AddressFields";
-import { FormProgress, FormSection } from "@/components/forms/FormSection";
 import { getProfileHome, useAuth } from "@/lib/auth";
 import { isValidCnpj } from "@/lib/organizations";
-import { useEffect, useRef, useState, type FormEvent } from "react";
 
 export const Route = createFileRoute("/signup/organization")({ component: SignupOrganization });
 
+const STEPS = [
+  {
+    title: "Dados da organização",
+    subtitle: "Conferimos o CNPJ na Receita antes de liberar as vendas.",
+  },
+  { title: "Responsável", subtitle: "Quem administra a organização no Origem Conecta." },
+  {
+    title: "Endereço e unidade",
+    subtitle: "A mesma conta também vende como produtor, sem outro cadastro.",
+  },
+  { title: "Crie sua senha", subtitle: "Você entra com o e-mail e esta senha." },
+];
+
 function SignupOrganization() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { signUp } = useAuth();
+  const [type, setType] = useState<"cooperativa" | "associacao">("cooperativa");
+  const [cnpj, setCnpj] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
-  const errorRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (error) errorRef.current?.focus();
-  }, [error]);
-  const validateStep = (form: HTMLFormElement, targetStep = step) => {
+
+  const validateStep = (form: HTMLFormElement | null, target = step) => {
+    if (!form) return false;
     const fields = form.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-      `[data-step="${targetStep}"] input, [data-step="${targetStep}"] select`,
+      `[data-step="${target}"] input, [data-step="${target}"] select`,
     );
     for (const field of fields) {
       if (!field.checkValidity()) {
@@ -28,26 +42,32 @@ function SignupOrganization() {
         return false;
       }
     }
+    if (target === 1 && !isValidCnpj(cnpj)) {
+      setError("Informe um CNPJ válido.");
+      return false;
+    }
+    setError("");
     return true;
   };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
-    setError("");
-    const form = new FormData(event.currentTarget);
-    const responsible = String(form.get("responsavel") ?? "");
-    const cnpj = String(form.get("cnpj") ?? "");
-    const password = String(form.get("password") ?? "");
-    if (!isValidCnpj(cnpj)) {
-      setError("Informe um CNPJ válido.");
-      setLoading(false);
-      return;
+    const formElement = event.currentTarget;
+    for (let current = 1; current <= 4; current += 1) {
+      if (!validateStep(formElement, current)) {
+        setStep(current);
+        return;
+      }
     }
+    const form = new FormData(formElement);
+    const responsible = String(form.get("responsavel") ?? "");
+    const password = String(form.get("password") ?? "");
     if (password.length < 8 || password !== String(form.get("passwordConfirmation") ?? "")) {
       setError("A senha deve ter pelo menos 8 caracteres e ser repetida corretamente.");
-      setLoading(false);
       return;
     }
+    setLoading(true);
+    setError("");
     try {
       const result = await signUp({
         tipo: "produtor",
@@ -65,7 +85,7 @@ function SignupOrganization() {
           commercializationMode: "organization",
         },
         organization: {
-          type: form.get("tipoOrganizacao") as "cooperativa" | "associacao",
+          type,
           legalName: String(form.get("razaoSocial") ?? ""),
           tradeName: String(form.get("nomeFantasia") ?? ""),
           cnpj,
@@ -85,9 +105,9 @@ function SignupOrganization() {
           "origem-conecta-auth-notice",
           "Cadastro concluído. Confirme o e-mail recebido antes de entrar.",
         );
-        navigate({ to: "/login" });
+        void navigate({ to: "/login" });
       } else if (result.profile) {
-        navigate({ to: getProfileHome(result.profile.tipo, result.profile.roles) });
+        void navigate({ to: getProfileHome(result.profile.tipo, result.profile.roles) });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a organização.");
@@ -95,150 +115,171 @@ function SignupOrganization() {
       setLoading(false);
     }
   };
+
+  const next = (button: HTMLButtonElement) => {
+    if (validateStep(button.form)) setStep((current) => current + 1);
+  };
+  const back = () => {
+    if (step > 1) setStep((current) => current - 1);
+    else if (window.history.length > 1) router.history.back();
+    else void navigate({ to: "/" });
+  };
+
   return (
-    <AuthLayout
-      title="Cadastrar cooperativa ou associação"
-      subtitle="Cadastre a instituição e o responsável pela gestão na Origem Conecta."
-      footer={
-        <>
-          Já tem conta?{" "}
-          <Link to="/login" className="font-semibold text-brand-900 hover:underline">
-            Entrar
-          </Link>
-        </>
+    <AuthPage
+      screen="m-s-a7-cad-cooperativa"
+      back={back}
+      headerTitle={`Etapa ${step} de 4`}
+      headerAction={
+        <Link to="/" className="m-exit">
+          Sair
+        </Link>
       }
-    >
-      <FormProgress step={step} total={4} hint="Você pode voltar sem perder os dados" />
-      <form className="space-y-6" onSubmit={onSubmit} noValidate>
-        <div data-step="1" className={step === 1 ? "space-y-6" : "hidden"}>
-          <FormSection title="Dados institucionais">
-            <label className="block">
-              <span className="block text-sm font-medium text-brand-900">Tipo da organização</span>
-              <select
-                name="tipoOrganizacao"
-                required
-                className="mt-2 h-[52px] w-full rounded-xl border border-border bg-white px-4"
-              >
-                <option value="cooperativa">Cooperativa</option>
-                <option value="associacao">Associação</option>
-              </select>
-            </label>
-            <Field name="razaoSocial" label="Razão social" required />
-            <Field name="nomeFantasia" label="Nome fantasia" required />
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                name="cnpj"
-                label="CNPJ"
-                placeholder="00.000.000/0000-00"
-                helper="Informe os 14 números registrados para a organização."
-                required
-              />
-              <Field
-                name="inscricaoEstadual"
-                label="Inscrição estadual"
-                helper="Preencha apenas se a organização possuir inscrição estadual."
-              />
-            </div>
-          </FormSection>
-        </div>
-        <div data-step="2" className={step === 2 ? "space-y-6" : "hidden"}>
-          <FormSection title="Responsável">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field name="responsavel" label="Nome completo" required />
-              <Field name="cargo" label="Cargo" placeholder="Presidente, diretor..." required />
-            </div>
-            <Field name="telefone" label="Telefone/WhatsApp" type="tel" required />
-            <Field
-              name="email"
-              label="E-mail de acesso"
-              type="email"
-              autoComplete="email"
-              required
-            />
-          </FormSection>
-        </div>
-        <div data-step="3" className={step === 3 ? "space-y-6" : "hidden"}>
-          <AddressFields />
-          <FormSection title="Produção e comercialização">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              A mesma conta também terá acesso ao estoque e às negociações como produtor, sem
-              precisar de outro cadastro.
-            </p>
-            <Field
-              name="nomePropriedade"
-              label="Nome da propriedade ou unidade produtiva"
-              helper="Pode ser o nome da sede, fazenda ou unidade que publicará os produtos."
-              required
-            />
-          </FormSection>
-        </div>
-        <div data-step="4" className={step === 4 ? "space-y-6" : "hidden"}>
-          <FormSection title="Segurança">
-            <Field
-              name="password"
-              label="Senha"
-              type="password"
-              minLength={8}
-              autoComplete="new-password"
-              required
-            />
-            <Field
-              name="passwordConfirmation"
-              label="Repita a senha"
-              type="password"
-              minLength={8}
-              autoComplete="new-password"
-              required
-            />
-          </FormSection>
-          <label className="flex items-start gap-3 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              required
-              className="mt-1 h-5 w-5 accent-[var(--color-brand-900)]"
-            />
-            <span>
-              Confirmo que sou autorizado a cadastrar esta organização e concordo com os termos de
-              uso.
-            </span>
-          </label>
-        </div>
-        {error && (
-          <p
-            ref={errorRef}
-            tabIndex={-1}
-            role="alert"
-            className="rounded-xl bg-[var(--color-error-bg)] px-4 py-3 text-sm text-[var(--color-error-fg)]"
+      steps={{ current: step, total: 4 }}
+      eyebrow="Cooperativa ou associação"
+      title={STEPS[step - 1].title}
+      subtitle={STEPS[step - 1].subtitle}
+      footer={
+        step === 1 ? (
+          <button
+            type="button"
+            form="signup-org"
+            className="m-btn m-primary"
+            onClick={(e) => next(e.currentTarget)}
           >
-            {error}
-          </p>
-        )}
-        <div className="flex gap-3">
-          {step > 1 && (
+            Continuar
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: "10px" }}>
             <button
               type="button"
-              onClick={() => setStep((current) => current - 1)}
-              className="h-[52px] flex-1 rounded-xl border border-border bg-white font-semibold text-brand-900"
+              className="m-btn m-secondary"
+              style={{ flex: "1" }}
+              onClick={back}
             >
               Voltar
             </button>
-          )}
-          {step < 4 ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                const form = event.currentTarget.form;
-                if (form && validateStep(form)) setStep((current) => current + 1);
-              }}
-              className="h-[52px] flex-1 rounded-xl bg-brand-900 font-semibold text-white"
-            >
-              Continuar
-            </button>
-          ) : (
-            <PrimaryButton loading={loading}>Criar organização</PrimaryButton>
-          )}
+            {step < 4 ? (
+              <button
+                type="button"
+                form="signup-org"
+                className="m-btn m-primary"
+                style={{ flex: "2" }}
+                onClick={(e) => next(e.currentTarget)}
+              >
+                Continuar
+              </button>
+            ) : (
+              <PrimaryButton form="signup-org" loading={loading} style={{ flex: "2" }}>
+                Criar conta
+              </PrimaryButton>
+            )}
+          </div>
+        )
+      }
+    >
+      <form id="signup-org" onSubmit={onSubmit} noValidate>
+        <div data-step="1" hidden={step !== 1}>
+          <div className="m-field">
+            <span>Tipo</span>
+            <div className="m-seg" role="radiogroup" aria-label="Tipo da organização">
+              {(
+                [
+                  ["cooperativa", "Cooperativa"],
+                  ["associacao", "Associação"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={type === value}
+                  className={type === value ? "m-on" : undefined}
+                  onClick={() => setType(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Field
+            name="cnpj"
+            label="CNPJ"
+            placeholder="00.000.000/0000-00"
+            required
+            value={cnpj}
+            onChange={(event) => setCnpj(event.target.value)}
+            helper={
+              isValidCnpj(cnpj) ? (
+                <span className="m-ok">
+                  <BadgeCheck className="lucide" aria-hidden />
+                  CNPJ válido
+                </span>
+              ) : undefined
+            }
+          />
+          <Field
+            name="nomeFantasia"
+            label="Nome fantasia"
+            placeholder="Ex.: Coop. Agro Piauí"
+            required
+          />
+          <Field name="razaoSocial" label="Razão social" placeholder="Como está no CNPJ" required />
+          <Field
+            name="inscricaoEstadual"
+            label="Inscrição estadual"
+            placeholder="Opcional agora"
+            helper="Necessária para emitir nota fiscal de venda."
+          />
         </div>
+        <div data-step="2" hidden={step !== 2}>
+          <Field name="responsavel" label="Nome completo" autoComplete="name" required />
+          <Field name="cargo" label="Cargo" placeholder="Presidente, diretor..." required />
+          <Field
+            name="telefone"
+            label="Telefone / WhatsApp"
+            type="tel"
+            placeholder="(86) 99999-9999"
+            required
+          />
+          <Field name="email" label="E-mail de acesso" type="email" autoComplete="email" required />
+        </div>
+        <div data-step="3" hidden={step !== 3}>
+          <AddressFields />
+          <Field
+            name="nomePropriedade"
+            label="Unidade produtiva"
+            placeholder="Sede, fazenda ou unidade que publica os produtos"
+            required
+          />
+        </div>
+        <div data-step="4" hidden={step !== 4}>
+          <Field
+            name="password"
+            label="Senha"
+            type="password"
+            helper="Mínimo 8 caracteres"
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <Field
+            name="passwordConfirmation"
+            label="Repita a senha"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <label className="m-terms">
+            <input type="checkbox" required />
+            <span>
+              Confirmo que posso cadastrar esta organização e concordo com os termos de uso.
+            </span>
+          </label>
+        </div>
+        <FormError>{error}</FormError>
       </form>
-    </AuthLayout>
+    </AuthPage>
   );
 }

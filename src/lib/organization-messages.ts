@@ -1,3 +1,4 @@
+import { readDemoList } from "@/lib/demo-store";
 import { assertSupabaseConfigured, throwSupabaseError } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 
@@ -74,6 +75,13 @@ export function useOrganizationConversations() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    const demo = readDemoList<OrganizationConversation>("organization-conversations");
+    if (demo) {
+      setConversations(demo);
+      setError("");
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error: queryError } = await assertSupabaseConfigured().rpc(
         "list_managed_organization_conversations",
@@ -103,6 +111,10 @@ export function useOrganizationConversations() {
 }
 
 export async function listManagedOrganizationMessages(conversationId: string) {
+  const demo = readDemoList<OrganizationMessage & { conversationId: string }>(
+    "organization-messages",
+  );
+  if (demo) return demo.filter((message) => message.conversationId === conversationId);
   const { data, error } = await assertSupabaseConfigured().rpc(
     "list_managed_organization_messages",
     { p_conversation_id: conversationId, p_limit: 200 },
