@@ -9,7 +9,7 @@ import {
   Trash2,
   Zap,
 } from "@/components/mobile/icons";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
@@ -41,7 +41,6 @@ export const Route = createFileRoute("/demands")({
 
 const UNITS = ["kg", "unidade", "peça", "caixa", "maço", "bandeja", "pote", "litro"];
 const PRODUCT_STATES = ["Indiferente", "Mais verde", "No ponto", "Maduro", "Selecionado"];
-const HIDDEN_KEY = "origem-conecta-hidden-demand-responses";
 type Filter = "all" | "open" | "withResponses" | "approved";
 
 const STATUS_CHIP: Record<DemandStatus, [string, string]> = {
@@ -90,18 +89,11 @@ function responseTotal(response: DemandResponse) {
   return response.items.filter((item) => item.canSupply).reduce((sum, item) => sum + item.price, 0);
 }
 
-function readHidden(): string[] {
-  try {
-    return JSON.parse(window.localStorage.getItem(HIDDEN_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
 function DemandsHub() {
   const { profile } = useAuth();
   const { respond } = Route.useSearch();
-  const { demands, addDemand, respondDemand, approveResponse } = useDemandRequests();
+  const { demands, addDemand, respondDemand, approveResponse, declineResponse } =
+    useDemandRequests();
 
   if (profile?.tipo === "produtor") {
     const demand = respond ? demands.find((item) => item.id === respond) : undefined;
@@ -116,6 +108,7 @@ function DemandsHub() {
       demands={demands}
       addDemand={addDemand}
       approveResponse={approveResponse}
+      declineResponse={declineResponse}
       buyerName={profile?.nome ?? "Comprador"}
       readOnly={profile?.tipo !== "comprador"}
     />
@@ -148,12 +141,14 @@ function BuyerDemands({
   demands,
   addDemand,
   approveResponse,
+  declineResponse,
   buyerName,
   readOnly,
 }: {
   demands: DemandRequest[];
   addDemand: ReturnType<typeof useDemandRequests>["addDemand"];
   approveResponse: ReturnType<typeof useDemandRequests>["approveResponse"];
+  declineResponse: ReturnType<typeof useDemandRequests>["declineResponse"];
   buyerName: string;
   readOnly: boolean;
 }) {
@@ -161,8 +156,6 @@ function BuyerDemands({
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [composing, setComposing] = useState(false);
   const [approvingId, setApprovingId] = useState("");
-  const [hidden, setHidden] = useState<string[]>([]);
-  useEffect(() => setHidden(readHidden()), []);
 
   const counts = {
     all: demands.length,
@@ -190,21 +183,16 @@ function BuyerDemands({
     }
   };
 
-  const hide = (response: DemandResponse) => {
-    const next = [...hidden, response.id];
-    window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
-    setHidden(next);
-    toast.success(`Proposta de ${response.producerName} ocultada`, {
-      description: "O produtor não é avisado. Você ainda pode aprovar outra proposta.",
-      action: {
-        label: "Desfazer",
-        onClick: () => {
-          const restored = readHidden().filter((id) => id !== response.id);
-          window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(restored));
-          setHidden(restored);
-        },
-      },
-    });
+  const decline = async (demand: DemandRequest, response: DemandResponse) => {
+    setApprovingId(response.id);
+    try {
+      await declineResponse(demand.id, response.id);
+      toast.success(`Proposta de ${response.producerName} recusada. O produtor foi avisado.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível recusar a proposta.");
+    } finally {
+      setApprovingId("");
+    }
   };
 
   const pills: { key: Filter; label: string; count?: number }[] = [
@@ -266,9 +254,7 @@ function BuyerDemands({
           </div>
         ) : (
           visible.map((demand) => {
-            const pending = demand.responses.filter(
-              (response) => response.status === "Enviada" && !hidden.includes(response.id),
-            );
+            const pending = demand.responses.filter((response) => response.status === "Enviada");
             const approved = demand.responses.find((response) => response.status === "Aprovada");
             const remaining = daysLeft(demand.deliveryDate);
             return (
@@ -332,7 +318,8 @@ function BuyerDemands({
                             <button
                               type="button"
                               className="m-btn m-secondary m-sm"
-                              onClick={() => hide(response)}
+                              disabled={approvingId === response.id}
+                              onClick={() => void decline(demand, response)}
                             >
                               Recusar
                             </button>

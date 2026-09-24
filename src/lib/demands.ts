@@ -445,5 +445,28 @@ export function useDemandRequests() {
     return orderId;
   };
 
-  return { demands, addDemand, respondDemand, approveResponse };
+  const declineResponse = async (demandId: string, responseId: string) => {
+    if (supabase && isSupabaseConfigured && profile?.tipo === "comprador") {
+      const { error } = await supabase.rpc("secure_decline_demand_response", {
+        p_response_id: responseId,
+      });
+      if (error) throw error;
+    }
+    setDemands((current) =>
+      current.map((demand) => {
+        if (demand.id !== demandId) return demand;
+        const responses = demand.responses.map((response) =>
+          response.id === responseId ? { ...response, status: "Recusada" as const } : response,
+        );
+        const pending = responses.some((response) => response.status === "Enviada");
+        return {
+          ...demand,
+          responses,
+          status: demand.status === "Respondida" && !pending ? "Aberta" : demand.status,
+        };
+      }),
+    );
+  };
+
+  return { demands, addDemand, respondDemand, approveResponse, declineResponse };
 }
