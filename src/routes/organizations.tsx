@@ -36,6 +36,12 @@ function OrganizationsDashboard() {
   const { organizations, loading, error } = useOrganizations();
   const organizationIds = organizations.map((organization) => organization.id);
   const dashboard = useOrganizationDashboard(organizationIds);
+  const guideDone = [
+    organizations.length > 0,
+    dashboard.metrics.activeMembers > 0,
+    dashboard.metrics.activeProducts > 0,
+  ].filter(Boolean).length;
+
   return (
     <div className="min-h-screen bg-canvas">
       <Navbar />
@@ -56,11 +62,22 @@ function OrganizationsDashboard() {
           />
         )}
         <section className="mt-6 rounded-2xl border border-leaf-200 bg-leaf-50 p-5">
-          <h2 className="text-lg font-bold text-brand-900">Primeiros passos</h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-bold text-brand-900">Primeiros passos</h2>
+            <span className="text-sm font-semibold text-brand-600">
+              {guideDone} de 3 concluídos
+            </span>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Use este roteiro para deixar a organização pronta para receber associados e negociar.
           </p>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--color-status-neutral-bg)]">
+            <div
+              className="progress-fill h-full rounded-full"
+              style={{ width: `${(guideDone / 3) * 100}%` }}
+            />
+          </div>
+          <ol className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 lg:grid-cols-3">
             <GuideStep done={organizations.length > 0} text="Cadastro institucional criado" />
             <GuideStep
               done={dashboard.metrics.activeMembers > 0}
@@ -328,11 +345,15 @@ function ActionAlert({ title, text, to }: { title: string; text: string; to: str
 }
 function GuideStep({ text, done, to }: { text: string; done?: boolean; to?: string }) {
   const content = (
-    <span className="flex min-h-12 items-center gap-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-brand-900">
+    <span
+      className={`flex min-h-10 items-center gap-2 text-[13px] font-medium leading-snug ${
+        done ? "text-brand-700" : "text-brand-900 hover:underline"
+      }`}
+    >
       {done ? (
-        <CheckCircle2 className="h-5 w-5 text-green-700" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-600" />
       ) : (
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-leaf-100 text-xs">•</span>
+        <span className="h-4 w-4 shrink-0 rounded-full border-2 border-[#cbc2ae]" />
       )}
       {text}
     </span>

@@ -98,21 +98,21 @@ function ChatsList() {
               {profile?.tipo === "comprador" && (
                 <Link
                   to="/portfolio"
-                  className="inline-flex h-11 items-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
+                  className="inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
                 >
                   Ver Portfólio
                 </Link>
               )}
               <Link
                 to="/demands"
-                className="inline-flex h-11 items-center rounded-xl border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors"
+                className="inline-flex h-11 items-center rounded-full border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors"
               >
                 Ver Demandas
               </Link>
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="surface-card divide-y divide-[var(--hairline)] px-4">
             {conversations.map((conv) => {
               const showBadge = (conv.unreadCount ?? 0) > 0;
               const hasOrder = !!conv.orderId;
@@ -122,17 +122,21 @@ function ChatsList() {
                   key={conv.id}
                   to="/chat"
                   search={{ id: conv.id }}
-                  className="block rounded-2xl border border-border bg-white p-4 transition-all hover:border-leaf-500 hover:shadow-sm"
+                  className="block py-3.5 transition-colors hover:bg-surface-brand-soft/60"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Chat avatar icon */}
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-surface-brand-soft text-brand-850">
-                      <MessageCircle className="h-6 w-6" />
-                    </div>
+                    <span
+                      className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-sm font-semibold shadow-[0_0_0_3px_#fff,0_4px_10px_-3px_rgba(20,61,34,0.3)] ${
+                        showBadge ? "bg-brand-900 text-white" : "bg-leaf-100 text-brand-900"
+                      }`}
+                      aria-hidden
+                    >
+                      {initials(conv.otherPartyName)}
+                    </span>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <h2 className="truncate text-base font-bold text-brand-900">
+                        <h2 className="truncate text-[15px] font-semibold text-brand-900">
                           {conv.otherPartyName}
                         </h2>
                         <span className="text-xs text-muted-foreground shrink-0">
@@ -180,4 +184,17 @@ function ChatsList() {
       </main>
     </div>
   );
+}
+
+function initials(name?: string) {
+  const words = (name ?? "")
+    .replace(/\(.*?\)/g, "")
+    .split(/\s+/)
+    .filter((word) => word && !["de", "da", "das", "do", "dos", "e"].includes(word.toLowerCase()));
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => word[0].toUpperCase())
+      .join("") || "?"
+  ).slice(0, 2);
 }

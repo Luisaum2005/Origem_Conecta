@@ -1,3 +1,4 @@
+import { CategoryIcon } from "@/components/marketplace/ProductCard";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
@@ -39,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/production")({
   component: () => (
@@ -188,13 +190,13 @@ function Production() {
           </div>
         </div>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3">
+        <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
           <Metric icon={Package} label="Produtos cadastrados" value={`${items.length}`} />
           <Metric icon={Sprout} label="Ativos no portfólio" value={`${activeItems.length}`} />
           <Metric
             icon={CircleDollarSign}
             label="Potencial do estoque"
-            value={`R$ ${totalPotential.toFixed(2)}`}
+            value={`${formatBRL(totalPotential)}`}
           />
         </section>
 
@@ -392,7 +394,7 @@ function Production() {
               type="button"
               onClick={save}
               disabled={!isValid}
-              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-5 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
+              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-leaf-600 px-5 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
             >
               {editingId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingId ? "Salvar alterações" : "Adicionar ao estoque"}
@@ -477,7 +479,7 @@ function PhotoField({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-white p-3">
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
             <ImagePlus className="h-4 w-4 text-leaf-700" />
             {uploading ? "Carregando..." : imageUrl ? "Trocar foto" : "Selecionar foto"}
             <input
@@ -533,7 +535,7 @@ function VideoField({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-white p-3">
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500">
             <PlayCircle className="h-4 w-4 text-leaf-700" />
             {uploading ? "Carregando..." : videoUrl ? "Trocar vídeo" : "Selecionar vídeo"}
             <input
@@ -678,16 +680,16 @@ function StockRow({
         editing ? "border-leaf-600 ring-2 ring-leaf-100" : "border-border"
       } ${item.status === "pausado" ? "opacity-70" : ""}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex items-start gap-3 sm:gap-4">
         {item.imageUrl ? (
           <img
             src={item.imageUrl}
             alt={item.product}
-            className="h-24 w-28 rounded-xl object-cover"
+            className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-24 sm:w-28"
           />
         ) : (
-          <div className="grid h-24 w-28 place-items-center rounded-xl bg-[var(--color-surface-brand-soft)] text-leaf-700">
-            <Package className="h-7 w-7" />
+          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-[linear-gradient(160deg,#eef8e2_0%,#d9eec4_100%)] sm:h-24 sm:w-28">
+            <CategoryIcon category="" name={item.product} />
           </div>
         )}
         <div className="min-w-0 flex-1">
@@ -704,7 +706,7 @@ function StockRow({
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {item.quantity || "0"} {item.unit} · R$ {Number(item.price || 0).toFixed(2)}/{item.unit}
+            {item.quantity || "0"} {item.unit} · {formatBRL(Number(item.price || 0))}/{item.unit}
           </p>
           {Number(item.minimumStock || 0) > 0 && (
             <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-orange-700">
@@ -716,6 +718,9 @@ function StockRow({
             Colheita {fmt(item.harvestDate)} · Validade {fmt(item.expiryDate)}
           </p>
           {item.notes && <p className="mt-2 text-sm text-brand-900">{item.notes}</p>}
+          <p className="mt-2 text-sm font-semibold text-brand-900 sm:hidden">
+            Potencial {formatBRL(total)}
+          </p>
           {item.sellerOrganizationName && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-leaf-100 px-2.5 py-1 text-xs font-semibold text-brand-900">
               <Building2 className="h-3.5 w-3.5" />
@@ -729,11 +734,11 @@ function StockRow({
             </p>
           )}
         </div>
-        <div className="text-left sm:text-right">
+        <div className="hidden text-right sm:block">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Potencial
           </p>
-          <p className="text-lg font-bold text-brand-900">R$ {total.toFixed(2)}</p>
+          <p className="text-lg font-bold text-brand-900">{formatBRL(total)}</p>
         </div>
       </div>
 
@@ -742,7 +747,7 @@ function StockRow({
           type="button"
           onClick={onToggleStatus}
           disabled={deleting}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
         >
           {item.status === "ativo" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           {item.status === "ativo" ? "Pausar" : "Ativar"}
@@ -751,7 +756,7 @@ function StockRow({
           type="button"
           onClick={onEdit}
           disabled={deleting}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
         >
           <Pencil className="h-4 w-4" />
           Editar
@@ -761,7 +766,7 @@ function StockRow({
             <button
               type="button"
               disabled={deleting}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)]"
             >
               <Trash2 className="h-4 w-4" /> Excluir
             </button>
@@ -801,14 +806,14 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
+      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
         <Icon className="h-5 w-5" />
       </span>
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
         {label}
       </p>
-      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
     </div>
   );
 }

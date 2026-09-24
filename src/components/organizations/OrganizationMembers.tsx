@@ -416,7 +416,7 @@ function MemberCard({
                   "Associado aprovado.",
                 )
               }
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-leaf-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-leaf-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
             >
               <Check className="h-4 w-4" /> Aprovar vínculo
             </button>
@@ -430,7 +430,7 @@ function MemberCard({
                   "Solicitação recusada.",
                 )
               }
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
             >
               <X className="h-4 w-4" /> Recusar
             </button>
@@ -535,7 +535,7 @@ function MemberCard({
               "Novo convite enviado.",
             )
           }
-          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
+          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
         >
           <MailPlus className="h-4 w-4" /> Convidar novamente
         </button>

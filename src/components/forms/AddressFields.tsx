@@ -94,7 +94,7 @@ export function AddressFields({ defaults }: { defaults?: AddressDefaults }) {
             type="button"
             onClick={handleSearchClick}
             disabled={searching}
-            className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-secondary disabled:cursor-wait disabled:opacity-60"
+            className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-secondary disabled:cursor-wait disabled:opacity-60"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
             {searching ? "Buscando..." : "Buscar CEP"}
