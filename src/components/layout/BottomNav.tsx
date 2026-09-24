@@ -111,13 +111,16 @@ export function BottomNav() {
     };
   }, [moreOpen]);
 
+  // Conversa e página de produto usam o rodapé para a ação principal.
+  if (pathname === "/chat" || pathname === "/product") return null;
+
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white/95 backdrop-blur lg:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 px-4 lg:hidden"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}
       aria-label="Navegação principal"
     >
-      <ul className="mx-auto flex h-[68px] max-w-md items-stretch justify-around px-1">
+      <ul className="pointer-events-auto mx-auto flex h-16 max-w-[360px] items-stretch justify-around gap-1 rounded-full p-1.5 [background:var(--gradient-brand)] [box-shadow:var(--shadow-float)]">
         {primaryItems.map((item) => {
           const Icon = item.icon;
           const isActive = isItemActive(item);
@@ -127,27 +130,21 @@ export function BottomNav() {
                 to={item.to}
                 title={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className="relative flex h-full min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-0.5 transition-all active:scale-95"
+                className="relative flex h-full min-w-0 items-center justify-center rounded-full transition-all active:scale-95"
               >
                 <span
-                  className={`flex h-9 w-12 items-center justify-center rounded-full transition-all ${
-                    isActive ? "bg-leaf-100" : ""
+                  className={`flex h-full w-full items-center justify-center rounded-full transition-all ${
+                    isActive ? "cta-leaf" : ""
                   }`}
                 >
                   <Icon
                     className={`h-[22px] w-[22px] transition-colors ${
-                      isActive ? "text-brand-900" : "text-muted-foreground"
+                      isActive ? "text-brand-900" : "text-white/70"
                     }`}
                     strokeWidth={isActive ? 2.4 : 2}
                   />
                 </span>
-                <span
-                  className={`block w-full truncate px-0.5 text-center text-[10px] leading-tight transition-colors sm:text-[11px] ${
-                    isActive ? "font-semibold text-brand-900" : "font-medium text-muted-foreground"
-                  }`}
-                >
-                  {item.label}
-                </span>
+                <span className="sr-only">{item.label}</span>
               </Link>
             </li>
           );
@@ -161,28 +158,20 @@ export function BottomNav() {
               aria-expanded={moreOpen}
               aria-haspopup="menu"
               aria-controls="bottom-nav-more-menu"
-              className="relative flex h-full min-h-[56px] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-0.5 transition-all active:scale-95"
+              className="relative flex h-full w-full min-w-0 items-center justify-center rounded-full transition-all active:scale-95"
             >
               <span
-                className={`flex h-9 w-12 items-center justify-center rounded-full transition-all ${
-                  overflowActive || moreOpen ? "bg-leaf-100" : ""
+                className={`flex h-full w-full items-center justify-center rounded-full transition-all ${
+                  overflowActive || moreOpen ? "cta-leaf" : ""
                 }`}
               >
                 <MoreHorizontal
                   className={`h-[22px] w-[22px] ${
-                    overflowActive || moreOpen ? "text-brand-900" : "text-muted-foreground"
+                    overflowActive || moreOpen ? "text-brand-900" : "text-white/70"
                   }`}
                 />
               </span>
-              <span
-                className={`block w-full truncate px-0.5 text-center text-[10px] leading-tight sm:text-[11px] ${
-                  overflowActive || moreOpen
-                    ? "font-semibold text-brand-900"
-                    : "font-medium text-muted-foreground"
-                }`}
-              >
-                Mais
-              </span>
+              <span className="sr-only">Mais</span>
             </button>
             {moreOpen && (
               <div
@@ -190,7 +179,7 @@ export function BottomNav() {
                 id="bottom-nav-more-menu"
                 role="menu"
                 aria-label="Mais opções de navegação"
-                className="absolute bottom-[76px] right-2 z-50 w-64 overflow-hidden rounded-2xl border border-border bg-white p-2 shadow-lg"
+                className="absolute bottom-[76px] right-0 z-50 w-64 overflow-hidden rounded-2xl border border-border bg-white p-2 shadow-lg"
               >
                 {overflowItems.map((item) => {
                   const Icon = item.icon;

@@ -1,3 +1,4 @@
+import { CategoryIcon } from "@/components/marketplace/ProductCard";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { RequireProfile } from "@/components/auth/RequireProfile";
 import { Navbar } from "@/components/layout/Navbar";
@@ -24,6 +25,7 @@ import {
   Truck,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/order")({
   component: () => (
@@ -119,10 +121,10 @@ function Order() {
         `- ${item.productName}`,
         `  Quantidade: ${formatQuantity(item.quantity)} ${item.unit}`,
         `  Produtor: ${item.producerName}`,
-        `  Valor anunciado: R$ ${item.lineTotal.toFixed(2)}`,
+        `  Valor anunciado: ${formatBRL(item.lineTotal)}`,
       ]),
       "",
-      `Valor estimado: R$ ${subtotal.toFixed(2)}`,
+      `Valor estimado: ${formatBRL(subtotal)}`,
       "Preço, logística, pagamento e documentação serão definidos na negociação.",
     ];
     return lines.join("\n");
@@ -249,7 +251,7 @@ function Order() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             to="/portfolio"
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar ao portfólio
           </Link>
@@ -264,7 +266,7 @@ function Order() {
           confirmar.
         </p>
 
-        <div className="mt-4 rounded-xl border border-[var(--border-strong)] bg-surface-brand-soft px-4 py-3 text-sm text-brand-900">
+        <div className="mt-4 rounded-2xl bg-orange-100 px-4 py-3 text-sm text-orange-700">
           <strong>{operation.orderDeadlineText}</strong> {operation.deliveryText}
         </div>
 
@@ -298,7 +300,7 @@ function Order() {
             </p>
             <Link
               to="/portfolio"
-              className="mt-6 inline-flex h-11 items-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+              className="mt-6 inline-flex h-11 items-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
             >
               Ver portfólio
             </Link>
@@ -310,7 +312,7 @@ function Order() {
                 <h2 className="text-lg font-semibold text-brand-900">Itens de interesse</h2>
                 <Link
                   to="/portfolio"
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
                 >
                   Acrescentar itens
                 </Link>
@@ -326,7 +328,7 @@ function Order() {
                     className="rounded-2xl border border-border bg-white p-4 shadow-xs transition-shadow hover:shadow-sm sm:p-5"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-surface-brand-soft text-3xl sm:h-20 sm:w-20 sm:text-4xl">
+                      <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[linear-gradient(160deg,#eef8e2_0%,#d9eec4_100%)] text-3xl sm:text-4xl">
                         {product.imageUrl ? (
                           <img
                             src={product.imageUrl}
@@ -334,7 +336,7 @@ function Order() {
                             className="h-full w-full rounded-xl object-cover"
                           />
                         ) : (
-                          product.emoji
+                          <CategoryIcon category={product.category} name={product.name} />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -348,8 +350,7 @@ function Order() {
                           <p className="text-xs text-muted-foreground">{selectedProducer.origin}</p>
                         )}
                         <p className="mt-1.5 text-sm font-medium text-brand-700">
-                          Unidade: {currentUnit} · R$ {selectedProducer.price.toFixed(2)}/
-                          {currentUnit}
+                          Unidade: {currentUnit} · {formatBRL(selectedProducer.price)}/{currentUnit}
                         </p>
                       </div>
                       <button
@@ -382,7 +383,7 @@ function Order() {
                         <button
                           type="button"
                           onClick={() => removeProduct(product.id)}
-                          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] sm:hidden cursor-pointer"
+                          className="inline-flex h-11 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] sm:hidden cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
                           Excluir
@@ -393,7 +394,7 @@ function Order() {
                             Total
                           </p>
                           <p className="text-base font-bold tabular-nums text-brand-900 sm:text-lg">
-                            R$ {lineTotal.toFixed(2)}
+                            {formatBRL(lineTotal)}
                           </p>
                         </div>
                       </div>
@@ -410,7 +411,7 @@ function Order() {
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Subtotal</dt>
                     <dd className="font-medium tabular-nums text-brand-900">
-                      R$ {subtotal.toFixed(2)}
+                      {formatBRL(subtotal)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
@@ -420,7 +421,7 @@ function Order() {
                   <div className="flex justify-between border-t border-border pt-3 text-base">
                     <dt className="font-semibold text-brand-900">Valor anunciado estimado</dt>
                     <dd className="text-xl font-bold tabular-nums text-brand-900">
-                      R$ {total.toFixed(2)}
+                      {formatBRL(total)}
                     </dd>
                   </div>
                 </dl>
@@ -459,7 +460,7 @@ function Order() {
                     {PAYMENT_METHODS.map((method) => (
                       <label
                         key={method}
-                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-medium text-brand-900 has-[:checked]:border-leaf-600 has-[:checked]:bg-leaf-50"
+                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-medium text-brand-900 has-[:checked]:border-leaf-600 has-[:checked]:bg-leaf-50"
                       >
                         <input
                           type="radio"
@@ -499,7 +500,7 @@ function Order() {
                     <button
                       type="button"
                       onClick={() => void copySummary()}
-                      className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
+                      className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
                     >
                       <ClipboardCopy className="h-4 w-4" />
                       Copiar
@@ -529,7 +530,7 @@ function Order() {
                 <button
                   disabled={isConfirming || hasStockIssues}
                   onClick={handleConfirmOrder}
-                  className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-full bg-brand-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isConfirming ? "Enviando..." : "Enviar solicitação de negociação"}
                 </button>
@@ -546,7 +547,7 @@ function Order() {
                       "Modelo recorrente salvo. Você pode carregá-lo em Solicitações antes de iniciar uma nova negociação.",
                     );
                   }}
-                  className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+                  className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-5 text-sm font-semibold text-brand-900 hover:border-leaf-500"
                 >
                   <Repeat className="h-4 w-4" />
                   Salvar como recorrente

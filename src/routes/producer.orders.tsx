@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { createBuyerRating, readLocalRatings } from "@/lib/ratings";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/producer/orders")({
   component: () => (
@@ -131,14 +132,14 @@ function ProducerOrders() {
           </div>
           <Link
             to="/production"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
           >
             <Sprout className="h-4 w-4" />
             Gerenciar estoque
           </Link>
         </div>
 
-        <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-8 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Metric
             icon={ClipboardList}
             label="Solicitações recebidas"
@@ -149,7 +150,7 @@ function ProducerOrders() {
           <Metric
             icon={ShoppingBag}
             label="Receita vinculada"
-            value={`R$ ${totalRevenue.toFixed(2)}`}
+            value={`${formatBRL(totalRevenue)}`}
           />
         </section>
 
@@ -207,7 +208,7 @@ function ProducerOrders() {
                           </p>
                         </div>
                         <p className="text-sm font-bold text-brand-900">
-                          R$ {product.total.toFixed(2)}
+                          {formatBRL(product.total)}
                         </p>
                       </div>
                     </li>
@@ -384,7 +385,7 @@ function ProducerOrderCard({
           </p>
           <h3 className="mt-1 text-lg font-bold text-brand-900 flex flex-wrap items-center gap-2">
             <span>
-              {order.buyerName} - R$ {total.toFixed(2)}
+              {order.buyerName} - {formatBRL(total)}
             </span>
             <Link
               to="/chat"
@@ -480,8 +481,8 @@ function ProducerOrderCard({
             <div>
               <p className="font-semibold text-brand-900">{item.productName}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {item.quantity.toLocaleString("pt-BR")} {item.unit} - R$ {item.unitPrice.toFixed(2)}
-                /{item.unit}
+                {item.quantity.toLocaleString("pt-BR")} {item.unit} - {formatBRL(item.unitPrice)}/
+                {item.unit}
               </p>
               {item.notes && (
                 <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-brand-900">
@@ -489,7 +490,7 @@ function ProducerOrderCard({
                 </p>
               )}
             </div>
-            <p className="text-sm font-bold text-brand-900">R$ {item.lineTotal.toFixed(2)}</p>
+            <p className="text-sm font-bold text-brand-900">{formatBRL(item.lineTotal)}</p>
           </li>
         ))}
       </ul>
@@ -513,7 +514,7 @@ function ProducerOrderCard({
               title={
                 !hasDeliveryAddress ? "Aguardando o endereço de entrega do comprador" : undefined
               }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
             >
               <CalendarClock className="h-4 w-4" />
               {operationPending
@@ -535,7 +536,7 @@ function ProducerOrderCard({
             onClick={() => void shipOrder()}
             disabled={operationPending}
             aria-busy={operationPending || undefined}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:h-10"
           >
             <Truck className="h-4 w-4 text-leaf-700" />
             {operationPending ? "Atualizando..." : "Saiu para entrega"}
@@ -558,7 +559,7 @@ function ProducerOrderCard({
               onClick={() => void finishDelivery()}
               disabled={operationPending}
               aria-busy={operationPending || undefined}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
             >
               <PackageCheck className="h-4 w-4" />
               {operationPending ? "Concluindo..." : "Concluir entrega"}
@@ -572,7 +573,7 @@ function ProducerOrderCard({
                 type="button"
                 onClick={() => setIsCancelModalOpen(true)}
                 disabled={operationPending}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center rounded-full border border-[var(--color-error-bg)] bg-white px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-[var(--color-error-bg)] transition-colors cursor-pointer disabled:opacity-60"
               >
                 Cancelar solicitação
               </button>
@@ -608,7 +609,7 @@ function ProducerOrderCard({
                   <button
                     type="button"
                     onClick={() => setIsCancelModalOpen(false)}
-                    className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                    className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
                   >
                     Voltar
                   </button>
@@ -617,7 +618,7 @@ function ProducerOrderCard({
                     onClick={() => void cancel()}
                     disabled={!cancelReason.trim() || operationPending}
                     aria-busy={operationPending || undefined}
-                    className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--color-error-bg)] px-4 text-sm font-semibold text-[var(--color-error-fg)] hover:bg-red-200 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                   >
                     {operationPending ? "Cancelando..." : "Confirmar cancelamento"}
                   </button>
@@ -635,14 +636,14 @@ function ProducerOrderCard({
               </div>
               <div>
                 {isRated ? (
-                  <span className="inline-flex h-10 items-center justify-center rounded-lg bg-leaf-100 text-leaf-800 px-4 text-sm font-semibold">
+                  <span className="inline-flex h-10 items-center justify-center rounded-full bg-leaf-100 text-leaf-800 px-4 text-sm font-semibold">
                     Comprador Avaliado
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsRatingModalOpen(true)}
-                    className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-900 text-white px-4 text-sm font-semibold hover:bg-brand-800 transition-colors cursor-pointer"
+                    className="inline-flex h-10 items-center justify-center rounded-full bg-brand-900 text-white px-4 text-sm font-semibold hover:bg-brand-800 transition-colors cursor-pointer"
                   >
                     Avaliar Comprador
                   </button>
@@ -706,7 +707,7 @@ function ProducerOrderCard({
                   <button
                     type="button"
                     onClick={() => setIsRatingModalOpen(false)}
-                    className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
+                    className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:bg-canvas transition-colors cursor-pointer"
                   >
                     Voltar
                   </button>
@@ -714,7 +715,7 @@ function ProducerOrderCard({
                     type="button"
                     onClick={() => void submitRating()}
                     disabled={submittingRating}
-                    className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    className="inline-flex h-10 items-center justify-center rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                   >
                     {submittingRating ? "Enviando..." : "Enviar Avaliação"}
                   </button>
@@ -819,14 +820,14 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
+      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
         <Icon className="h-5 w-5" />
       </span>
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
         {label}
       </p>
-      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
     </div>
   );
 }

@@ -67,7 +67,7 @@ function OrganizationNegotiationsPage() {
         </p>
 
         <section
-          className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4"
           aria-label="Resumo das negociações"
         >
           <Summary icon={ClipboardList} label="Novas" value={countByGroup(negotiations, "new")} />
@@ -279,9 +279,9 @@ function Summary({
   value: number;
 }) {
   return (
-    <article className="rounded-2xl border border-border bg-white p-5 shadow-xs">
-      <Icon className="h-6 w-6 text-leaf-700" />
-      <p className="mt-3 text-3xl font-bold text-brand-900">{value}</p>
+    <article className="rounded-2xl border border-border bg-white p-3 shadow-xs sm:p-5">
+      <Icon className="hidden h-6 w-6 text-leaf-700 sm:block" />
+      <p className="text-2xl font-bold text-brand-900 sm:mt-3 sm:text-3xl">{value}</p>
       <p className="mt-1 text-sm font-medium text-muted-foreground">{label}</p>
     </article>
   );

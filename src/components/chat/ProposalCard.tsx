@@ -5,6 +5,7 @@ import {
 } from "@/lib/negotiation-proposals";
 import { Link } from "@tanstack/react-router";
 import { Check, Clock3, Handshake, RefreshCw, ShoppingBag, X } from "lucide-react";
+import { formatBRL } from "@/lib/format";
 
 const statusLabels = {
   pending: "Aguardando resposta",
@@ -71,8 +72,8 @@ export function ProposalCard({
             <div>
               <p className="font-semibold text-brand-900">{item.productName}</p>
               <p className="text-xs text-muted-foreground">
-                {item.quantity.toLocaleString("pt-BR")} {item.unit} · R$ {item.unitPrice.toFixed(2)}
-                /{item.unit}
+                {item.quantity.toLocaleString("pt-BR")} {item.unit} · {formatBRL(item.unitPrice)}/
+                {item.unit}
               </p>
               {item.sellerOrganizationName && (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -80,7 +81,7 @@ export function ProposalCard({
                 </p>
               )}
             </div>
-            <strong className="text-brand-900">R$ {item.lineTotal.toFixed(2)}</strong>
+            <strong className="text-brand-900">{formatBRL(item.lineTotal)}</strong>
           </li>
         ))}
       </ul>
@@ -104,9 +105,7 @@ export function ProposalCard({
         )}
         <div>
           <dt className="text-xs text-muted-foreground">Total</dt>
-          <dd className="text-lg font-bold text-brand-900">
-            R$ {proposalTotal(proposal).toFixed(2)}
-          </dd>
+          <dd className="text-lg font-bold text-brand-900">{formatBRL(proposalTotal(proposal))}</dd>
         </div>
       </dl>
       {proposal.deliveryNotes && (
@@ -131,7 +130,7 @@ export function ProposalCard({
             type="button"
             onClick={onAccept}
             disabled={busy}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-900 px-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             <Check className="h-4 w-4" /> Aceitar
           </button>
@@ -139,7 +138,7 @@ export function ProposalCard({
             type="button"
             onClick={onCounter}
             disabled={busy}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" /> Contraproposta
           </button>
@@ -147,7 +146,7 @@ export function ProposalCard({
             type="button"
             onClick={onReject}
             disabled={busy}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm font-semibold text-red-700 disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-3 text-sm font-semibold text-red-700 disabled:opacity-50"
           >
             <X className="h-4 w-4" /> Recusar
           </button>
@@ -158,7 +157,7 @@ export function ProposalCard({
           type="button"
           onClick={onCounter}
           disabled={busy}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 disabled:opacity-50"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 disabled:opacity-50"
         >
           <RefreshCw className="h-4 w-4" /> Substituir proposta
         </button>
@@ -166,7 +165,7 @@ export function ProposalCard({
       {status === "accepted" && proposal.orderId && (
         <Link
           to={orderHref}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800"
         >
           <ShoppingBag className="h-4 w-4" /> Ver pedido
         </Link>

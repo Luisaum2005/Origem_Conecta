@@ -95,7 +95,7 @@ export function OrganizationSettingsForm({
                 setError("");
                 setSuccess("");
               }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-brand-900 hover:bg-secondary"
             >
               <Pencil className="h-4 w-4" /> Editar dados
             </button>

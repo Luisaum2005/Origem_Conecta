@@ -56,7 +56,7 @@ function Reset() {
           </p>
           <button
             onClick={() => navigate({ to: "/login" })}
-            className="mt-4 inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-brand-900"
+            className="mt-4 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-brand-900"
           >
             Voltar ao login
           </button>

@@ -23,7 +23,8 @@ import {
   Zap,
   MessageSquare,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/demands")({
   component: () => (
@@ -59,7 +60,7 @@ function DemandsHub() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             to={profile?.tipo === "produtor" ? "/producer/orders" : "/portfolio"}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar
@@ -123,6 +124,15 @@ function BuyerDemandView({
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [composing, setComposing] = useState(demands.length === 0);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const openComposer = () => {
+    setComposing(true);
+    requestAnimationFrame(() =>
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
 
   const validItems = items.filter((item) => item.productName.trim() && item.quantity > 0);
 
@@ -158,126 +168,152 @@ function BuyerDemandView({
       setPaymentNotes("");
       setNotes("");
       setMessage("Demanda enviada para os produtores.");
+      setComposing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a demanda.");
     }
   };
 
   return (
-    <div className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-      <Panel
-        title="Criar demanda"
-        icon={Send}
-        description="Use quando precisar de um produto urgente, fora do portfólio ou em maior quantidade."
+    <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[0.95fr_1.05fr]">
+      <div
+        ref={formRef}
+        className={`order-2 scroll-mt-24 lg:order-1 ${composing ? "" : "hidden lg:block"}`}
       >
-        <div className="grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Data desejada">
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(event) => setDeliveryDate(event.target.value)}
-                className="form-input"
+        <Panel
+          title="Criar demanda"
+          icon={Send}
+          description="Use quando precisar de um produto urgente, fora do portfólio ou em maior quantidade."
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Data desejada">
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(event) => setDeliveryDate(event.target.value)}
+                  className="form-input"
+                />
+              </Field>
+              <Field label="Urgência">
+                <select
+                  value={urgency}
+                  onChange={(event) => setUrgency(event.target.value as DemandUrgency)}
+                  className="form-input"
+                >
+                  <option value="normal">Normal</option>
+                  <option value="urgente">Urgente</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Forma de pagamento">
+                <select
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                  className="form-input"
+                >
+                  {PAYMENT_METHODS.map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Observação do pagamento">
+                <input
+                  value={paymentNotes}
+                  onChange={(event) => setPaymentNotes(event.target.value)}
+                  placeholder="Ex: Pix na entrega"
+                  className="form-input"
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <DemandItemEditor
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  onChange={(next) =>
+                    setItems((current) =>
+                      current.map((currentItem) =>
+                        currentItem.id === item.id ? next : currentItem,
+                      ),
+                    )
+                  }
+                  onRemove={() =>
+                    setItems((current) =>
+                      current.length === 1
+                        ? [emptyItem()]
+                        : current.filter((currentItem) => currentItem.id !== item.id),
+                    )
+                  }
+                />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setItems((current) => [...current, emptyItem()])}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar produto
+            </button>
+
+            <Field label="Observações gerais">
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+                placeholder="Ex: padrão de maturação, embalagem, horário preferido..."
+                className="form-input min-h-[92px] py-3"
               />
             </Field>
-            <Field label="Urgência">
-              <select
-                value={urgency}
-                onChange={(event) => setUrgency(event.target.value as DemandUrgency)}
-                className="form-input"
-              >
-                <option value="normal">Normal</option>
-                <option value="urgente">Urgente</option>
-              </select>
-            </Field>
+
+            {error && <Alert tone="error">{error}</Alert>}
+            {message && <Alert tone="success">{message}</Alert>}
+
+            <button
+              type="button"
+              onClick={() => void createDemand()}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+              <Send className="h-4 w-4" />
+              Enviar para produtores
+            </button>
           </div>
+        </Panel>
+      </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Forma de pagamento">
-              <select
-                value={paymentMethod}
-                onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                className="form-input"
-              >
-                {PAYMENT_METHODS.map((method) => (
-                  <option key={method} value={method}>
-                    {method}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Observação do pagamento">
-              <input
-                value={paymentNotes}
-                onChange={(event) => setPaymentNotes(event.target.value)}
-                placeholder="Ex: Pix na entrega"
-                className="form-input"
-              />
-            </Field>
+      <div className="order-1 lg:order-2">
+        {message && !composing && (
+          <div className="mb-4">
+            <Alert tone="success">{message}</Alert>
           </div>
+        )}
+        <Panel
+          title="Acompanhar demandas"
+          icon={ClipboardList}
+          description="Veja as propostas recebidas e aprove a melhor para gerar o pedido."
+        >
+          <DemandList demands={demands} approveResponse={approveResponse} />
+        </Panel>
+      </div>
 
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <DemandItemEditor
-                key={item.id}
-                item={item}
-                index={index}
-                onChange={(next) =>
-                  setItems((current) =>
-                    current.map((currentItem) => (currentItem.id === item.id ? next : currentItem)),
-                  )
-                }
-                onRemove={() =>
-                  setItems((current) =>
-                    current.length === 1
-                      ? [emptyItem()]
-                      : current.filter((currentItem) => currentItem.id !== item.id),
-                  )
-                }
-              />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setItems((current) => [...current, emptyItem()])}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
-          >
-            <Plus className="h-4 w-4" />
-            Adicionar produto
-          </button>
-
-          <Field label="Observações gerais">
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={3}
-              placeholder="Ex: padrão de maturação, embalagem, horário preferido..."
-              className="form-input min-h-[92px] py-3"
-            />
-          </Field>
-
-          {error && <Alert tone="error">{error}</Alert>}
-          {message && <Alert tone="success">{message}</Alert>}
-
-          <button
-            type="button"
-            onClick={() => void createDemand()}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-5 text-sm font-semibold text-white hover:bg-brand-800"
-          >
-            <Send className="h-4 w-4" />
-            Enviar para produtores
-          </button>
-        </div>
-      </Panel>
-
-      <Panel
-        title="Acompanhar demandas"
-        icon={ClipboardList}
-        description="Veja as propostas recebidas e aprove a melhor para gerar o pedido."
-      >
-        <DemandList demands={demands} approveResponse={approveResponse} />
-      </Panel>
+      {!composing && (
+        <button
+          type="button"
+          onClick={openComposer}
+          className="cta-orange fixed bottom-[104px] right-5 z-40 inline-flex h-13 items-center gap-2 rounded-full px-5 py-3.5 text-[15px] font-semibold lg:hidden"
+        >
+          <Plus className="h-5 w-5" />
+          Nova demanda
+        </button>
+      )}
     </div>
   );
 }
@@ -357,7 +393,7 @@ function DemandItemEditor({
         <button
           type="button"
           onClick={onRemove}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-error-bg)] bg-white px-3 text-xs font-semibold text-[var(--color-error-fg)]"
+          className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-error-bg)] bg-white px-3 text-xs font-semibold text-[var(--color-error-fg)]"
         >
           <Trash2 className="h-4 w-4" />
           Remover
@@ -459,7 +495,7 @@ function DemandList({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2">
         <MiniStat
           label="Abertas"
           value={openCount}
@@ -483,7 +519,7 @@ function DemandList({
         <button
           type="button"
           onClick={() => setActiveFilter("all")}
-          className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
+          className="inline-flex h-10 w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500 sm:w-auto"
         >
           Limpar filtro
         </button>
@@ -505,7 +541,7 @@ function DemandList({
                         type="button"
                         disabled={approvingId === response.id}
                         onClick={() => void approve(demand.id, response.id)}
-                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-3 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         {approvingId === response.id ? "Aprovando..." : "Aprovar proposta"}
@@ -596,7 +632,7 @@ function ProducerDemandCard({
           <Link
             to="/chat"
             search={{ demandId: demand.id, buyerId: demand.buyerId }}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-white px-3 text-xs font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
           >
             <MessageSquare className="h-3.5 w-3.5 text-leaf-700" />
             Conversar com Comprador
@@ -701,7 +737,7 @@ function ProducerDemandCard({
           <button
             type="button"
             onClick={() => void sendResponse()}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
           >
             <Send className="h-4 w-4" />
             Enviar proposta
@@ -791,7 +827,7 @@ function ResponseSummary({
         <div>
           <p className="font-semibold text-brand-900">{response.producerName}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {response.status} · Proposta total R$ {total.toFixed(2)}
+            {response.status} · Proposta total {formatBRL(total)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -799,7 +835,7 @@ function ResponseSummary({
             <Link
               to="/chat"
               search={{ demandId: response.demandId, producerId: response.producerId }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 cursor-pointer"
             >
               <MessageSquare className="h-4 w-4 text-leaf-700" />
               Conversar
@@ -816,10 +852,10 @@ function ResponseSummary({
             return (
               <li key={item.id}>
                 <span className="font-semibold">{item.productName}</span>: entrega{" "}
-                {item.quantity.toLocaleString("pt-BR")} {item.unit} por R$ {item.price.toFixed(2)}
+                {item.quantity.toLocaleString("pt-BR")} {item.unit} por {formatBRL(item.price)}
                 <span className="text-muted-foreground">
                   {" "}
-                  · equivalente R$ {unitPrice.toFixed(2)}/{item.unit}
+                  · equivalente {formatBRL(unitPrice)}/{item.unit}
                 </span>
               </li>
             );
@@ -852,9 +888,7 @@ function MiniStat({
           : "border-border bg-canvas"
       }`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
+      <p className="text-xs font-medium leading-tight text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-bold text-brand-900">{value}</p>
     </button>
   );

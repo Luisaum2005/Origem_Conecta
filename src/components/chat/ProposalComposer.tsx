@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { formatBRL } from "@/lib/format";
 
 type DraftItem = { inventoryId: string; quantity: string; unitPrice: string };
 
@@ -256,7 +257,7 @@ export function ProposalComposer({
                   }
                 }}
                 disabled={items.length >= inventory.length}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" /> Adicionar produto
               </button>
@@ -330,7 +331,7 @@ export function ProposalComposer({
             </label>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-leaf-50 p-4">
               <span className="text-sm font-semibold text-brand-900">Total da proposta</span>
-              <strong className="text-xl text-brand-900">R$ {total.toFixed(2)}</strong>
+              <strong className="text-xl text-brand-900">{formatBRL(total)}</strong>
             </div>
             {error && (
               <p

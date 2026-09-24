@@ -49,6 +49,7 @@ import {
 import { getProduct } from "@/lib/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { formatBRL } from "@/lib/format";
 
 type ChatSearch = {
   id?: string;
@@ -818,7 +819,7 @@ function ChatRoom() {
 
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-brand-900 leading-tight">
-                    R$ {opt.price.toFixed(2)}
+                    {formatBRL(opt.price)}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">por {prod.unit}</p>
                   <span className="inline-flex items-center rounded-full bg-leaf-100 px-2 py-0.5 text-[9px] font-bold text-brand-900 mt-1">
@@ -942,7 +943,7 @@ function ChatRoom() {
         </div>
 
         {/* Input box section */}
-        <footer className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 lg:static lg:border-x-0">
+        <footer className="fixed inset-x-0 bottom-0 z-40 pb-[calc(12px+env(safe-area-inset-bottom))] mx-auto w-full max-w-[800px] shrink-0 border-x border-t border-border bg-white p-3 sm:p-4 lg:static lg:border-x-0">
           {isRecording ? (
             <div
               className="flex min-h-16 items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-2.5"

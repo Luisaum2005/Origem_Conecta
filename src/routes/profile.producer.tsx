@@ -37,6 +37,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/profile/producer")({
   component: () => (
@@ -149,13 +150,13 @@ function ProducerProfile() {
           </div>
         )}
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Metric icon={Package} label="Produtos ativos" value={`${activeStock.length}`} />
           <Metric icon={Truck} label="Negociações em andamento" value={`${openOrders.length}`} />
           <Metric
             icon={CircleDollarSign}
             label="Valor anunciado nas solicitações"
-            value={`R$ ${orderRevenue.toFixed(2)}`}
+            value={`${formatBRL(orderRevenue)}`}
           />
           <Metric
             icon={ShieldCheck}
@@ -210,7 +211,7 @@ function ProducerProfile() {
                         {item.quantity || "0"} {item.unit}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        R$ {Number(item.price || 0).toFixed(2)}/{item.unit}
+                        {formatBRL(Number(item.price || 0))}/{item.unit}
                       </p>
                     </div>
                   </li>
@@ -219,7 +220,7 @@ function ProducerProfile() {
             )}
             <Link
               to="/production"
-              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 active:scale-[0.99] sm:w-auto"
+              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-leaf-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-leaf-700 active:scale-[0.99] sm:w-auto"
             >
               <RefreshCw className="h-4 w-4" />
               Atualizar disponibilidade
@@ -240,9 +241,7 @@ function ProducerProfile() {
                           {product.quantity} {product.unit} vendidos
                         </p>
                       </div>
-                      <p className="text-sm font-bold text-brand-900">
-                        R$ {product.total.toFixed(2)}
-                      </p>
+                      <p className="text-sm font-bold text-brand-900">{formatBRL(product.total)}</p>
                     </div>
                   </li>
                 ))}
@@ -254,7 +253,7 @@ function ProducerProfile() {
         <section className="mt-6 grid gap-6 lg:grid-cols-3">
           <Panel title="Resumo operacional" icon={PackageCheck}>
             <dl className="grid gap-4">
-              <Mini label="Potencial do estoque ativo" value={`R$ ${stockPotential.toFixed(2)}`} />
+              <Mini label="Potencial do estoque ativo" value={`${formatBRL(stockPotential)}`} />
               <Mini label="Pedidos recebidos" value={`${producerOrders.length}`} />
               <Mini label="Produtos pausados" value={`${pausedStock.length}`} />
               <Mini label="Próxima entrega" value={nextDeliveryLabel(openOrders)} />
@@ -499,7 +498,7 @@ function ProducerDetailsPanel({
                   <button
                     type="button"
                     onClick={openProductsEditor}
-                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg bg-orange-700 px-4 text-sm font-semibold text-white hover:bg-orange-800"
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full bg-orange-700 px-4 text-sm font-semibold text-white hover:bg-orange-800"
                   >
                     Cadastrar produtos
                   </button>
@@ -557,7 +556,7 @@ function ProducerDetailsPanel({
               setError("");
               setEditing(true);
             }}
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <Pencil className="h-4 w-4 text-leaf-700" />
             {missingFields.length ? "Completar perfil" : "Editar dados"}
@@ -676,7 +675,7 @@ function ProducerDetailsPanel({
                     type="button"
                     onClick={() => void searchCep()}
                     disabled={searchingCep}
-                    className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 disabled:cursor-wait disabled:opacity-60"
+                    className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500 disabled:cursor-wait disabled:opacity-60"
                   >
                     <Search className="h-4 w-4 text-leaf-700" />
                     {searchingCep ? "Buscando CEP..." : "Buscar CEP"}
@@ -765,7 +764,7 @@ function ProducerDetailsPanel({
               type="button"
               onClick={save}
               disabled={saving}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
             >
               <Save className="h-4 w-4" />
               {saving ? "Salvando..." : "Salvar dados"}
@@ -777,7 +776,7 @@ function ProducerDetailsPanel({
                 setError("");
                 setEditing(false);
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
             >
               <X className="h-4 w-4" />
               Cancelar
@@ -949,14 +948,14 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
+      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
         <Icon className="h-5 w-5" />
       </span>
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
         {label}
       </p>
-      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
     </div>
   );
 }

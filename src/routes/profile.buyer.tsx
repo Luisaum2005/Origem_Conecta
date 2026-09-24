@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useBuyerRatings } from "@/lib/ratings";
+import { formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/profile/buyer")({
   component: () => (
@@ -105,12 +106,12 @@ function BuyerProfile() {
           </div>
         )}
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
           <Metric icon={ShieldCheck} label="Pedidos entregues" value={`${onTimeRate}%`} />
           <Metric
             icon={ShoppingBasket}
             label="Compras registradas"
-            value={`R$ ${recentTotal.toFixed(2)}`}
+            value={`${formatBRL(recentTotal)}`}
           />
           <Metric icon={CalendarClock} label="Próxima entrega" value={nextDelivery} />
         </section>
@@ -138,7 +139,7 @@ function BuyerProfile() {
                       </span>
                     </div>
                     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <Mini label="Total" value={`R$ ${order.total.toFixed(2)}`} />
+                      <Mini label="Total" value={`${formatBRL(order.total)}`} />
                       <Mini label="Entrega" value={order.deliveryEta || "A combinar"} />
                     </dl>
                   </li>
@@ -253,7 +254,7 @@ function BuyerProfile() {
                 </p>
                 <Link
                   to="/orders"
-                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-brand-900 px-4 text-sm font-semibold text-white hover:bg-brand-800"
                 >
                   Ver recorrentes
                 </Link>
@@ -330,7 +331,7 @@ function BuyerDetailsPanel({
               setError("");
               setEditing(true);
             }}
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-semibold text-brand-900 hover:border-leaf-500"
           >
             <Pencil className="h-4 w-4 text-leaf-700" />
             Editar dados
@@ -428,7 +429,7 @@ function BuyerDetailsPanel({
               type="button"
               onClick={save}
               disabled={saving}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-leaf-600 px-4 text-sm font-semibold text-white hover:bg-leaf-700 disabled:bg-[var(--color-surface-disabled)] disabled:text-[var(--text-disabled)]"
             >
               <Save className="h-4 w-4" />
               {saving ? "Salvando..." : "Salvar dados"}
@@ -440,7 +441,7 @@ function BuyerDetailsPanel({
                 setError("");
                 setEditing(false);
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-brand-900 hover:border-leaf-500"
             >
               <X className="h-4 w-4" />
               Cancelar
@@ -548,14 +549,14 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-xs">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-leaf-100 text-brand-700">
+    <div className="rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-xs">
+      <span className="hidden h-10 w-10 place-items-center sm:grid rounded-xl bg-leaf-100 text-brand-700">
         <Icon className="h-5 w-5" />
       </span>
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium leading-tight text-muted-foreground sm:mt-4 sm:text-[11px] sm:uppercase sm:tracking-wide">
         {label}
       </p>
-      <p className="mt-1 text-xl font-bold text-brand-900">{value}</p>
+      <p className="mt-1 truncate text-base font-bold sm:text-xl text-brand-900">{value}</p>
     </div>
   );
 }
