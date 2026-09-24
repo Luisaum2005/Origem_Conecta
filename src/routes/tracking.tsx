@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Ban,
   Check,
-  CircleCheck,
   Handshake,
   LifeBuoy,
   MessageCircle,
@@ -127,16 +126,8 @@ function summary(order: SavedOrder) {
 
 function Tracking() {
   const { id } = Route.useSearch();
-  const {
-    orders,
-    loading,
-    error,
-    reload,
-    isOrderPending,
-    completeDelivery,
-    cancelOrder,
-    openComplaint,
-  } = useOrders();
+  const { orders, loading, error, reload, isOrderPending, cancelOrder, openComplaint } =
+    useOrders();
   const navigate = useNavigate();
   const router = useRouter();
   const [sheet, setSheet] = useState<"problem" | "cancel" | null>(null);
@@ -188,16 +179,6 @@ function Tracking() {
   const steps = buildSteps(order);
   const firstItem = order.items[0];
   const chatSearch = { orderId: order.id, producerId: firstItem?.producerId };
-
-  const confirmReceipt = async () => {
-    try {
-      await completeDelivery(order.id, order.deliveryCode ?? "");
-      toast.success("Recebimento confirmado");
-      void navigate({ to: "/rating", search: { id: order.id } });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível confirmar o recebimento.");
-    }
-  };
 
   const submitSheet = async () => {
     const value = text.trim();
@@ -301,17 +282,8 @@ function Tracking() {
 
         {order.status !== "Cancelado" && (
           <div className="m-footer">
-            {order.status === "Em entrega" ? (
-              <button
-                type="button"
-                className="m-btn m-primary"
-                disabled={pending}
-                onClick={() => void confirmReceipt()}
-              >
-                <CircleCheck className="lucide" aria-hidden />
-                {pending ? "Confirmando..." : "Confirmar recebimento"}
-              </button>
-            ) : order.status === "Entregue" ? (
+            {/* A entrega é concluída pelo produtor com o código acima (secure_complete_order). */}
+            {order.status === "Entregue" ? (
               <Link to="/rating" search={{ id: order.id }} className="m-btn m-primary">
                 <Star className="lucide" aria-hidden />
                 Avaliar entrega
@@ -337,11 +309,13 @@ function Tracking() {
                 ) : (
                   <span />
                 )
-              ) : (
+              ) : order.status === "Entregue" ? (
                 <Link to="/chat" search={chatSearch} className="m-btn m-text">
                   <MessageCircle className="lucide" aria-hidden />
                   Conversar
                 </Link>
+              ) : (
+                <span />
               )}
               <button
                 type="button"

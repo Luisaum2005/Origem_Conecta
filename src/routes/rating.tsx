@@ -10,7 +10,7 @@ import { DataLoading } from "@/components/system/DataLoadState";
 import { useAuth } from "@/lib/auth";
 import { useAvailableProducts } from "@/lib/available-products";
 import { getBuyerId, useOrders } from "@/lib/orders";
-import { getRatingForOrder, useBuyerRatings } from "@/lib/ratings";
+import { createProducerRating, getProducerRatingForOrder } from "@/lib/producer-ratings";
 
 export const Route = createFileRoute("/rating")({
   validateSearch: (search: Record<string, unknown>): { id?: string } => ({
@@ -38,7 +38,6 @@ function Rating() {
   const { profile } = useAuth();
   const { orders, loading } = useOrders();
   const products = useAvailableProducts();
-  const { addRating } = useBuyerRatings();
   const [scores, setScores] = useState<Record<string, number>>({});
   const [highlights, setHighlights] = useState<string[]>([]);
   const [comment, setComment] = useState("");
@@ -52,9 +51,10 @@ function Rating() {
   );
 
   useEffect(() => {
-    if (!order) return;
+    const producerId = order?.items[0]?.producerId;
+    if (!order || !producerId) return;
     let active = true;
-    getRatingForOrder(order.id)
+    getProducerRatingForOrder(order.id, producerId)
       .then((rating) => active && setAlreadyRated(Boolean(rating)))
       .catch(() => undefined);
     return () => {
@@ -66,7 +66,7 @@ function Rating() {
   const complete = CRITERIA.every((criterion) => (scores[criterion] ?? 0) > 0);
 
   const submit = async () => {
-    if (!order || !profile || !complete) return;
+    if (!order || !profile || !complete || !order.items[0]?.producerId) return;
     setSending(true);
     try {
       const buyerId = (await getBuyerId(profile.id)) ?? profile.id;
@@ -80,10 +80,10 @@ function Rating() {
       ]
         .filter(Boolean)
         .join("\n");
-      await addRating({
+      await createProducerRating({
         orderId: order.id,
         buyerId,
-        producerId: order.items[0]?.producerId ?? "",
+        producerId: order.items[0].producerId,
         rating: average,
         comment: details,
       });
