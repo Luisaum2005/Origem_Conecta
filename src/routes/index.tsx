@@ -32,8 +32,8 @@ function Splash() {
         </header>
         <div className="relative px-5 pb-16 pt-24 sm:px-10 sm:pb-20 sm:pt-32">
           <h1 className="text-[30px] font-normal leading-tight tracking-tight text-white sm:text-5xl">
-            Da roça
-            <span className="block text-[34px] font-semibold sm:text-6xl">para a sua cozinha.</span>
+            Negócios que
+            <span className="block text-[34px] font-semibold sm:text-6xl">nascem do campo.</span>
           </h1>
           <p className="mt-3 max-w-md text-sm text-white/85 sm:text-base">
             Produtores da região vendendo direto para restaurantes, mercados e cozinhas.
